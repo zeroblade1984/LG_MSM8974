@@ -8,37 +8,37 @@ config XZ_DEC
 
 config XZ_DEC_X86
 	bool "x86 BCJ filter decoder" if EXPERT
-	default y
+	default y if X86
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 
 config XZ_DEC_POWERPC
 	bool "PowerPC BCJ filter decoder" if EXPERT
-	default y
+	default y if POWERPC
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 
 config XZ_DEC_IA64
 	bool "IA-64 BCJ filter decoder" if EXPERT
-	default y
+	default y if IA64
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 
 config XZ_DEC_ARM
 	bool "ARM BCJ filter decoder" if EXPERT
-	default y
+	default y if ARM
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 
 config XZ_DEC_ARMTHUMB
 	bool "ARM-Thumb BCJ filter decoder" if EXPERT
-	default y
+	default y if (ARM && ARM_THUMB)
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 
 config XZ_DEC_SPARC
 	bool "SPARC BCJ filter decoder" if EXPERT
-	default y
+	default y if SPARC
 	depends on XZ_DEC
 	select XZ_DEC_BCJ
 

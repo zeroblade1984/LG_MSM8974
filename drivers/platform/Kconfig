@@ -1,0 +1,9 @@
+if X86
+source "drivers/platform/x86/Kconfig"
+endif
+if ARCH_MSM
+source "drivers/platform/msm/Kconfig"
+endif
+if MACH_LGE
+source "drivers/platform/lge/Kconfig"
+endif

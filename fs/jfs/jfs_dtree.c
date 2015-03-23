@@ -3095,7 +3095,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				 * self "."
 				 */
 				filp->f_pos = 0;
-				if (filldir(dirent, ".", 1, 0, ip->i_ino,
+				if (filldir(dirent, ".", 1, 1, ip->i_ino,
 					    DT_DIR))
 					return 0;
 			}
@@ -3103,7 +3103,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			 * parent ".."
 			 */
 			filp->f_pos = 1;
-			if (filldir(dirent, "..", 2, 1, PARENT(ip), DT_DIR))
+			if (filldir(dirent, "..", 2, 2, PARENT(ip), DT_DIR))
 				return 0;
 
 			/*

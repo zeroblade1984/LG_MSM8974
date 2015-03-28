@@ -992,9 +992,12 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 #ifdef CONFIG_HOTPLUG_CPU
 	for_each_online_cpu(sibling) {
 		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
-		if (cp && cp->governor &&
-		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
+		if (cp && cp->governor) {
 			policy->governor = cp->governor;
+			policy->min = cp->min;
+      			policy->max = cp->max;
+      			policy->user_policy.min = cp->user_policy.min;
+      			policy->user_policy.max = cp->user_policy.max;
 			found = 1;
 			break;
 		}

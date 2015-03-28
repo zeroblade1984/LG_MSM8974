@@ -1942,6 +1942,12 @@ config USERSPACE_VOLTAGE_CONTROL
 	help
 	  Userspace Voltage Control for MSM8974
 
+config CPU_OVERCLOCK
+	bool "Enable CPU Overclocking option"
+	default y
+	help
+	  Krait 400 CPU overclocking
+
 config MSM_AVS_HW
 	bool "Enable Adaptive Voltage Scaling (AVS)"
 	default n

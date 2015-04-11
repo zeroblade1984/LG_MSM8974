@@ -175,8 +175,7 @@ static struct dbs_tuners {
 	.optimal_max_freq = DEF_OPTIMAL_FREQ,
 	.debug_mask=0,
 };
-
-#ifdef CONFIG_MACH_MSM8974_B1_KR
+#if defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 extern int boost_freq;
 #endif
 
@@ -994,8 +993,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	load_at_max_freq = (cur_load * policy->cur)/policy->cpuinfo.max_freq;
 
 	cpufreq_notify_utilization(policy, load_at_max_freq);
-
-#ifdef CONFIG_MACH_MSM8974_B1_KR
+#if defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 	if (boost_freq == 2) {
 		if(policy->cur < policy->max){
 			dbs_freq_increase(policy, policy->max);
@@ -1122,14 +1120,8 @@ static void do_dbs_timer(struct work_struct *work)
 			dbs_info->sample_type = DBS_SUB_SAMPLE;
 			delay = dbs_info->freq_hi_jiffies;
 		} else {
-			/* We want all CPUs to do sampling nearly on
-			 * same jiffy
-			 */
 			delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate
 				* dbs_info->rate_mult);
-
-			if (num_online_cpus() > 1)
-				delay -= jiffies % delay;
 		}
 	} else {
 		__cpufreq_driver_target(dbs_info->cur_policy,
@@ -1229,7 +1221,6 @@ bail_acq_sema_failed:
 	put_online_cpus();
 	return;
 }
-
 
 static int dbs_migration_notify(struct notifier_block *nb,
 				unsigned long target_cpu, void *arg)
@@ -1345,13 +1336,14 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		/* nothing to do */
 		return;
 	}
-
-#ifdef CONFIG_MACH_MSM8974_B1_KR
+#if defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 	if (boost_freq == 1) {
 		if (!strcmp((char*)(handle->dev->name), "qpnp_pon")){
-			printk(KERN_ERR "ws->name=%s, boost_Freq=%d\n", handle->dev->name, boost_freq);
+			printk(KERN_ERR "ws->name=%s, boost_Freq=%d\n",
+				handle->dev->name, boost_freq);
 			boost_freq++;
-			printk(KERN_ERR "ws->name=%s, boost_Freq=%d\n", handle->dev->name, boost_freq);
+			printk(KERN_ERR "ws->name=%s, boost_Freq=%d\n",
+				handle->dev->name, boost_freq);
 		}
 	}
 #endif

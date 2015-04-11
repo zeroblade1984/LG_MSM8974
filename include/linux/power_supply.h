@@ -146,13 +146,13 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_EXT_PWR_CHECK,
 	POWER_SUPPLY_PROP_BAT_REMOVED,
 #endif
-#if defined(CONFIG_LGE_CURRENTNOW)
-	/*                                                
-                                        
-*/
-	POWER_SUPPLY_PROP_VIRT_CURRENT_NOW,
-	POWER_SUPPLY_PROP_VIRT_ENABLE_BMS,
-	/*                                                 */
+#if defined(CONFIG_VZW_POWER_REQ) || defined(CONFIG_SMB349_VZW_FAST_CHG)
+	POWER_SUPPLY_PROP_VZW_CHG,
+#endif
+#if defined(CONFIG_CHARGER_MAX77819) || defined(CONFIG_CHARGER_MAX8971) || \
+    defined(CONFIG_BQ24296_CHARGER) || defined(CONFIG_SMB349_CHARGER)
+	POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER,
+	POWER_SUPPLY_PROP_CHARGING_COMPLETE,
 #endif
 #ifdef CONFIG_FTT_CHARGER_V3
 	POWER_SUPPLY_PROP_FTT_ANNTENA_LEVEL,

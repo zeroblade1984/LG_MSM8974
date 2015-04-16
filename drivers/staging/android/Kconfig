@@ -40,18 +40,11 @@ config ANDROID_PERSISTENT_RAM
 	select REED_SOLOMON_ENC8
 	select REED_SOLOMON_DEC8
 
-choice
-	prompt "Android RAM Console Type"
-	default ANDROID_RAM_CONSOLE
 config ANDROID_RAM_CONSOLE
 	bool "Android RAM buffer console"
 	depends on !S390 && !UML && HAVE_MEMBLOCK
 	select ANDROID_PERSISTENT_RAM
-config ANDROID_NEW_RAM_CONSOLE
-	bool "Android NEW RAM buffer console"
-	depends on !S390 && !UML && HAVE_MEMBLOCK
-	select ANDROID_PERSISTENT_RAM
-endchoice
+	default n
 
 config PERSISTENT_TRACER
 	bool "Persistent function tracer"
@@ -101,6 +94,11 @@ config ANDROID_INTF_ALARM_DEV
 	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
 	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
 	  Also exports the alarm interface to user-space.
+
+config VIBRATOR_PM8941_HAPTIC
+	tristate "Support for vibrator power control using pm8974"
+	help
+	  This option enables support for the vibrator power control.
 
 endif # if ANDROID
 

@@ -58,15 +58,21 @@ typedef enum _e_snfc_i2c_status {
 
 
 /* function feature */
-#define FELICA_LED_SUPPORT
-#define FELICA_NFC_INTERFACE
+//#define FELICA_LED_SUPPORT
+//#define FELICA_NFC_INTERFACE
 
 /* debug message */
-#define FEATURE_DEBUG_HIGH
+//#define FEATURE_DEBUG_HIGH
 //#define FEATURE_DEBUG_MED
 //#define FEATURE_DEBUG_LOW
+
 #define RXTX_LOG_ENABLE
-#define FELICA_DEBUG_MSG printk
+
+#define FELICA_DEBUG_MSG_HIGH pr_info
+#define FELICA_DEBUG_MSG_MED pr_info
+#define FELICA_DEBUG_MSG_LOW pr_debug
+
+//#define FELICA_DEBUG_MSG pr_info
 
 /* felica */
 #define FELICA_NAME    "felica"
@@ -101,19 +107,11 @@ typedef enum _e_snfc_i2c_status {
  *  EXTERNAL VARIABLE
 */
 /* Must check each model's path in 'android/system/core/rootdir/init.rc'file */
-#define FELICA_LD_LIBRARY_PATH "LD_LIBRARY_PATH=/vendor/lib:/system/lib"
+#define FELICA_LD_LIBRARY_PATH "LD_PRELOAD=/vendor/lib/libNimsWrap.so"
 
 #define FELICA_PATH "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin"
 
-/* JB */
-//#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework_ext.jar:/system/framework/framework2.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/com.lge.core.jar"
-
-/* JB MR1 */
-//#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/telephony-msim.jar:/system/framework/qcmediaplayer.jar:/system/framework/WfdCommon.jar:/system/framework/com.lge.core.jar:/system/framework/qcrilhook.jar:/system/framework/security-bridge.jar:/system/framework/qsb-port.jar:/system/framework/oem-services.jar"
-//#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/telephony-msim.jar:/system/framework/com.lge.core.jar:/system/framework/qcmediaplayer.jar:/system/framework/oem-services.jar"
-//#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/telephony-msim.jar:/system/framework/com.lge.core.jar:/system/framework/qcmediaplayer.jar:/system/framework/security-bridge.jar:/system/framework/oem-services.jar"
-//#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/telephony-msim.jar:/system/framework/com.lge.core.jar:/system/framework/oem-services.jar"
-#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/telephony-msim.jar:/system/framework/com.lge.core.jar:/system/framework/qcmediaplayer.jar:/system/framework/oem-services.jar"
+#define FELICA_BOOTCLASSPATH "BOOTCLASSPATH=/system/framework/WfdCommon.jar:/system/framework/com.lge.frameworks.jar:/system/framework/com.lge.policy.jar:/system/framework/telephony-target.jar:/system/framework/com.lge.opt.jar:/system/framework/tcmiface.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/okhttp.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/apache-xml.jar"
 
 /* Must check each model's VALUE from UART developer */
 #define FELICA_IC2_NAME "/dev/i2c-0"  // dev/i2c-84
@@ -132,7 +130,7 @@ void set_felica_uart_status(_e_snfc_uart_status uart_status);
 _e_snfc_i2c_status get_felica_i2c_status(void);
 void set_felica_i2c_status(_e_snfc_i2c_status i2c_status);
 
-#if defined(CONFIG_LGE_FELICA_NFC)&& defined(FELICA_NFC_INTERFACE)
+#if defined(CONFIG_LGE_FELICA_NFC)
 extern _e_snfc_uart_status __snfc_uart_control_get_uart_status(void);
 extern void __snfc_uart_control_set_uart_status(_e_snfc_uart_status uart_status);
 extern _e_snfc_i2c_status __snfc_i2c_control_get_status(void);

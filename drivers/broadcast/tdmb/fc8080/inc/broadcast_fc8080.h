@@ -11,6 +11,7 @@
 ====================================================================**/
 #ifndef _BROADCAST_FC8080_H_
 #define _BROADCAST_FC8080_H_
+#define FEATURE_POWER_ON_RETRY
 #include "../../broadcast_tdmb_typedef.h"
 
 typedef struct
@@ -38,5 +39,6 @@ void tdmb_fc8080_interrupt_free(void);
 int tdmb_fc8080_spi_write_read(uint8* tx_data, int tx_length, uint8 *rx_data, int rx_length);
 void tdmb_fc8080_set_userstop(int mode);
 int tdmb_fc8080_tdmb_is_on(void);
+int tdmb_fc8080_power_on_retry(void);
 #endif
 

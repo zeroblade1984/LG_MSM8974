@@ -120,5 +120,5 @@ struct input_dev;
 extern struct device *max14688_device (struct input_dev *input_dev);
 
 extern struct input_dev *max14688_input_device (struct device *dev);
-
+struct qpnp_vadc_chip *input_vadc = NULL;
 #endif /* !__MAX14688_H__ */

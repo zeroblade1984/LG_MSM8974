@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8000_hal.h
- 
+
  Description : fc8000 host interface header
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/08/29 	jason		initial
+ 2009/08/29     jason        initial
 *******************************************************************************/
 
 #ifndef __FCI_HAL_H__
@@ -39,4 +39,4 @@ extern int bbm_data(HANDLE hDevice, fci_u16 addr, fci_u8* data, fci_u16 length);
 }
 #endif
 
-#endif		// __FCI_HAL_H__
+#endif        // __FCI_HAL_H__

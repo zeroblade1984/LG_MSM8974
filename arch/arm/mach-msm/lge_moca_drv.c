@@ -40,6 +40,8 @@
 
 #include "smd_private.h"
 
+//#define MOCA_DEBUG
+
 #define NUM_LGE_MOCA_PORTS 1
 
 #define LGE_MOCA_DEVICE_NAME "lge_moca"
@@ -284,7 +286,7 @@ static void lge_moca_ch_notify(void *priv, unsigned event)
 #include <linux/delay.h>
 
 #define MAX_SSR_REASON_LEN		81U
-#define SSR_IOCTL_MAGIC			'S'
+#define SSR_IOCTL_MAGIC			'S'	
 #define SSR_NOTI_REASON		_IOR(SSR_IOCTL_MAGIC, 0x01, char[MAX_SSR_REASON_LEN])
 static char ssr_reason[MAX_SSR_REASON_LEN];
 
@@ -315,18 +317,19 @@ static long lge_moca_ioctl(struct file *file, unsigned int cmd,
 					     unsigned long arg)
 {
 	int ret=0;
-
+	
 	struct lge_moca_dev *lge_moca_devp;
-
+	
 	lge_moca_devp = file->private_data;
 	if (!lge_moca_devp)
 		return -EINVAL;
-
+	
 	//mutex_lock(&lge_moca_devp->ch_lock);
 
-	switch (cmd)
+	
+	switch (cmd) 
 	{
-
+		
 		case TIOCMGET:
 		{
 			ret = smd_tiocmget(lge_moca_devp->ch);
@@ -342,7 +345,7 @@ static long lge_moca_ioctl(struct file *file, unsigned int cmd,
 			ret = get_user(lge_moca_devp->blocking_write, (int *)arg);
 			break;
 		}
-
+		
 		case SSR_NOTI_REASON:
 		{
 			log_modem_sfr();
@@ -358,7 +361,7 @@ static long lge_moca_ioctl(struct file *file, unsigned int cmd,
 			pr_err("%s: Unrecognized ioctl command %d\n", __func__, cmd);
 			ret = -1;
 		}
-    }
+	}
 	//mutex_unlock(&lge_moca_devp->ch_lock);
 
 	return ret;
@@ -781,6 +784,10 @@ int lge_moca_release(struct inode *inode, struct file *file)
 	return r;
 }
 
+
+
+
+
 static const struct file_operations lge_moca_fops = {
 	.owner = THIS_MODULE,
 	.open = lge_moca_open,
@@ -790,6 +797,10 @@ static const struct file_operations lge_moca_fops = {
 	.poll = lge_moca_poll,
 	.unlocked_ioctl = lge_moca_ioctl,
 };
+
+
+
+
 
 static int __init lge_moca_drv_init(void)
 {

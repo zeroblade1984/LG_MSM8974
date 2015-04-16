@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -75,6 +76,14 @@ static bool is_qchat(struct msm_voice *pqchat)
 		return false;
 }
 
+static bool is_vowlan(struct msm_voice *pvowlan)
+{
+	if (pvowlan == &voice_info[VOWLAN_SESSION_INDEX])
+		return true;
+	else
+		return false;
+}
+
 static uint32_t get_session_id(struct msm_voice *pvoc)
 {
 	uint32_t session_id = 0;
@@ -85,6 +94,8 @@ static uint32_t get_session_id(struct msm_voice *pvoc)
 		session_id = voc_get_session_id(VOICE2_SESSION_NAME);
 	else if (is_qchat(pvoc))
 		session_id = voc_get_session_id(QCHAT_SESSION_NAME);
+	else if (is_vowlan(pvoc))
+		session_id = voc_get_session_id(VOWLAN_SESSION_NAME);
 	else
 		session_id = voc_get_session_id(VOICE_SESSION_NAME);
 
@@ -133,6 +144,10 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	} else if (!strncmp("QCHAT", substream->pcm->id, 5)) {
 		voice = &voice_info[QCHAT_SESSION_INDEX];
 		pr_debug("%s: Open QCHAT Substream Id=%s\n",
+			 __func__, substream->pcm->id);
+	} else if (!strncmp("VoWLAN", substream->pcm->id, 6)) {
+		voice = &voice_info[VOWLAN_SESSION_INDEX];
+		pr_debug("%s: Open VoWLAN Substream Id=%s\n",
 			 __func__, substream->pcm->id);
 	} else {
 		voice = &voice_info[VOICE_SESSION_INDEX];
@@ -391,7 +406,33 @@ static int msm_voice_mute_put(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
 		mute, session_id, ramp_duration);
 
-	voc_set_tx_mute(session_id, TX_PATH, mute, ramp_duration);
+	ret = voc_set_tx_mute(session_id, TX_PATH, mute, ramp_duration);
+
+done:
+	return ret;
+}
+
+static int msm_voice_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	int mute = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
+
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0) ||
+	    (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		 mute, session_id, ramp_duration);
+
+	ret = voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_TX,
+				  mute, ramp_duration);
 
 done:
 	return ret;
@@ -405,8 +446,8 @@ static int msm_voice_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 	uint32_t session_id = ucontrol->value.integer.value[1];
 	int ramp_duration = ucontrol->value.integer.value[2];
 
-	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
-		|| (ramp_duration > MAX_RAMP_DURATION)) {
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0) ||
+	    (ramp_duration > MAX_RAMP_DURATION)) {
 		pr_err(" %s Invalid arguments", __func__);
 
 		ret = -EINVAL;
@@ -414,14 +455,38 @@ static int msm_voice_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 	}
 
 	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
-		mute, session_id, ramp_duration);
+		 mute, session_id, ramp_duration);
 
-	voc_set_rx_device_mute(session_id, mute, ramp_duration);
+	voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_RX,
+			    mute, ramp_duration);
 
 done:
 	return ret;
 }
 
+static int msm_phonememo_voice_mute_put(struct snd_kcontrol *kcontrol,
+                    struct snd_ctl_elem_value *ucontrol)
+{
+    int ret = 0;
+    int mute = ucontrol->value.integer.value[0];
+    uint32_t session_id = ucontrol->value.integer.value[1];
+    int ramp_duration = ucontrol->value.integer.value[2];
+
+    if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+        || (ramp_duration > MAX_RAMP_DURATION)) {
+        pr_err(" %s Invalid arguments", __func__);
+
+        ret = -EINVAL;
+        goto done;
+    }
+
+    pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+        mute, session_id, ramp_duration);
+    voc_set_phonememo_tx_mute(voc_get_session_id(VOICE_SESSION_NAME), TX_PATH, mute);
+
+    done:
+    return 0;
+}
 
 
 static const char const *tty_mode[] = {"OFF", "HCO", "VCO", "FULL"};
@@ -447,6 +512,7 @@ static int msm_voice_tty_mode_put(struct snd_kcontrol *kcontrol,
 	voc_set_tty_mode(voc_get_session_id(VOICE_SESSION_NAME), tty_mode);
 	voc_set_tty_mode(voc_get_session_id(VOICE2_SESSION_NAME), tty_mode);
 	voc_set_tty_mode(voc_get_session_id(VOLTE_SESSION_NAME), tty_mode);
+	voc_set_tty_mode(voc_get_session_id(VOWLAN_SESSION_NAME), tty_mode);
 
 	return 0;
 }
@@ -466,9 +532,61 @@ static int msm_voice_slowtalk_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#ifdef CONFIG_MACH_LGE
+static void msm_voice_unmute_work (struct work_struct *work)
+{
+	pr_debug("%s: unmute by timeout\n", __func__);
+	voc_set_device_mute_lge(voc_get_session_id(VOICE_SESSION_NAME),
+							VSS_IVOLUME_DIRECTION_RX, 0, 500);
+	return;
+}
+
+static int msm_voice_rx_mute_timeout_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	static struct delayed_work *unmute_work = NULL;
+	int ret = 0;
+	int mute = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+	int timeout = ucontrol->value.integer.value[2];
+
+	if (unmute_work == NULL) {
+		unmute_work = kzalloc(sizeof(struct delayed_work), GFP_KERNEL);
+		INIT_DELAYED_WORK(unmute_work, msm_voice_unmute_work);
+	}
+
+	if ((mute != 1) || (timeout <= 0)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: mute=%d session_id=%#x timeout=%d\n", __func__,
+		 mute, session_id, timeout);
+
+	voc_set_device_mute_lge(voc_get_session_id(VOICE_SESSION_NAME),
+							VSS_IVOLUME_DIRECTION_RX, 1, 500);
+
+	if (unlikely(delayed_work_pending(unmute_work)))
+		cancel_delayed_work_sync(unmute_work);
+	schedule_delayed_work(unmute_work, msecs_to_jiffies(timeout));
+done:
+	return ret;
+}
+#endif
+
 static struct snd_kcontrol_new msm_voice_controls[] = {
+    SOC_SINGLE_MULTI_EXT("Voice Tx Mute Phonememo", SND_SOC_NOPM, 0, VSID_MAX,
+                0, 3, NULL, msm_phonememo_voice_mute_put),
 	SOC_SINGLE_MULTI_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
 				0, 3, NULL, msm_voice_rx_device_mute_put),
+#ifdef CONFIG_MACH_LGE
+	SOC_SINGLE_MULTI_EXT("Voice Rx Mute Timeout", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, NULL, msm_voice_rx_mute_timeout_put),
+#endif
+	SOC_SINGLE_MULTI_EXT("Voice Tx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, NULL, msm_voice_tx_device_mute_put),
 	SOC_SINGLE_MULTI_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, VSID_MAX,
 				0, 3, NULL, msm_voice_mute_put),
 	SOC_SINGLE_MULTI_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, VSID_MAX, 0, 3,

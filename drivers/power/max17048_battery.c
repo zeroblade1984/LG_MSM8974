@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/max17048_battery.h>
 #include <mach/msm_smsm.h>
+
 #ifdef CONFIG_LGE_PM
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
@@ -30,44 +31,69 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/power_supply.h>
-#include <linux/qpnp/qpnp-charger.h>
-#include <linux/i2c/smb349_charger.h>
-#include <linux/i2c/bq24192_charger.h>
-#include <mach/board_lge.h>
 #define MAX17048_MODE		0x06
 #endif
 
-#define MAX17048_VCELL		0x02
-#define MAX17048_SOC		0x04
-#define MAX17048_VER		0x08
-#define MAX17048_HIBRT		0x0A
-#define MAX17048_CONFIG		0x0C
-#define MAX17048_OCV		0x0E
-#define MAX17048_VLRT		0x14
-#define MAX17048_VRESET		0x18
-#define MAX17048_STATUS		0x1A
-#define MAX17048_UNLOCK		0x3E
-#define MAX17048_TABLE		0x40
-#define MAX17048_RCOMPSEG1	0x80
-#define MAX17048_RCOMPSEG2	0x90
-#define MAX17048_CMD		0xFF
-#define MAX17048_UNLOCK_VALUE	0x4a57
-#define MAX17048_RESET_VALUE	0x5400
-#if !defined(CONFIG_MAX17048_SOC_ALERT)|| defined(CONFIG_MAX17048_POLLING)
-#define MAX17048_POLLING_PERIOD	60000
-#endif
-#ifdef CONFIG_MAX17048_POLLING
-#define MAX17048_POLLING_PERIOD_7	10000
-#define MAX17048_POLLING_PERIOD_3	5000
-#endif
-#ifdef CONFIG_MAX17048_LOW_POLLING
-#define MAX17048_LOW_POLLING_PERIOD	5000
+#ifdef CONFIG_MACH_LGE
+#include <mach/board_lge.h>
 #endif
 
-#define MAX17048_BATTERY_FULL		100
-#define MAX17048_BATTERY_LOW		15
-#define MAX17048_VERSION_NO		0x11
-#define MAX17048_VERSION_NO2		0x12
+#ifdef CONFIG_QPNP_CHARGER
+#include <linux/qpnp/qpnp-charger.h>
+#endif
+
+#ifdef CONFIG_SMB349_CHARGER
+#include <linux/i2c/smb349_charger.h>
+#endif
+
+#ifdef CONFIG_BQ24296_CHARGER
+#include <linux/i2c/bq24296_charger.h>
+#endif
+
+#define MAX17048_VCELL                  0x02
+#define MAX17048_SOC                    0x04
+#define MAX17048_VER                    0x08
+#define MAX17048_HIBRT                  0x0A
+#define MAX17048_CONFIG                 0x0C
+#define MAX17048_OCV                    0x0E
+#define MAX17048_VLRT                   0x14
+#define MAX17048_VRESET                 0x18
+#define MAX17048_STATUS                 0x1A
+#define MAX17048_UNLOCK                 0x3E
+#define MAX17048_TABLE                  0x40
+#define MAX17048_RCOMPSEG1              0x80
+#define MAX17048_RCOMPSEG2              0x90
+#define MAX17048_CMD                    0xFF
+#define MAX17048_UNLOCK_VALUE           0x4a57
+#define MAX17048_RESET_VALUE            0x5400
+
+#if !defined(CONFIG_MAX17048_SOC_ALERT) || defined(CONFIG_MAX17048_POLLING)
+#define MAX17048_POLLING_PERIOD         60000
+#endif
+
+#ifdef CONFIG_MAX17048_POLLING
+#define MAX17048_POLLING_PERIOD_7       10000
+#define MAX17048_POLLING_PERIOD_3       5000
+#endif
+
+#ifdef CONFIG_MAX17048_LOW_POLLING
+#define MAX17048_LOW_POLLING_PERIOD     5000
+#endif
+
+#ifdef CONFIG_LGE_PM_LLK_MODE
+#ifdef CONFIG_MACH_MSM8974_G3_VZW
+#define LLK_MAX_THR_SOC 35
+#define LLK_MIN_THR_SOC 30
+#else
+#define LLK_MAX_THR_SOC 75
+#define LLK_MIN_THR_SOC 70
+#endif
+#endif
+
+#define MAX17048_BATTERY_FULL           100
+#define MAX17048_BATTERY_LOW            15
+#define MAX17048_VERSION_NO             0x11
+#define MAX17048_VERSION_NO2            0x12
 
 struct max17048_chip {
 	struct i2c_client		*client;
@@ -101,24 +127,21 @@ struct max17048_chip {
 	int lasttime_capacity_level;
 	int state;
 	struct power_supply *batt_psy;
+	struct power_supply *ac_psy;
+#ifdef CONFIG_LGE_PM_LLK_MODE
+	struct power_supply *usb_psy;
+#endif
 #endif
 };
 
 #ifdef CONFIG_LGE_PM
 static struct max17048_chip *ref;
-/* TODO : lge_power_test_flash must be implemented charger side.
-*  it will be changed after.
-*/
-#ifndef CONFIG_LGE_PM
-/* extern int lge_power_test_flag; */
-#else
 int lge_power_test_flag = 1;
 #endif
-#endif
 
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
 /* using to cal rcomp */
-int cell_info = 0;
+int cell_info;
 #endif
 
 static int max17048_write_word(struct i2c_client *client, int reg, u16 value)
@@ -197,6 +220,30 @@ static int max17048_set_reset(struct i2c_client *client)
 	return 0;
 }
 
+#define TRIP_HIGH_SOC_THRESH	103
+#define TRIP_LOW_SOC_THRESH	100
+static int max17048_capacity_evaluator(int raw_soc)
+{
+	static int prev_soc = TRIP_HIGH_SOC_THRESH;
+	static bool is_full = false;
+	if (raw_soc >= prev_soc && raw_soc >= TRIP_HIGH_SOC_THRESH) {
+		is_full = true;
+	} else if (raw_soc < prev_soc && raw_soc < TRIP_LOW_SOC_THRESH) {
+		is_full = false;
+	}
+	if (prev_soc != raw_soc)
+		prev_soc = raw_soc;
+
+	if (is_full)
+		return TRIP_LOW_SOC_THRESH;
+	else if (raw_soc >= TRIP_LOW_SOC_THRESH)
+		return TRIP_LOW_SOC_THRESH - 1;
+	else if (raw_soc < 0)
+		return 0;
+	else
+		return raw_soc;
+}
+
 /* Calculate MAX17048 custom model SOC */
 #ifdef CONFIG_MAX17048_CUSTOM
 static int max17048_get_capacity_from_soc(void)
@@ -214,44 +261,40 @@ static int max17048_get_capacity_from_soc(void)
 	batt_soc = ((buf[0]*256)+buf[1])*19531;
 
 	pr_debug("[max17048]%s : MAXIM Raw Capacity : %d , *100 is %d \n"
-			, __func__,(int)(batt_soc/10000000),(int)(batt_soc/100000));
+			, __func__, (int)(batt_soc/10000000)
+			, (int)(batt_soc/100000));
 
 	/* SOC scaling for stable max SOC and changed Cut-off */
 	/*Adj SOC = (FG SOC-Emply)/(Full-Empty)*100*/
-#ifdef CONFIG_MACH_MSM8974_G2_KR
 	batt_soc = (batt_soc-((ref->model_data->empty)*100000))
-						/(9400-(ref->model_data->empty))*10000;
-#elif defined (CONFIG_MACH_MSM8974_VU3_KR)
-	batt_soc = (batt_soc-((ref->model_data->empty)*100000))
-						/(9200-(ref->model_data->empty))*10000;
-#elif defined (CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI)
-	batt_soc = batt_soc/94*100+10000000;
-#elif defined(CONFIG_MACH_MSM8974_B1_KR)
-	batt_soc = batt_soc/93*100;
-#else
-	batt_soc = batt_soc/94*100;
-#endif
+		/(9400-(ref->model_data->empty))*10000;
 	batt_soc /= 10000000;
 
-	if (batt_soc > 100)
-		batt_soc = 100;
-	else if (batt_soc < 0)
-		batt_soc = 0;
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR)
+	batt_soc = max17048_capacity_evaluator((int)batt_soc);
+#ifdef CONFIG_LGE_UPSCALING_LOW_SOC
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
 	/* Report 0.42%(0x300) ~ 1% to 1% */
 	/* If Full and Emplty is changed, need to modify the value, 3 */
-	else if(batt_soc == 0 && buf[0] >= 3){
-		if(cell_info == LGC_LLL && buf[0] >= 3){
-			printk(KERN_ERR "%s : buf[0] is %d, Do upscaling to 1%%\n"
+	else if (batt_soc == 0 && buf[0] >= 3) {
+		if (cell_info == LGC_LLL && buf[0] >= 3) {
+			printk(KERN_ERR "%s : buf[0] is %d, upscale to 1%%\n"
 				, __func__, buf[0]);
 			batt_soc = 1;
-		}
-		else if(cell_info == TCD_AAC && buf[0] >= 6){
-			printk(KERN_ERR "%s : buf[0] is %d, Do upscaling to 1%%\n"
+		} else if (cell_info == TCD_AAC && buf[0] >= 6) {
+			printk(KERN_ERR "%s : buf[0] is %d, upscale to 1%%\n"
 				, __func__, buf[0]);
 			batt_soc = 1;
 		}
 	}
+#else
+	/* Report 0.42%(0x300) ~ 1% to 1% */
+	/* If Full and Emplty is changed, need to modify the value, 3 */
+	else if (batt_soc == 0 && buf[0] >= 3) {
+		printk(KERN_ERR "%s : buf[0] is %d, upscale to 1%%\n"
+				, __func__, buf[0]);
+		batt_soc = 1;
+	}
+#endif
 #endif
 	return batt_soc;
 }
@@ -301,7 +344,7 @@ static uint16_t max17048_get_version(struct i2c_client *client)
 	return swab16(i2c_smbus_read_word_data(client, MAX17048_VER));
 }
 
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#ifdef CONFIG_LGE_SHOW_OCV
 static void max17048_get_ocv(struct i2c_client *client)
 {
 	u8 values[2];
@@ -313,7 +356,7 @@ static void max17048_get_ocv(struct i2c_client *client)
 
 	/* Read OCV */
 	org_ocv = max17048_read_word(client, MAX17048_OCV);
-	if (org_ocv == 0xFFFF){
+	if (org_ocv == 0xFFFF) {
 		pr_err("%s: unlock fail %x\n",	__func__, org_ocv);
 	} else {
 		values[0] = (org_ocv & 0xff00)>>8;
@@ -329,6 +372,15 @@ static void max17048_get_ocv(struct i2c_client *client)
 }
 #endif
 
+#ifdef CONFIG_LGE_PM
+static void external_charger_enable(bool enable)
+{
+	union power_supply_propval val = {0,};
+	val.intval = enable;
+	ref->batt_psy->set_property(ref->batt_psy, POWER_SUPPLY_PROP_CHARGING_ENABLED, &val);
+}
+#endif
+
 #ifdef CONFIG_MAX17048_LOW_POLLING
 static void max17048_low_polling_work(struct work_struct *work)
 {
@@ -339,7 +391,7 @@ static void max17048_low_polling_work(struct work_struct *work)
 		printk(KERN_INFO "%s : Called before init.\n", __func__);
 		return;
 	}
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#ifdef CONFIG_LGE_SHOW_OCV
 	max17048_get_ocv(chip->client);
 #endif
 	max17048_get_soc(chip->client);
@@ -373,18 +425,19 @@ psy_error:
 		round_jiffies_relative(msecs_to_jiffies(
 			MAX17048_LOW_POLLING_PERIOD)));
 }
-#endif //END OF max17048_polling_work
+#endif
 
 
 #ifdef CONFIG_MAX17048_POLLING
 /*  func : max17048_polling_work
-    This work func  just print MAX17048 reg. value at kernel log
-    and does not update it at battery power supply
-    It means that battery data from this func. is not delivered to user  */
+ *  This work func  just print MAX17048 reg. value at kernel log
+ *  and does not update it at battery power supply
+ *  It means that battery data from this func. is not delivered to user
+ */
 static void max17048_polling_work(struct work_struct *work)
 {
 	struct max17048_chip *chip;
-	int vcell =0, soc = 0, capacity = 0, voltage = 0;
+	int vcell = 0, soc = 0, capacity = 0, voltage = 0;
 	u8 buf[2];
 
 	chip = container_of(work, struct max17048_chip, polling_work.work);
@@ -394,57 +447,46 @@ static void max17048_polling_work(struct work_struct *work)
 		return;
 	}
 
-//Read VCELL
+	/* Read VCELL */
 	vcell = max17048_read_word(chip->client, MAX17048_VCELL);
-	if (vcell < 0){
+	if (vcell < 0) {
 		printk(KERN_ERR "%s: error get vcell register %d\n",
 			__func__, vcell);
-	}
-	else{
+	} else {
 		vcell = vcell >> 4;
 		voltage  = (vcell * 5) >> 2;
 	}
 
-//Read SOC
+	/* Read SOC */
 	soc = max17048_read_word(chip->client, MAX17048_SOC);
-	if (soc < 0){
+	if (soc < 0) {
 		printk(KERN_ERR "%s: error get soc register %d\n",
 			__func__, soc);
-	}
-	else{
+	} else {
 		buf[0] = (soc & 0x0000FF00) >> 8;
 		buf[1] = (soc & 0x000000FF);
 
 		/* The unit of bit[0] is 1/512 %, Change it to 1% */
 		capacity = ((buf[0]*256)+buf[1])*19531;
 
-		pr_debug("[max17048]%s : MAXIM Raw Capacity : %d , *100 is %d \n"
-			, __func__,(int)(capacity/10000000),(int)(capacity/100000));
+		pr_debug("%s : Raw Capacity : %d , *100 is %d \n"
+			, __func__, (int)(capacity/10000000)
+			, (int)(capacity/100000));
 
 		/* SOC scaling for stable max SOC and changed Cut-off */
-		/*Adj SOC = (FG SOC-Emply)/(Full-Empty)*100*/
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR)
+		/* Adj SOC = (FG SOC-Emply) / (Full-Empty) * 100 */
 		capacity = (capacity-((ref->model_data->empty)*100000))
-						/(9400-(ref->model_data->empty))*10000;
-#elif defined (CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI)
-		capacity = capacity/94*100 + 10000000;
-#elif defined(CONFIG_MACH_MSM8974_B1_KR)
-		capacity = capacity/93*100;
-#else
-		capacity = capacity/94*100;
-#endif
+			/(9400-(ref->model_data->empty))*10000;
 
 		capacity /= 10000000;
 
-#ifdef CONFIG_MACH_MSM8974_G2_KR
-	/* Report 0.42%(0x300) ~ 1% to 1% */
-	/* If Full and Emplty is changed, need to modify the value, 3 */
-		if(capacity == 0 && buf[0] >= 3){
-			printk(KERN_ERR "%s : buf[0] is %d, Do upscaling to 1%%\n"
+		/* Report 0.42%(0x300) ~ 1% to 1% */
+		/* If Full and Emplty is changed, need to modify the value, 3 */
+		if (capacity == 0 && buf[0] >= 3) {
+			printk(KERN_ERR "%s : buf[0] is %d, upscale to 1%%\n"
 				, __func__, buf[0]);
 			capacity = 1;
 		}
-#endif
 	}
 
 	printk(KERN_ERR "%s : soc : 0x%x / vcell : 0x%x\n",
@@ -452,30 +494,35 @@ static void max17048_polling_work(struct work_struct *work)
 	printk(KERN_ERR "%s : capacity : %d  / voltage : %d \n",
 			__func__, capacity, voltage);
 
-	if (8 < capacity){
+	if (8 < capacity) {
 		schedule_delayed_work(&chip->polling_work,
 				round_jiffies_relative(msecs_to_jiffies(
 					MAX17048_POLLING_PERIOD)));
 	}
-	if(3 < capacity && capacity < 8 ){	/*4%~7% 10sec polling*/
+
+	if (3 < capacity && capacity < 8) {
+		/* 4%~7% 10sec polling */
 		schedule_delayed_work(&chip->polling_work,
 			round_jiffies_relative(msecs_to_jiffies(
 				MAX17048_POLLING_PERIOD_7)));
-	}
-	else {					/*0%~3% 5sec polling*/
+	} else {
+		/* 0%~3% 5sec polling */
 		schedule_delayed_work(&chip->polling_work,
 			round_jiffies_relative(msecs_to_jiffies(
 				MAX17048_POLLING_PERIOD_3)));
 	}
 	return ;
 }
-#endif //END OF max17048_polling_work
+#endif
 
 static void max17048_work(struct work_struct *work)
 {
 	struct max17048_chip *chip;
 #ifdef CONFIG_LGE_PM
 	int ret = 0;
+#endif
+#ifdef CONFIG_LGE_PM_LLK_MODE
+	union power_supply_propval val = {0,};
 #endif
 
 #ifdef MAX17048_DEBUG
@@ -501,7 +548,7 @@ static void max17048_work(struct work_struct *work)
 		printk(KERN_INFO "%s : error get status register.\n", __func__);
 #endif
 
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#ifdef CONFIG_LGE_SHOW_OCV
 	max17048_get_ocv(chip->client);
 #endif
 	/* Update recently VCELL, SOC and CAPACITY */
@@ -512,11 +559,14 @@ static void max17048_work(struct work_struct *work)
 		__func__, chip->soc, chip->vcell);
 
 #ifdef CONFIG_LGE_PM
-	if ( (abs(chip->voltage - chip->lasttime_voltage) >= 50) ||
+	if ((abs(chip->voltage - chip->lasttime_voltage) >= 50) ||
 		chip->capacity_level != chip->lasttime_capacity_level) {
 		chip->lasttime_voltage = chip->voltage;
 		chip->lasttime_soc = chip->soc;
 		chip->lasttime_capacity_level = chip->capacity_level;
+
+		printk(KERN_ERR "%s : Reported Capacity : %d / voltage : %d\n",
+				__func__, chip->capacity_level, chip->voltage);
 
 		if (!chip->batt_psy) {
 			chip->batt_psy = power_supply_get_by_name("battery");
@@ -525,9 +575,31 @@ static void max17048_work(struct work_struct *work)
 				goto psy_error;
 		}
 
-		printk(KERN_ERR "%s : Reported Capacity : %d / voltage : %d\n",
-				__func__, chip->capacity_level, chip->voltage);
+#ifdef CONFIG_LGE_PM_LLK_MODE
+		chip->batt_psy->get_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_STORE_DEMO_ENABLED,&val);
+		if (val.intval) {
+			if (!chip->usb_psy) {
+				chip->usb_psy = power_supply_get_by_name("usb");
 
+				if (!chip->usb_psy)
+					goto psy_error;
+			}
+			chip->usb_psy->get_property(chip->usb_psy,POWER_SUPPLY_PROP_PRESENT,&val);
+			if (val.intval) {
+				printk(KERN_INFO "%s : LLK_mode is operating.\n", __func__);
+				if (chip->capacity_level > LLK_MAX_THR_SOC) {
+					external_charger_enable(0);
+					printk(KERN_INFO "%s : stop charging by LLK_mode.\n",
+							__func__);
+				}
+				if (chip->capacity_level < LLK_MIN_THR_SOC) {
+					external_charger_enable(1);
+					printk(KERN_INFO "%s : charging by LLK_mode.\n", __func__);
+				}
+			}
+		}
+#endif
 		power_supply_changed(chip->batt_psy);
 	}
 #else
@@ -542,7 +614,7 @@ static void max17048_work(struct work_struct *work)
 #endif
 
 #ifdef CONFIG_MAX17048_LOW_POLLING
-	if(chip->capacity_level < 3) {
+	if (chip->capacity_level < 3) {
 		schedule_delayed_work(&chip->low_polling_work,
 			round_jiffies_relative(msecs_to_jiffies(
 				MAX17048_LOW_POLLING_PERIOD)));
@@ -692,11 +764,11 @@ static int max17048_set_alsc_alert(struct i2c_client *client,
 	return 0;
 }
 
-static int max17048_set_rcomp(struct i2c_client *client,int rcomp)
+static int max17048_set_rcomp(struct i2c_client *client, int rcomp)
 {
 
 	struct max17048_chip *chip = i2c_get_clientdata(client);
-	int ret =0;
+	int ret = 0;
 
 	if (chip == NULL)
 		return -ENODEV;
@@ -710,33 +782,57 @@ static int max17048_set_rcomp(struct i2c_client *client,int rcomp)
 	return ret;
 }
 
+#define IDLE_BATT_TEMP 250
 int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 {
-	int startingRcomp;
-	int tempCoHot;
-	int tempCoCold;
-	int PreviousRcomp = 0, newRcomp =0;
+	int init_rcomp;
+	int temp_hot;
+	int temp_cold;
+	int pre_rcomp = 0, new_rcomp = 0;
 	int temp;
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
+	int rc;
+#ifndef CONFIG_SMB349_CHARGER
 	union power_supply_propval ret = {0,};
 #endif
-	int rc;
+
+#ifdef CONFIG_BQ24296_CHARGER
+	hw_rev_type rev;
+#endif
 
 	struct max17048_chip *chip = i2c_get_clientdata(client);
 
-	if (ref == NULL ||chip==NULL)	/* if fuel gauge is not initialized, */
+	/* if fuel gauge is not initialized, */
+	if (ref == NULL || chip == NULL)
 		return -1;
 
 	else {
-		startingRcomp = ref->model_data->rcomp;
-		tempCoHot =  ref->model_data->temp_co_hot;
-		tempCoCold = ref->model_data->temp_co_cold;
+		init_rcomp = ref->model_data->rcomp;
+		temp_hot =  ref->model_data->temp_co_hot;
+		temp_cold = ref->model_data->temp_co_cold;
 	}
+#ifdef CONFIG_SMB349_CHARGER
+	temp = smb349_get_batt_temp_origin();
+#elif defined(CONFIG_BQ24296_CHARGER)
+	rev = lge_get_board_revno();
+	if (rev == HW_REV_A) {
+		if (!chip->batt_psy) {
+			chip->batt_psy = power_supply_get_by_name("battery");
+			if (!chip->batt_psy) {
+				printk(KERN_INFO "%s : batt_psy is not init yet!\n", __func__);
+				return -1;
+			}
+		}
 
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
+		chip->batt_psy->get_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_TEMP, &ret);
+
+		temp = ret.intval;
+	} else {
+		temp = bq24296_get_batt_temp_origin();
+	}
+#else
 	if (!chip->batt_psy) {
 		chip->batt_psy = power_supply_get_by_name("battery");
-
 		if (!chip->batt_psy) {
 			printk(KERN_INFO "%s : batt_psy is not init yet!\n", __func__);
 			return -1;
@@ -744,50 +840,46 @@ int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 	}
 
 	chip->batt_psy->get_property(chip->batt_psy,
-			  POWER_SUPPLY_PROP_TEMP, &ret);
+			POWER_SUPPLY_PROP_TEMP, &ret);
 
-	temp= ret.intval;
-#else
-#if defined(CONFIG_BQ24192_CHARGER)
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_SPR)
-	if(lge_get_board_revno() == HW_REV_A)
-		temp = 250;
-	else
-#endif
-		temp = bq24192_get_batt_temp_origin();
-#else
-	temp = smb349_get_batt_temp_origin();
-#endif
+	temp = ret.intval;
 #endif
 	temp /= 10;
 
 	/* Read RCOMP applied*/
-	PreviousRcomp = max17048_read_word(client, MAX17048_CONFIG);
-	PreviousRcomp =(PreviousRcomp& 0xFF00) >> 8;
+	pre_rcomp = max17048_read_word(client, MAX17048_CONFIG);
+	pre_rcomp = (pre_rcomp & 0xFF00) >> 8;
 
-	if (PreviousRcomp < 0)
-		return PreviousRcomp;
+	if (pre_rcomp < 0)
+		return pre_rcomp;
 
 	/* Calculate RCOMP by temperature*/
 	if (temp > 20)
-		newRcomp = startingRcomp + (int)((temp - 20)*tempCoHot/(-1000));
+#ifdef CONFIG_MACH_MSM8974_DZNY_DCM
+		new_rcomp = init_rcomp + (int)((temp - 20)*temp_hot/(-10000));
+#else
+		new_rcomp = init_rcomp + (int)((temp - 20)*temp_hot/(-1000));
+#endif
 	else if (temp < 20)
-		newRcomp = startingRcomp + (int)((temp - 20)*tempCoCold/(-1000));
+#ifdef CONFIG_MACH_MSM8974_DZNY_DCM
+		new_rcomp = init_rcomp + (int)((temp - 20)*temp_hot/(-10000));
+#else
+		new_rcomp = init_rcomp + (int)((temp - 20)*temp_cold/(-1000));
+#endif
 	else
-		newRcomp = startingRcomp;
+		new_rcomp = init_rcomp;
 
-	if (newRcomp > 0xFF)
-		newRcomp = 0xFF;
-	else if (newRcomp < 0)
-		newRcomp = 0;
+	if (new_rcomp > 0xFF)
+		new_rcomp = 0xFF;
+	else if (new_rcomp < 0)
+		new_rcomp = 0;
 
-	printk(KERN_ERR "%s : temp =%d, PreviousRcomp =0x%02X -> newRcomp = 0x%02X\n"
-		, __func__,temp,PreviousRcomp,newRcomp);
+	pr_err("%s : temp = %d, pre_rcomp = 0x%02X -> new_rcomp = 0x%02X\n"
+		, __func__ , temp, pre_rcomp, new_rcomp);
 
 	/* Write RCOMP */
-	if (newRcomp != PreviousRcomp)
-	{
-		rc = max17048_set_rcomp(chip->client,newRcomp);
+	if (new_rcomp != pre_rcomp) {
+		rc = max17048_set_rcomp(chip->client, new_rcomp);
 		if (rc < 0)
 			pr_info("failed to write RCOMP\n");
 	}
@@ -845,12 +937,8 @@ ssize_t max17048_show_voltage(struct device *dev,
 		cancel_delayed_work(&ref->work);
 #endif
 		/* Reduce charger source */
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
-		external_qpnp_enable_charging(0);
-#elif defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
-		external_bq24192_enable_charging(0);
-#else
-		external_smb349_enable_charging(0);
+#ifdef CONFIG_LGE_PM
+		external_charger_enable(0);
 #endif
 
 		/* Wait for Fuel-gauge stability */
@@ -858,12 +946,8 @@ ssize_t max17048_show_voltage(struct device *dev,
 		max17048_work(&(ref->work.work));
 
 		/* Restore charger source */
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
-		external_qpnp_enable_charging(1);
-#elif defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
-		external_bq24192_enable_charging(1);
-#else
-		external_smb349_enable_charging(1);
+#ifdef CONFIG_LGE_PM
+		external_charger_enable(1);
 #endif
 
 #ifdef CONFIG_MAX17048_SOC_ALERT
@@ -894,12 +978,8 @@ ssize_t max17048_show_capacity(struct device *dev,
 		cancel_delayed_work(&ref->work);
 #endif
 		/* Reduce charger source */
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
-		external_qpnp_enable_charging(0);
-#elif defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
-		external_bq24192_enable_charging(0);
-#else
-		external_smb349_enable_charging(0);
+#ifdef CONFIG_LGE_PM
+		external_charger_enable(0);
 #endif
 		/* Wait for Fuel-gauge stability */
 		msleep(1000);
@@ -911,14 +991,9 @@ ssize_t max17048_show_capacity(struct device *dev,
 		max17048_work(&(ref->work.work));
 
 		/* Restore charger source */
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
-		external_qpnp_enable_charging(1);
-#elif defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
-		external_bq24192_enable_charging(1);
-#else
-		external_smb349_enable_charging(1);
+#ifdef CONFIG_LGE_PM
+		external_charger_enable(1);
 #endif
-
 #ifdef CONFIG_MAX17048_SOC_ALERT
 		enable_irq(gpio_to_irq(ref->model_data->alert_gpio));
 #else
@@ -958,24 +1033,32 @@ DEVICE_ATTR(fuelrst, 0664, NULL, max17048_store_status);
 
 int max17048_get_voltage(void)
 {
-	if (ref == NULL)	/* if fuel gauge is not initialized, */
-		return 4350;	/* return Dummy Value */
+	/* if fuel gauge is not initialized, */
+	if (ref == NULL) {
+		return 4350;
+	}
+
 	return ref->voltage;
 }
 EXPORT_SYMBOL(max17048_get_voltage);
 
 int max17048_get_capacity(void)
 {
-	if (ref == NULL)	/* if fuel gauge is not initialized, */
-		return 100;	/* return Dummy Value */
+	/* if fuel gauge is not initialized, */
+	if (ref == NULL) {
+		return 100;
+	}
+
 	return ref->capacity_level;
 }
 EXPORT_SYMBOL(max17048_get_capacity);
 
 int max17048_get_fulldesign(void)
 {
-	if (ref == NULL)	/* if fuel gauge is not initialized, */
-		return 2000;	/* return Dummy Value */
+	/* if fuel gauge is not initialized, */
+	if (ref == NULL) {
+		return 2000;
+	}
 	return ref->model_data->full_design;
 }
 EXPORT_SYMBOL(max17048_get_fulldesign);
@@ -1001,31 +1084,25 @@ static int max17048_parse_dt(struct device *dev,
 	rc = of_property_read_u32(dev_node, "max17048,full_design",
 			&mdata->full_design);
 
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR)
-	if(cell_info == LGC_LLL){
-		rc = of_property_read_u32(dev_node, "max17048,empty_lgc",&mdata->empty);
-		mdata->rcomp = 96;
-		mdata->temp_co_hot = 25;
-		mdata->temp_co_cold = 7400;
-	}
-	else if(cell_info == TCD_AAC) {
-		rc = of_property_read_u32(dev_node, "max17048,empty_tocad",&mdata->empty);
-		mdata->rcomp = 44;
-		mdata->temp_co_hot = -275;
-		mdata->temp_co_cold = 5275;
-
-	}
-#elif defined(CONFIG_MACH_MSM8974_B1_KR)
-	if(cell_info == LGC_LLL) {
-		mdata->rcomp = 93;
-		mdata->temp_co_hot = 0;
-		mdata->temp_co_cold = 5275;
-	}
-	else if(cell_info == TCD_AAC) {
-		mdata->rcomp = 43;
-		mdata->temp_co_hot = 325;
-		mdata->temp_co_cold = 4875;
-
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+	if (cell_info == LGC_LLL) {
+		rc = of_property_read_u32(dev_node, "max17048,rcomp_lgc",
+				&mdata->rcomp);
+		rc = of_property_read_u32(dev_node, "max17048,temp_co_hot_lgc",
+				&mdata->temp_co_hot);
+		rc = of_property_read_u32(dev_node, "max17048,temp_co_cold_lgc",
+				&mdata->temp_co_cold);
+		rc = of_property_read_u32(dev_node, "max17048,empty_lgc",
+				&mdata->empty);
+	} else if (cell_info == TCD_AAC) {
+		rc = of_property_read_u32(dev_node, "max17048,rcomp_tcd",
+				&mdata->rcomp);
+		rc = of_property_read_u32(dev_node, "max17048,temp_co_hot_tcd",
+				&mdata->temp_co_hot);
+		rc = of_property_read_u32(dev_node, "max17048,temp_co_cold_tcd",
+				&mdata->temp_co_cold);
+		rc = of_property_read_u32(dev_node, "max17048,empty_tcd",
+				&mdata->empty);
 	}
 #else
 	rc = of_property_read_u32(dev_node, "max17048,rcomp",
@@ -1034,25 +1111,23 @@ static int max17048_parse_dt(struct device *dev,
 			&mdata->temp_co_hot);
 	rc = of_property_read_u32(dev_node, "max17048,temp_co_cold",
 			&mdata->temp_co_cold);
+	rc = of_property_read_u32(dev_node, "max17048,empty",
+			&mdata->empty);
 #endif
 
-
 	printk(KERN_INFO "[MAX17048] platform data : "\
-		"max17048,rcomp = %d, "\
-		"max17048,temp_co_hot = %d, "\
-		"max17048,temp_co_cold = %d, "\
-		"max17048,alert_threshold = 0x%x, "\
-		"max17048,full_design = %d\n",
+		"rcomp = %d, "\
+		"temp_co_hot = %d, "\
+		"temp_co_cold = %d, "\
+		"alert_threshold = 0x%x, "\
+		"full_design = %d, "\
+		"empty = %d\n",
 		mdata->rcomp,
 		mdata->temp_co_hot,
 		mdata->temp_co_cold,
 		mdata->alert_threshold,
-		mdata->full_design);
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR)
-	printk(KERN_INFO "[MAX17048] platform data : "\
-		"max17048,empty = %d\n",
+		mdata->full_design,
 		mdata->empty);
-#endif
 
 	return rc;
 }
@@ -1065,36 +1140,60 @@ static int __devinit max17048_probe(struct i2c_client *client,
 	struct max17048_chip *chip;
 #ifdef CONFIG_LGE_PM
 	struct max17048_battery_model *mdata;
-	hw_rev_type rev;
 #endif
 	int ret = 0;
 	uint16_t version;
-
+#ifdef CONFIG_LGE_PM
 	unsigned int smem_size = 0;
+#if defined(CONFIG_LGE_LOW_BATT_LIMIT)
+	uint	_batt_id_ = 0;
+#endif
 	unsigned int *batt_id = (unsigned int *)
 		(smem_get_entry(SMEM_BATT_INFO, &smem_size));
-
-	if (smem_size != 0 && batt_id){
-		if(*batt_id == BATT_NOT_PRESENT) {
+#if defined(CONFIG_LGE_LOW_BATT_LIMIT)
+	if (smem_size != 0 && batt_id) {
+		_batt_id_ = (*batt_id >> 8) & 0x00ff;
+		if (_batt_id_ == BATT_NOT_PRESENT) {
 			printk(KERN_INFO "[MAX17048] probe : skip for no model data\n");
 			ref = NULL;
 			return 0;
 		}
-
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
-		else if(*batt_id == BATT_DS2704_L || *batt_id == BATT_ISL6296_C){
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+		 else if (_batt_id_ == BATT_DS2704_L
+			|| _batt_id_ == BATT_ISL6296_C) {
 			cell_info = LGC_LLL; /* LGC Battery */
-		}
-		else if(*batt_id == BATT_DS2704_C || *batt_id == BATT_ISL6296_L){
-			cell_info = TCD_AAC; /*Sanyo Tocad Battery */
-		}
-		else{
+		} else if (_batt_id_ == BATT_DS2704_C
+			|| _batt_id_ == BATT_ISL6296_L) {
+			cell_info = TCD_AAC; /* Tocad, Hitachi Battery */
+		} else {
 			printk(KERN_INFO "[MAX17048] probe : Unknown cell, Using LGC profile\n");
 			cell_info = LGC_LLL;
 		}
 #endif
 	}
 
+#else
+	if (smem_size != 0 && batt_id) {
+		if (*batt_id == BATT_NOT_PRESENT) {
+			printk(KERN_INFO "[MAX17048] probe : skip for no model data\n");
+			ref = NULL;
+			return 0;
+		}
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+		 else if (*batt_id == BATT_DS2704_L
+			|| *batt_id == BATT_ISL6296_C) {
+			cell_info = LGC_LLL; /* LGC Battery */
+		} else if (*batt_id == BATT_DS2704_C
+			|| *batt_id == BATT_ISL6296_L) {
+			cell_info = TCD_AAC; /* Tocad, Hitachi Battery */
+		} else {
+			printk(KERN_INFO "[MAX17048] probe : Unknown cell, Using LGC profile\n");
+			cell_info = LGC_LLL;
+		}
+#endif
+	}
+#endif
+#endif
 	printk(KERN_INFO "[MAX17048] probe : START\n");
 
 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
@@ -1102,37 +1201,13 @@ static int __devinit max17048_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 #ifdef CONFIG_LGE_PM
-	rev = lge_get_board_revno();
-#if defined(CONFIG_MACH_MSM8974_G2_DCM)
-	if (rev > HW_REV_A) {
-		printk(KERN_INFO "[MAX17048] G2_DCM REVISION > REV_A\n");
+	chip->ac_psy = power_supply_get_by_name("ac");
+	if(!chip->ac_psy) {
+		printk(KERN_INFO "[MAX17048] ac probe not yet!\n");
+		ret = -EPROBE_DEFER;
 		goto error;
 	}
 #endif
-
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
-	ret = qpnp_charger_is_ready();
-#elif defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_SPR)
-	if (rev >= HW_REV_B)
-		ret = bq24192_is_ready();
-	else
-		ret = smb349_is_ready();
-#elif defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_Z_TMO_US) || defined(CONFIG_MACH_MSM8974_Z_ATT_US) || defined(CONFIG_MACH_MSM8974_B1_KR)
-	ret = bq24192_is_ready();
-#else
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_G2_ATT) || defined(CONFIG_MACH_MSM8974_G2_TEL_AU)
-	if (rev > HW_REV_A)
-#else
-	if (rev >= HW_REV_A)
-#endif
-	{
-		ret = smb349_is_ready();
-	} else {
-		ret = qpnp_charger_is_ready();
-	}
-#endif
-	if (ret)
-		goto error;
 
 	if (!i2c_check_functionality(client->adapter,
 				I2C_FUNC_SMBUS_BYTE_DATA)) {
@@ -1140,7 +1215,6 @@ static int __devinit max17048_probe(struct i2c_client *client,
 				__func__);
 		return -EIO;
 	}
-#endif
 
 	chip->client = client;
 
@@ -1171,12 +1245,14 @@ static int __devinit max17048_probe(struct i2c_client *client,
 	version = max17048_get_version(client);
 	dev_info(&client->dev, "MAX17048 Fuel-Gauge Ver 0x%x\n", version);
 
-	if ((version != MAX17048_VERSION_NO) && (version != MAX17048_VERSION_NO2)) {
+	if ((version != MAX17048_VERSION_NO)
+		&& (version != MAX17048_VERSION_NO2)) {
 		ret = -ENODEV;
 		goto error;
 	}
 
 	ref = chip;
+
 #ifdef CONFIG_LGE_PM
 	/* MAX17048 alert gpio setting */
 	if (chip->model_data->alert_gpio) {
@@ -1367,7 +1443,7 @@ static int max17048_resume(struct i2c_client *client)
 		return 0;
 
 #ifdef CONFIG_MAX17048_POLLING
-	schedule_delayed_work(&ref->polling_work,MAX17048_POLLING_PERIOD);
+	schedule_delayed_work(&ref->polling_work, MAX17048_POLLING_PERIOD);
 #endif
 
 #ifndef CONFIG_MAX17048_SOC_ALERT

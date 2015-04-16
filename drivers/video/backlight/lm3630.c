@@ -33,29 +33,27 @@
 
 #define I2C_BL_NAME                              "lm3630"
 #define MAX_BRIGHTNESS_LM3630                    0xFF
-#define MIN_BRIGHTNESS_LM3630                    0x0F
 #define DEFAULT_BRIGHTNESS                       0xFF
-#define DEFAULT_FTM_BRIGHTNESS                   0x0F
 
 #define BL_ON        1
 #define BL_OFF       0
 
-#ifdef CONFIG_G2_LGD_PANEL
+#if defined(CONFIG_B1_LGD_PANEL)
+#define PWM_THRESHOLD 165	/* UI bar 56 % */
+#define PWM_OFF 0
+#define PWM_ON 1
+#elif defined(CONFIG_G2_LGD_PANEL)
 #define PWM_THRESHOLD 135	/* UI bar 41 % */
 #define PWM_OFF 0
 #define PWM_ON 1
 #endif
 
-/*           
-                                                     
-                       
-                                   
- */
-#define BOOT_BRIGHTNESS 1
-
 static struct i2c_client *lm3630_i2c_client;
 
 static int store_level_used = 0;
+#if defined(CONFIG_B1_LGD_PANEL)
+static int factory_boot = 0;
+#endif
 
 struct backlight_platform_data {
 	void (*platform_init)(void);
@@ -78,7 +76,6 @@ struct lm3630_device {
 	int max_current;
 	int min_brightness;
 	int max_brightness;
-	int default_brightness;
 	int factory_brightness;
 	struct mutex bl_mutex;
 	int blmap_size;
@@ -98,7 +95,7 @@ static int lm3630_write_reg(struct i2c_client *client, unsigned char reg, unsign
 static int cur_main_lcd_level = DEFAULT_BRIGHTNESS;
 static int saved_main_lcd_level = DEFAULT_BRIGHTNESS;
 
-#if defined (CONFIG_G2_LGD_PANEL) || defined (CONFIG_B1_LGD_PANEL) || defined (CONFIG_VU3_LGD_PANEL)
+#if defined(CONFIG_MACH_LGE)
 int backlight_status = BL_OFF;
 #else
 static int backlight_status = BL_OFF;
@@ -114,7 +111,7 @@ int wireless_backlight_state(void)
 EXPORT_SYMBOL(wireless_backlight_state);
 #endif
 
-#ifdef CONFIG_G2_LGD_PANEL
+#if defined(CONFIG_G2_LGD_PANEL) || defined(CONFIG_B1_LGD_PANEL)
 static void bl_set_pwm_mode(int mode)
 {
 	if (mode)
@@ -127,10 +124,10 @@ static void bl_set_pwm_mode(int mode)
 static void lm3630_hw_reset(void)
 {
 	int gpio = main_lm3630_dev->gpio;
-	/*           
-                            
-                                      
-  */
+	/* LGE_CHANGE
+	 * Fix GPIO Setting Warning
+	 * 2011. 12. 14, kyunghoo.ryu@lge.com
+	 */
 
 	if (gpio_is_valid(gpio)) {
 		gpio_direction_output(gpio, 1);
@@ -144,12 +141,12 @@ static int lm3630_read_reg(struct i2c_client *client, u8 reg, u8 *buf)
 {
 	s32 ret;
 
-	pr_debug("[LCD][DEBUG] reg: %x\n", reg);
+	pr_debug("reg: %x\n", reg);
 
 	ret = i2c_smbus_read_byte_data(client, reg);
 
 	if (ret < 0)
-		pr_err("[LCD][DEBUG] error\n");
+		pr_err("%s read register error\n", __func__);
 
 	*buf = ret;
 
@@ -184,9 +181,6 @@ static void lm3630_set_main_current_level(struct i2c_client *client, int level)
 	int min_brightness = dev->min_brightness;
 	int max_brightness = dev->max_brightness;
 
-	if (level == -BOOT_BRIGHTNESS)
-		level = dev->default_brightness;
-
 	cur_main_lcd_level = level;
 	dev->bl_dev->props.brightness = cur_main_lcd_level;
 
@@ -194,7 +188,11 @@ static void lm3630_set_main_current_level(struct i2c_client *client, int level)
 
 	mutex_lock(&dev->bl_mutex);
 
-#ifdef CONFIG_G2_LGD_PANEL
+#if defined(CONFIG_B1_LGD_PANEL)
+	if(factory_boot)
+		level = min_brightness;
+#endif
+#if defined(CONFIG_G2_LGD_PANEL) || defined(CONFIG_B1_LGD_PANEL)
 	if (level < PWM_THRESHOLD)
 		bl_set_pwm_mode(PWM_OFF);
 	else
@@ -225,14 +223,8 @@ static void lm3630_set_main_current_level(struct i2c_client *client, int level)
 
 	mutex_unlock(&dev->bl_mutex);
 
-	#ifdef CONFIG_MACH_MSM8974_VU3_KR
-		pr_info("[LCD][DEBUG] %s : backlight level=%d, cal_value=%d\n",
+	pr_info("%s : backlight level=%d, cal_value=%d \n",
 				__func__, level, cal_value);
-	#else
-		pr_debug("[LCD][DEBUG] %s : backlight level=%d, cal_value=%d\n",
-				__func__, level, cal_value);
-	#endif
-
 }
 
 static void lm3630_set_main_current_level_no_mapping(
@@ -262,15 +254,17 @@ static void lm3630_set_main_current_level_no_mapping(
 
 void lm3630_backlight_on(int level)
 {
-
 	if (backlight_status == BL_OFF) {
+		pr_info("%s : level = %d\n", __func__, level);
 
-		pr_info("%s with level %d\n", __func__, level);
+#if defined(CONFIG_B1_LGD_PANEL)
+		mdelay(30);
+#elif defined(CONFIG_G2_LGD_PANEL)
+		mdelay(15);
+#endif
 		lm3630_hw_reset();
 
-
-
-		/*	OVP(24V),OCP(1.0A) , Boost Frequency(500khz) */
+		/*  OVP(24V),OCP(1.0A) , Boost Frequency(500khz) */
 		lm3630_write_reg(main_lm3630_dev->client, 0x02, 0x30);
 
 		if (lm3630_pwm_enable) {
@@ -284,11 +278,7 @@ void lm3630_backlight_on(int level)
 		/* Brightness Code Setting Max on Bank A */
 		/* Full-Scale Current (20.2mA) of BANK A */
 		/* 20.2mA : 0x13 , 23.4mA : 0x17 */
-#ifdef CONFIG_MACH_MSM8974_VU3_KR
-		lm3630_write_reg(main_lm3630_dev->client, 0x05, 0x14);
-#else
 		lm3630_write_reg(main_lm3630_dev->client, 0x05, 0x16);
-#endif
 
 		/* Enable LED A to Exponential, LED2 is connected to BANK_A */
 		lm3630_write_reg(main_lm3630_dev->client, 0x00, 0x15);
@@ -312,10 +302,10 @@ void lm3630_backlight_off(void)
 	lm3630_set_main_current_level(main_lm3630_dev->client, 0);
 	backlight_status = BL_OFF;
 
+	pr_info("%s\n", __func__);
 	gpio_direction_output(gpio, 0);
 	msleep(6);
 
-	pr_info("%s from level %d\n", __func__, saved_main_lcd_level);
 	return;
 }
 
@@ -324,7 +314,6 @@ void lm3630_lcd_backlight_set_level(int level)
 	if (level > MAX_BRIGHTNESS_LM3630)
 		level = MAX_BRIGHTNESS_LM3630;
 
-	pr_debug("### %s level = (%d)\n ", __func__, level);
 	if (lm3630_i2c_client != NULL) {
 		if (level == 0) {
 			lm3630_backlight_off();
@@ -339,21 +328,23 @@ EXPORT_SYMBOL(lm3630_lcd_backlight_set_level);
 
 static int bl_set_intensity(struct backlight_device *bd)
 {
+#if defined(CONFIG_MACH_LGE_BACKLIGHT_SUPPORT)
+	lm3630_lcd_backlight_set_level(bd->props.brightness);
+#else
 	struct i2c_client *client = to_i2c_client(bd->dev.parent);
 
-	/*           
-                                               
-            
-                                    
-  */
+	/* LGE_CHANGE
+	 * if it's trying to set same backlight value,
+	 * skip it.
+	 * 2013-02-15, baryun.hwang@lge.com
+	 */
 	if (bd->props.brightness == cur_main_lcd_level) {
 		pr_debug("%s level is already set. skip it\n", __func__);
 		return 0;
 	}
-
 	lm3630_set_main_current_level(client, bd->props.brightness);
 	cur_main_lcd_level = bd->props.brightness;
-
+#endif
 	return 0;
 }
 
@@ -393,7 +384,7 @@ static ssize_t lcd_backlight_store_level(struct device *dev,
 	level = simple_strtoul(buf, NULL, 10);
 
 	lm3630_set_main_current_level_no_mapping(client, level);
-	pr_info("[LCD][DEBUG] write %d direct to "
+	pr_info("write %d direct to "
 			"backlight register\n", level);
 
 	return count;
@@ -407,7 +398,7 @@ static int lm3630_bl_resume(struct i2c_client *client)
 
 static int lm3630_bl_suspend(struct i2c_client *client, pm_message_t state)
 {
-	pr_info("[LCD][DEBUG] %s: new state: %d\n",
+	pr_info("%s: new state: %d\n",
 			__func__, state.event);
 
 	lm3630_lcd_backlight_set_level(saved_main_lcd_level);
@@ -440,7 +431,7 @@ static ssize_t lcd_backlight_store_on_off(struct device *dev,
 
 	on_off = simple_strtoul(buf, NULL, 10);
 
-	pr_info("[LCD][DEBUG] %d", on_off);
+	pr_info(" %d", on_off);
 
 	if (on_off == 1)
 		lm3630_bl_resume(client);
@@ -541,11 +532,15 @@ static int lm3630_parse_dt(struct device *dev,
 	if (rc == -EINVAL)
 		lm3630_pwm_enable = 1;
 
+
 	rc = of_property_read_u32(np, "lm3630,blmap_size",
 			&pdata->blmap_size);
 
 	if (pdata->blmap_size) {
 		array = kzalloc(sizeof(u32) * pdata->blmap_size, GFP_KERNEL);
+
+	pr_info("%s : backlight parse dt3\n", __func__);
+
 		if (!array)
 			return -ENOMEM;
 
@@ -569,7 +564,7 @@ static int lm3630_parse_dt(struct device *dev,
 		pdata->blmap = NULL;
 	}
 
-	pr_debug("%s gpio: %d, max_current: %d, min: %d, "
+	pr_info("%s gpio: %d, max_current: %d, min: %d, "
 			"default: %d, max: %d, pwm : %d , blmap_size : %d\n",
 			__func__, pdata->gpio,
 			pdata->max_current,
@@ -597,7 +592,7 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 	struct backlight_properties props;
 	int err;
 
-	pr_info("[LCD][DEBUG] %s: i2c probe start\n", __func__);
+	pr_info(" %s: i2c probe start\n", __func__);
 
 #ifdef CONFIG_OF
 	if (&i2c_dev->dev.of_node) {
@@ -617,7 +612,7 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 #else
 	pdata = i2c_dev->dev.platform_data;
 #endif
-	pr_debug("[LCD][DEBUG] %s: gpio = %d\n", __func__, pdata->gpio);
+	pr_info("%s: gpio = %d\n", __func__, pdata->gpio);
 	if (pdata->gpio && gpio_request(pdata->gpio, "lm3630 reset") != 0) {
 		return -ENODEV;
 	}
@@ -638,7 +633,21 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 	bl_dev = backlight_device_register(I2C_BL_NAME, &i2c_dev->dev,
 			NULL, &lm3630_bl_ops, &props);
 	bl_dev->props.max_brightness = MAX_BRIGHTNESS_LM3630;
-	bl_dev->props.brightness = DEFAULT_BRIGHTNESS;
+#if defined(CONFIG_B1_LGD_PANEL)
+	if(lge_get_boot_mode() == LGE_BOOT_MODE_CHARGERLOGO)
+		bl_dev->props.brightness = 0x99; // same to LK
+	else if(lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY
+			|| lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY2
+			|| lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY3
+			|| lge_get_boot_mode() == LGE_BOOT_MODE_PIFBOOT
+			|| lge_get_boot_mode() == LGE_BOOT_MODE_PIFBOOT2
+			|| lge_get_boot_mode() == LGE_BOOT_MODE_PIFBOOT3)
+		factory_boot = 1;
+	else
+		bl_dev->props.brightness = DEFAULT_BRIGHTNESS;
+#else
+	bl_dev->props.brightness = pdata->default_brightness;
+#endif
 	bl_dev->props.power = FB_BLANK_UNBLANK;
 
 	dev->bl_dev = bl_dev;
@@ -647,7 +656,6 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 	dev->gpio = pdata->gpio;
 	dev->max_current = pdata->max_current;
 	dev->min_brightness = pdata->min_brightness;
-	dev->default_brightness = pdata->default_brightness;
 	dev->max_brightness = pdata->max_brightness;
 	dev->blmap_size = pdata->blmap_size;
 
@@ -662,11 +670,15 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 		dev->blmap = NULL;
 	}
 
-	#if !defined(CONFIG_MACH_MSM8974_VU3_KR)
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+	if ((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561)) {
+		dev->bl_dev->props.brightness = 50;
+		pr_info("%s : fota reboot - backlight set 50\n", __func__);
+	}
+#endif
 	if (gpio_get_value(dev->gpio))
 		backlight_status = BL_ON;
 	else
-	#endif
 		backlight_status = BL_OFF;
 
 	i2c_set_clientdata(i2c_dev, dev);
@@ -684,10 +696,7 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 			&dev_attr_lm3630_pwm);
 #endif
 
-#ifdef CONFIG_G2_LGD_PANEL
-	if (!lge_get_cont_splash_enabled())
-		lm3630_lcd_backlight_set_level(0);
-#endif
+	pr_info("%s: i2c probe done\n", __func__);
 	return 0;
 }
 
@@ -735,6 +744,8 @@ static int __init lcd_backlight_init(void)
 	static int err;
 
 	err = i2c_add_driver(&main_lm3630_driver);
+
+	pr_info("%s : backlight init\n", __func__);
 
 	return err;
 }

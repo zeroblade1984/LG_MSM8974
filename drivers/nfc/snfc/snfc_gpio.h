@@ -13,7 +13,6 @@
  */
 #include <linux/gpio.h>
 #include "snfc_common.h"
-#include <mach/board_lge.h>
 /*DEFINE*/
 
 enum{
@@ -31,40 +30,33 @@ enum{
   GPIO_CONFIG_DISABLE,
 };
 
+
+struct snfc_gp {
+     int gpio_hsel;
+     int gpio_pon;
+     int gpio_hvdd;
+     int gpio_intu;
+     int gpio_rfs;
+     int gpio_uicc_con;
+};
+
 /* snfc_pon */
-#define GPIO_SNFC_PON           40      //IMA_PON
+#define GPIO_SNFC_PON       74      //IMA_PON
 
 /* snfc_rfs */
-#define GPIO_SNFC_RFS           94              //IMA_CDET
-
-/* snfc_rfs */
-#define GPIO_SNFC_RFS_REV_D     59              //IMA_CDET_REV_D
+#define GPIO_SNFC_RFS       82      //IMA_CDET
 
 /* snfc_int */
-#define GPIO_SNFC_INT           38              //IMA_INT
-
-/* snfc_int */
-#define GPIO_SNFC_INT_REV_D     37              //IMA_INT_REV_D
+#define GPIO_SNFC_INT       46      //IMA_INT
 
 /* snfc_lockcont */
-#define GPIO_SNFC_INTU          36              //IMA_INTU
-
-/* snfc_lockcont */
-#define GPIO_SNFC_INTU_REV_D    35              //IMA_INTU_REV_D
+#define GPIO_SNFC_INTU      59      //IMA_INTU
 
 /* snfc_hsel */
-#define GPIO_SNFC_HSEL          59              //NFC_HSEL
-
-/* snfc_hsel */
-#define GPIO_SNFC_HSEL_REV_D            94              //NFC_HSEL_REV_D
+#define GPIO_SNFC_HSEL      94      //NFC_HSEL
 
 /* snfc_hvdd */
-#define GPIO_SNFC_HVDD          35      //NFC_HVDD
-
-/* snfc_hvdd */
-#define GPIO_SNFC_HVDD_REV_D            36      //NFC_HVDD_REV_D
-
-#define GPIO_SNFC_UICC_CON		39	//UICC_CON
+#define GPIO_SNFC_HVDD      145     //NFC_HVDD
 
 #define SNFC_GPIO_CFG(gpio, func, dir, pull, drvstr) \
     ((((gpio) & 0x3FF) << 4)        |   \
@@ -76,15 +68,10 @@ enum{
 extern int gpio_rfs;
 
 /*
- *      FUNCTION PROTOTYPE
+ *  FUNCTION PROTOTYPE
  */
 int snfc_gpio_open(int gpionum, int direction, int value);
 void snfc_gpio_write(int gpionum, int value);
 int snfc_gpio_read(int gpionum);
-int snfc_get_rfs_gpio_num(void);
-int snfc_get_int_gpio_num(void);
-int snfc_get_intu_gpio_num(void);
-int snfc_get_hsel_gpio_num(void);
-int snfc_get_hvdd_gpio_num(void);
 
 #endif  //__SNFC_GPIO_H__

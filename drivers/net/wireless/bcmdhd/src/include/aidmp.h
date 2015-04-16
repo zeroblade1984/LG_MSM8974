@@ -1,7 +1,7 @@
 /*
  * Broadcom AMBA Interconnect definitions.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: aidmp.h 385510 2013-02-15 21:02:07Z $
+ * $Id: aidmp.h 456346 2014-02-18 16:48:52Z $
  */
 
 #ifndef	_AIDMP_H
@@ -111,7 +111,7 @@
 #define	SD_SZ_ALIGN		0x00000fff
 
 
-#ifndef _LANGUAGE_ASSEMBLY
+#if !defined(_LANGUAGE_ASSEMBLY) && !defined(__ASSEMBLY__)
 
 typedef volatile struct _aidmp {
 	uint32	oobselina30;	/* 0x000 */
@@ -231,7 +231,7 @@ typedef volatile struct _aidmp {
 	uint32	componentid3;	/* 0xffc */
 } aidmp_t;
 
-#endif /* _LANGUAGE_ASSEMBLY */
+#endif /* !_LANGUAGE_ASSEMBLY && !__ASSEMBLY__ */
 
 /* Out-of-band Router registers */
 #define	OOB_BUSCONFIG		0x020

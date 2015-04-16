@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fci_oal.h
- 
+
  Description : OS Adatation Layer header
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/09/13 	jason		initial
+ 2009/09/13     jason        initial
 *******************************************************************************/
 
 #ifndef __FCI_OAL_H__
@@ -25,4 +25,4 @@ extern void msMustWait(int ms);
 }
 #endif
 
-#endif		// __FCI_OAL_H__
+#endif        // __FCI_OAL_H__

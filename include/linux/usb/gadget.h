@@ -138,6 +138,9 @@ struct usb_ep_ops {
 
 	int (*fifo_status) (struct usb_ep *ep);
 	void (*fifo_flush) (struct usb_ep *ep);
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	void (*yield_request) (struct usb_ep *ep, struct usb_request *req);
+#endif
 };
 
 /**
@@ -180,6 +183,19 @@ struct usb_ep {
 };
 
 /*-------------------------------------------------------------------------*/
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+/*B2-BSP-USB@lge.com
+ * If some eps need to share the usb_requset,
+ * this function is do that.
+ * Change original ep num of dwc3_request to parameter ep num.
+ */
+static inline void lge_usb_ep_yield_request(struct usb_ep *ep,
+				       struct usb_request *req)
+{
+	if (ep->ops->yield_request)
+		ep->ops->yield_request(ep, req);
+}
+#endif
 
 /**
  * usb_ep_enable - configure endpoint, making it usable
@@ -509,6 +525,7 @@ struct usb_gadget_ops {
  * @usb_core_id: Identifies the usb core controlled by this usb_gadget.
  *		 Used in case of more then one core operates concurrently.
  * @streaming_enabled: Enable streaming mode with usb core.
+ * @xfer_isr_count: UI (transfer complete) interrupts count
  *
  * Gadgets have a mostly-portable "gadget driver" implementing device
  * functions, handling all usb configurations and interfaces.  Gadget
@@ -548,6 +565,7 @@ struct usb_gadget {
 	u8				usb_core_id;
 	bool				l1_supported;
 	bool				streaming_enabled;
+	u32				xfer_isr_count;
 };
 
 static inline void set_gadget_data(struct usb_gadget *gadget, void *data)

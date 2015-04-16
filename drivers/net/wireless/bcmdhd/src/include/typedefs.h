@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -18,7 +18,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: typedefs.h 397286 2013-04-18 01:42:19Z $
+ * $Id: typedefs.h 484281 2014-06-12 22:42:26Z $
  */
 
 #ifndef _TYPEDEFS_H_
@@ -65,7 +65,7 @@
 
 #endif	/* ! __cplusplus */
 
-#if defined(__x86_64__)
+#if defined(__LP64__)
 #define TYPEDEF_UINTPTR
 typedef unsigned long long int uintptr;
 #endif
@@ -85,7 +85,6 @@ typedef long unsigned int size_t;
 #if defined(__sparc__)
 #define TYPEDEF_ULONG
 #endif
-
 
 /*
  * If this is either a Linux hybrid build or the per-port code of a hybrid build
@@ -114,8 +113,6 @@ typedef long unsigned int size_t;
 #endif	/* == 2.6.18 */
 #endif	/* __KERNEL__ */
 #endif  /* !defined(LINUX_HYBRID) || defined(LINUX_PORT) */
-
-
 
 
 /* Do not support the (u)int64 types with strict ansi for GNU C */
@@ -149,13 +146,11 @@ typedef long unsigned int size_t;
 
 #else
 
-
 #include <sys/types.h>
 
 #endif /* linux && __KERNEL__ */
 
 #endif 
-
 
 
 /* use the default typedefs in the next section of this file */
@@ -173,7 +168,7 @@ typedef long unsigned int size_t;
 
 #ifndef TYPEDEF_BOOL
 typedef	/* @abstract@ */ unsigned char	bool;
-#endif
+#endif /* endif TYPEDEF_BOOL */
 
 /* define uchar, ushort, uint, ulong */
 

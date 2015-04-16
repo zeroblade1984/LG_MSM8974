@@ -30,9 +30,9 @@
 #define RESTART_REASON_ADDR       0x65C
 #define DLOAD_MODE_ADDR           0x0
 #define UEFI_RAM_DUMP_MAGIC_ADDR  0xC
-#define RAM_CONSOLE_ADDR_ADDR     0x24
-#define RAM_CONSOLE_SIZE_ADDR     0x28
-#define FB1_ADDR_ADDR             0x2C
+#define RAM_CONSOLE_ADDR_ADDR     0x28
+#define RAM_CONSOLE_SIZE_ADDR     0x2C
+#define FB1_ADDR_ADDR             0x30
 
 #define RESTART_REASON      (MSM_IMEM_BASE + RESTART_REASON_ADDR)
 #define UEFI_RAM_DUMP_MAGIC \
@@ -91,7 +91,7 @@ void lge_set_restart_reason(unsigned int reason)
 			&& (reason != LAF_DLOAD_MODE))
 		__raw_writel(LGE_RB_MAGIC | LGE_LAF_CRASH, RESTART_REASON);
 	else
-		__raw_writel(reason, RESTART_REASON);
+	__raw_writel(reason, RESTART_REASON);
 }
 EXPORT_SYMBOL(lge_set_restart_reason);
 
@@ -136,25 +136,35 @@ static int gen_mba_panic(const char *val, struct kernel_param *kp)
 module_param_call(gen_mba_panic, gen_mba_panic, param_get_bool, &dummy_arg,
 		S_IWUSR | S_IRUGO);
 
+static int gen_modem_panic_type = 0;
+
+int lge_get_modem_panic(void)
+{
+	return gen_modem_panic_type;
+}
+
+EXPORT_SYMBOL(lge_get_modem_panic);
+
 static int gen_modem_panic(const char *val, struct kernel_param *kp)
 {
-	subsystem_restart("modem");
+	int ret = param_set_int(val, kp);
+	if (ret) {
+		pr_err("error setting value %d\n", ret);
+		return ret;
+	}
+	pr_err("gen_modem_panic param to %d\n", gen_modem_panic_type);
+	switch (gen_modem_panic_type) {
+		case 2:
+			subsys_modem_restart();
+			break;
+		default:
+			subsystem_restart("modem");
+			break;
+	}
 	return 0;
 }
-module_param_call(gen_modem_panic, gen_modem_panic, param_get_bool, &dummy_arg,
+module_param_call(gen_modem_panic, gen_modem_panic, param_get_bool, &gen_modem_panic_type,
 		S_IWUSR | S_IRUGO);
-
-
-/* START : gen_subsys_modem_restart */
-static int gen_subsys_modem_restart(const char *val, struct kernel_param *kp)
-{
-	subsys_modem_restart();
-	return 0;
-}
-module_param_call(gen_subsys_modem_restart, gen_subsys_modem_restart, param_get_bool, &dummy_arg,
-		S_IWUSR | S_IRUGO);
-/* END : gen_subsys_modem_restart */
-
 
 static int gen_wcnss_panic(const char *val, struct kernel_param *kp)
 {
@@ -229,7 +239,6 @@ module_param_call(gen_hw_reset, gen_hw_reset, param_get_bool,
 static int __init lge_panic_handler_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-
 	return ret;
 }
 

@@ -215,7 +215,6 @@ void __put_task_struct(struct task_struct *tsk)
 	put_signal_struct(tsk->signal);
 
 	atomic_notifier_call_chain(&task_free_notifier, 0, tsk);
-	ccs_free_task_security(tsk);
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
 }
@@ -1298,9 +1297,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	retval = audit_alloc(p);
 	if (retval)
 		goto bad_fork_cleanup_policy;
-	retval = ccs_alloc_task_security(p);
-	if (retval)
-		goto bad_fork_cleanup_audit;
 	/* copy all the process information */
 	retval = copy_semundo(clone_flags, p);
 	if (retval)
@@ -1499,7 +1495,6 @@ bad_fork_cleanup_semundo:
 	exit_sem(p);
 bad_fork_cleanup_audit:
 	audit_free(p);
-	ccs_free_task_security(p);
 bad_fork_cleanup_policy:
 	perf_event_free_task(p);
 #ifdef CONFIG_NUMA

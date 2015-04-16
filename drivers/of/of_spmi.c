@@ -267,6 +267,7 @@ static void of_spmi_walk_dev_container(struct of_spmi_dev_info *d_info,
 		return;
 #endif
 
+
 	/*
 	 * Count the total number of device_nodes so we know how much
 	 * device_store to allocate.

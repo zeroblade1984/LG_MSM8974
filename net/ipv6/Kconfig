@@ -261,4 +261,10 @@ config LGP_DATA_BUGFIX_IPV6_ADDRCONF_KERNEL_CRASH
 	---help---
 	During DAD process, if the interface of ipv6 were down, kernel crash will be occured.
 
+config LGE_DHCPV6_WIFI
+	bool "IPv6: Stateless DHCPV6 support"
+	default n
+	---help---
+	  If you enable stateless dhcpv6 feature in Wi-Fi network, say Y
+
 endif # IPV6

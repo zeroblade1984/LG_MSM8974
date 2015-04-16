@@ -28,7 +28,6 @@
 #define BMS_EN_CTL			0x4046
 #define BMS1_VSENSE_AVG_DATA0		0x4098
 #define RSENSE_MICRO_OHM		10000
-#define RATIO_TO_MICRO_A		100
 
 struct cn_chip {
 	struct device			*dev;
@@ -37,14 +36,26 @@ struct cn_chip {
 	int				r_sense_uohm;
 	u16				base;
 	u16				iadc_base;
-	u16				bms_enabled;
 	struct qpnp_iadc_chip       *iadc_dev;
 };
 
 static enum power_supply_property cn_props[] = {
-	POWER_SUPPLY_PROP_VIRT_CURRENT_NOW,
-	POWER_SUPPLY_PROP_VIRT_ENABLE_BMS,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_PRESENT,
 };
+
+static int
+cn_power_property_is_writeable(struct power_supply *psy,
+				enum power_supply_property psp)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+		return 1;
+	default:
+		break;
+	}
+	return 0;
+}
 
 static int cn_read_wrapper(struct cn_chip *chip, u8 *val,
 		u16 addr, int count)
@@ -144,21 +155,13 @@ static int cn_set_property(struct power_supply *psy,
 	struct cn_chip *chip = container_of(psy, struct cn_chip, cn_psy);
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_VIRT_ENABLE_BMS:
-		if (!val->intval)
-			ret = cn_masked_write_base(chip, BMS_EN_CTL,
-					BMS_EN_MASK, 0x00);
-		else
+	case POWER_SUPPLY_PROP_PRESENT:
+		if (val->intval)
 			ret = cn_masked_write_base(chip, BMS_EN_CTL,
 					BMS_EN_MASK, 0x80);
-
-
-		if (ret) {
-			chip->bms_enabled = 0;
-			pr_err("fail to enable bms\n");
-		} else {
-			chip->bms_enabled = 1;
-		}
+		else
+			ret = cn_masked_write_base(chip, BMS_EN_CTL,
+					BMS_EN_MASK, 0x00);
 		break;
 	default:
 		return -EINVAL;
@@ -176,14 +179,15 @@ static int cn_get_property(struct power_supply *psy,
 	struct cn_chip *chip = container_of(psy, struct cn_chip, cn_psy);
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_VIRT_CURRENT_NOW:
+	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		cn_read_wrapper(chip, (u8 *)&reg,
 				BMS1_VSENSE_AVG_DATA0, 2);
 		result_uv = convert_vsense_to_uv(chip, reg);
-		val->intval = (int)(result_uv * RATIO_TO_MICRO_A);
+		val->intval = (int)result_uv;
 		break;
-	case POWER_SUPPLY_PROP_VIRT_ENABLE_BMS:
-		val->intval = chip->bms_enabled;
+	case POWER_SUPPLY_PROP_PRESENT:
+		cn_read_wrapper(chip, (u8 *)&reg, BMS_EN_CTL, 1);
+		val->intval = !!(reg | BMS_EN_MASK);
 		break;
 	default:
 		return -EINVAL;
@@ -220,8 +224,14 @@ static int __devinit cn_probe(struct spmi_device *spmi)
 {
 	int rc;
 	struct cn_chip *chip;
+	struct device *dev = &spmi->dev;
 
 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+	if (unlikely(!chip)) {
+		pr_err("cn_probe: out of memory space\n");
+		return -ENOMEM;
+	}
+	dev_set_drvdata(dev, chip);
 
 	if (chip == NULL) {
 		pr_err("kzalloc() failed.\n");
@@ -230,7 +240,6 @@ static int __devinit cn_probe(struct spmi_device *spmi)
 	chip->iadc_base = IADC_BASE;
 	chip->base = BMS_BASE;
 	chip->r_sense_uohm = RSENSE_MICRO_OHM; /* rsense is 10mohm */
-	chip->bms_enabled = 0;
 
 	rc = spmi_cn_add_controller(chip, spmi);
 	if (rc) {
@@ -250,14 +259,18 @@ static int __devinit cn_probe(struct spmi_device *spmi)
 	chip->cn_psy.set_property	= cn_set_property;
 	chip->cn_psy.properties		= cn_props;
 	chip->cn_psy.num_properties	= ARRAY_SIZE(cn_props);
+	chip->cn_psy.property_is_writeable =
+				cn_power_property_is_writeable;
 
 	rc = power_supply_register(chip->dev, &chip->cn_psy);
-
 	if (rc < 0) {
 		pr_err("power_supply_register bms failed rc = %d\n", rc);
 		goto unregister_dc;
 	}
-
+	/* Enable BMS_EN_CTL */
+	rc = cn_masked_write_base(chip, BMS_EN_CTL, BMS_EN_MASK, 0x80);
+	if (rc)
+		pr_err("Fail to enable BMS_EN_CTL!! rc=%d\n", rc);
 	return 0;
 unregister_dc:
 	power_supply_unregister(&chip->cn_psy);
@@ -271,19 +284,38 @@ static struct of_device_id cn_match_table[] = {
 };
 
 
-static int __devexit
-cn_remove(struct spmi_device *spmi)
+static int __devexit cn_remove(struct spmi_device *spmi)
 {
+	struct cn_chip *chip = dev_get_drvdata(&spmi->dev);
+	power_supply_unregister(&chip->cn_psy);
+	kfree(chip);
+	dev_set_drvdata(&spmi->dev, NULL);
 	return 0;
 }
 
 static int cn_resume(struct device *dev)
 {
-	return 0;
+	int rc;
+	struct cn_chip *chip = dev_get_drvdata(dev);
+	rc = cn_masked_write_base(chip, BMS_EN_CTL, BMS_EN_MASK, 0x80);
+	if (rc)
+		pr_err("Fail to enable BMS_EN_CTL!! rc=%d\n", rc);
+	return rc;
+}
+
+static int cn_suspend(struct device *dev)
+{
+	int rc;
+	struct cn_chip *chip = dev_get_drvdata(dev);
+	rc = cn_masked_write_base(chip, BMS_EN_CTL, BMS_EN_MASK, 0x00);
+	if (rc)
+		pr_err("Fail to disable BMS_EN_CTL!! rc=%d\n", rc);
+	return rc;
 }
 
 static const struct dev_pm_ops cn_pm_ops = {
 	.resume		= cn_resume,
+	.suspend	= cn_suspend,
 };
 
 static struct spmi_driver cn_driver = {

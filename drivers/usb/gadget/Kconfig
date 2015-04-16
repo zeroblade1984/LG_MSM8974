@@ -1081,11 +1081,6 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        help
 	  Data SMD channel for transferring network data
 
-# LGE_CHANGE
-# LGE android gadget config for JB.
-# Toward simple, straightforward...
-# 2012-09-26, jinhyuck.kwon@lge.com
-#
 config USB_G_LGE_ANDROID
 	boolean "LGE Android Gadget for LG PC host Driver"
 	depends on USB_G_ANDROID
@@ -1213,6 +1208,64 @@ config USB_G_LGE_ANDROID_DIAG_OSP_SUPPORT
 
 	default n
 
+#CONFIG_USB_DWC3_MSM_VZW_SUPPORT
+config USB_DWC3_MSM_VZW_SUPPORT
+	bool "VZW specific DWC3_MSM support in LGE Android"
+	depends on USB_DWC3_MSM
+	help
+	  It supports VZW specific DWC3_MSM feature for USB BC 1.2 event.
+	  note that this must be used in VZW devices.
+
+	  Say y if this must be needed.
+
+	default n
+
+#B2-BSP-USB@lge.com
+config DWC3_MSM_CDP_SUPPORT
+	bool "CDP support in LGE Android"
+	depends on USB_G_LGE_ANDROID
+	help
+	  To support BC 1.2 scenario, high current draw for CDP.
+
+	  Say y if this must be needed.
+
+	default n
+
+#B2-BSP-USB@lge.com
+config DWC3_MSM_BC_12_VZW_SUPPORT
+	bool "Specific BC 1.2 Scenario for VZW"
+	depends on USB_G_LGE_ANDROID
+	help
+	  VZW wants that don't charging for open dcd and not configured situation.
+
+	  Say y if this must be needed.
+
+	default n
+
+#B2-BSP-USB@lge.com
+config USB_G_LGE_MULTIPLE_CONFIGURATION
+	boolean "LGE Multiple Configuration"
+	help
+	  Support multiple mtp functions in multiple configuration.
+	  Add another descriptor for 2nd mtp function.
+
+	  Say y if this must be needed.
+
+	default n
+
+config USB_G_LGE_MULTICONFIG_ATF_WA
+	boolean "LGE Multiple Configuration"
+	depends on USB_G_LGE_MULTIPLE_CONFIGURATION
+	help
+	  If USB multiple configuration applied, AFT can't recognize device.
+	  Thus, change ACM interfaceclass by OS type.
+	  You need to change host driver if this config enabled.
+	  Just workaround until AFT update.
+
+	  Say y if this must be needed.
+
+	default y
+
 config USB_G_LGE_SERIALNO_REDIRECTION
 	boolean "LGE specific serial number support in LGE Android"
 	help
@@ -1222,37 +1275,13 @@ config USB_G_LGE_SERIALNO_REDIRECTION
 
 	default n
 
-config USB_G_LGE_MULTIPLE_CONFIGURATION
-	boolean "LGE Multiple Configuration"
+config USB_EMBEDDED_BATTERY_REBOOT
+	boolean "power cycle when factory cable is connected"
 	help
-	  If there is any function which has duplicated in multiple configuration, it occurs error when makes descriptor.
-	  So in case of duplicated functions should be add another descriptor This config is for duplicated functions.
-	  
-	  Say y if this must be needed.
-
-	default n
-
-#CONFIG_USB_DWC3_MSM_VZW_SUPPORT
-config USB_DWC3_MSM_VZW_SUPPORT
-	bool "VZW specific DWC3_MSM support in LGE Android"
-	depends on USB_DWC3_MSM
-	help
-	  It supports VZW specific DWC3_MSM feature for USB BC 1.2 event. 
-	  note that this must be used in VZW devices.
+	  In case of the phone with embedded battery, power cycle is implemented
+          when factory cable is connected.
 
 	  Say y if this must be needed.
 
 	default n
-
-config USB_LGE_REPOSITION_FACTORY_BIND
-	boolean "translocation of factory bind function call"
-	depends on USB_G_LGE_ANDROID
-	help
-	  Factory usb device can be connected on host PC at the right sequence
-	  provided by Android USB framework.
-
-	  Say y if this feature must be needed.
-
-	  default n
-
 endif # USB_GADGET

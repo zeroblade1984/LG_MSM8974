@@ -28,12 +28,6 @@
 
 #define NO_SINK		(-1)
 
-
-#if defined(CONFIG_MACH_LGE) && defined(CONFIG_MSM_RTB)
-extern int msm_rtb_panic_notifier(struct notifier_block *this,
-					unsigned long event, void *ptr);
-#endif
-
 static int curr_sink = NO_SINK;
 static LIST_HEAD(coresight_orph_conns);
 static LIST_HEAD(coresight_devs);
@@ -409,9 +403,7 @@ void coresight_abort(void)
 	}
 	if (curr_sink == NO_SINK)
 		goto out;
-#if defined(CONFIG_MACH_LGE) && defined(CONFIG_MSM_RTB)
-        msm_rtb_panic_notifier(NULL, 0, NULL);
-#endif
+
 	list_for_each_entry(cd, &coresight_devs, dev_link) {
 		if (cd->id == curr_sink) {
 			if (cd->enable && cd->ops->sink_ops->abort) {

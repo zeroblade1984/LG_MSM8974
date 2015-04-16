@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8050_bb.h
- 
+
  Description : baseband header file
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/09/14 	jason		initial
+ 2009/09/14     jason        initial
 *******************************************************************************/
 
 #ifndef __FC8050_BB_H__
@@ -37,4 +37,4 @@ extern int  fc8050_data_deselect(HANDLE hDevice, fci_u8 subChId, fci_u8 svcChId)
 }
 #endif
 
-#endif 		// __FC8050_BB_H__
+#endif         // __FC8050_BB_H__

@@ -32,4 +32,6 @@ struct max1462x_platform_data {
 	unsigned int latency_for_key;
 };
 
+struct qpnp_vadc_chip *switch_vadc = NULL;
+
 #endif /* __HDS_MAX1462X_H__ */

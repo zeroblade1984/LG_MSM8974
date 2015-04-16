@@ -181,13 +181,8 @@ static struct usb_cdc_union_desc ncm_union_desc = {
 	/* .bSlaveInterface0 =	DYNAMIC */
 };
 
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-static struct usb_cdc_ether_desc ether_desc = {
-	.bLength =		sizeof ether_desc,
-#else
 static struct usb_cdc_ether_desc necm_desc = {
 	.bLength =		sizeof necm_desc,
-#endif
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ETHERNET_TYPE,
 
@@ -275,11 +270,7 @@ static struct usb_descriptor_header *ncm_fs_function[] = {
 	(struct usb_descriptor_header *) &ncm_control_intf,
 	(struct usb_descriptor_header *) &ncm_header_desc,
 	(struct usb_descriptor_header *) &ncm_union_desc,
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-	(struct usb_descriptor_header *) &ether_desc,
-#else
 	(struct usb_descriptor_header *) &necm_desc,
-#endif
 	(struct usb_descriptor_header *) &ncm_desc,
 	(struct usb_descriptor_header *) &fs_ncm_notify_desc,
 	/* data interface, altsettings 0 and 1 */
@@ -325,11 +316,7 @@ static struct usb_descriptor_header *ncm_hs_function[] = {
 	(struct usb_descriptor_header *) &ncm_control_intf,
 	(struct usb_descriptor_header *) &ncm_header_desc,
 	(struct usb_descriptor_header *) &ncm_union_desc,
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-	(struct usb_descriptor_header *) &ether_desc,
-#else
 	(struct usb_descriptor_header *) &necm_desc,
-#endif
 	(struct usb_descriptor_header *) &ncm_desc,
 	(struct usb_descriptor_header *) &hs_ncm_notify_desc,
 	/* data interface, altsettings 0 and 1 */
@@ -664,10 +651,6 @@ static int ncm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		value = w_length > sizeof ntb_parameters ?
 			sizeof ntb_parameters : w_length;
 		memcpy(req->buf, &ntb_parameters, value);
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-		((struct usb_cdc_ncm_ntb_parameters *)(req->buf))->dwNtbOutMaxSize =
-			cpu_to_le32(NTB_OUT_SIZE-1);
-#endif
 		VDBG(cdev, "Host asked NTB parameters\n");
 		break;
 
@@ -856,20 +839,16 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 				}
 			}
 
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-			ncm->port.is_zlp_ok = !(
-				gadget_is_musbhdrc(cdev->gadget) ||
-				gadget_is_dwc3(cdev->gadget)
-				);
-#else
 			/* TODO */
 			/* Enable zlps by default for NCM conformance;
 			 * override for musb_hdrc (avoids txdma ovhead)
 			 */
 			ncm->port.is_zlp_ok = !(
 				gadget_is_musbhdrc(cdev->gadget)
-				);
+#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
+				|| gadget_is_dwc3(cdev->gadget)
 #endif
+				);
 			ncm->port.cdc_filter = DEFAULT_FILTER;
 			DBG(cdev, "activate ncm\n");
 			net = gether_connect(&ncm->port);
@@ -1369,11 +1348,7 @@ int ncm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		if (status < 0)
 			return status;
 		ncm_string_defs[STRING_MAC_IDX].id = status;
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-		ether_desc.iMACAddress = status;
-#else
 		necm_desc.iMACAddress = status;
-#endif
 
 		/* IAD */
 		status = usb_string_id(c->cdev);
@@ -1449,10 +1424,6 @@ static int ncm_ctrlrequest(struct usb_composite_dev *cdev,
 
 	if (b_requestType == (USB_DIR_OUT | USB_TYPE_VENDOR)) {
 		if (ctrl->bRequest == 0xf0) {
-			/*
-			mode_version = w_value;
-			mode_vendor_id = w_index;
-			*/
 			printk(KERN_INFO "ncm_ctrlrequest "
 					"%02x.%02x v%04x i%04x l%u\n",
 					b_requestType, b_request,

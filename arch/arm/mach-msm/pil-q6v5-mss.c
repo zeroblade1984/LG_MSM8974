@@ -38,14 +38,17 @@
 #include "pil-msa.h"
 #include "sysmon.h"
 
+/* FEATURE_LGE_MODEM_DEBUG_INFO, 2014-08-18, jin.park@lge.com */
+#define FEATURE_LGE_MODEM_DEBUG_INFO
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+#include <asm/uaccess.h>
+#include <linux/syscalls.h>
+#endif
+
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	81U
 #define STOP_ACK_TIMEOUT_MS	1000
-
-/* START : subsys_modem_restart : testmode */
-bool ignore_errors_by_subsys_modem_restart = false;
-/* END : subsys_modem_restart : testmode */
 
 struct modem_data {
 	struct mba_data *mba;
@@ -59,6 +62,7 @@ struct modem_data {
 	struct completion stop_ack;
 };
 
+/* LGE_MODEM_RESET, 2013-12-17, wj1208.jo@lge.com */
 struct lge_hw_smem_id2_type {
 	u32 build_info;             /* build type user:0 userdebug:1 eng:2 */
 	int modem_reset;
@@ -66,9 +70,129 @@ struct lge_hw_smem_id2_type {
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
-/*                                       */
+// [START] jin.park@lge.com, SSR FEATURE
 char ssr_noti[MAX_SSR_REASON_LEN];
-/*                                     */
+// [END] jin.park@lge.com, SSR FEATURE
+
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+enum modem_ssr_event {
+    MODEM_SSR_ERR_FATAL = 0x01,
+    MODEM_SSR_WATCHDOG_BITE,
+    MODEM_SSR_UNEXPECTED_RESET1,
+    MODEM_SSR_UNEXPECTED_RESET2,
+};
+
+struct modem_debug_info {
+    char save_ssr_reason[MAX_SSR_REASON_LEN];
+    int modem_ssr_event;
+    int modem_ssr_level;
+    struct workqueue_struct *modem_ssr_queue;
+    struct work_struct modem_ssr_report_work;
+};
+
+struct modem_debug_info modem_debug;
+
+static void modem_ssr_report_work_fn(struct work_struct *work)
+{
+
+    int fd, ret = 0;
+    char report_index, index_to_write;
+    char path_prefix[]="/data/logger/modem_ssr_report";
+    char index_file_path[]="/data/logger/modem_ssr_index";
+    char report_file_path[128];
+
+    char watchdog_bite[]="Watchdog bite received from modem software!";
+    char unexpected_reset1[]="unexpected reset external modem";
+    char unexpected_reset2[]="MDM2AP_STATUS did not go high";
+
+    mm_segment_t oldfs;
+
+    oldfs = get_fs();
+    set_fs(get_ds());
+
+    fd = sys_open(index_file_path, O_RDONLY, 0664);
+    if (fd < 0) {
+        printk("%s : can't open the index file\n", __func__);
+        report_index = '0';
+    } else {
+        ret = sys_read(fd, &report_index, 1);
+        if (ret < 0) {
+            printk("%s : can't read the index file\n", __func__);
+            report_index = '0';
+        }
+        sys_close(fd);
+    }
+
+    if (report_index == '9') {
+        index_to_write = '0';
+    } else if (report_index >= '0' && report_index <= '8') {
+        index_to_write = report_index + 1;
+    } else {
+        index_to_write = '1';
+        report_index = '0';
+    }
+
+    fd = sys_open(index_file_path, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    if (fd < 0) {
+        printk("%s : can't open the index file\n", __func__);
+        return;
+    }
+
+    ret = sys_write(fd, &index_to_write, 1);
+    if (ret < 0) {
+        printk("%s : can't write the index file\n", __func__);
+        return;
+    }
+
+    ret = sys_close(fd);
+    if (ret < 0) {
+        printk("%s : can't close the index file\n", __func__);
+        return;
+    }
+
+    sprintf(report_file_path, "%s%c", path_prefix, report_index);
+
+    fd = sys_open(report_file_path, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+
+    if (fd < 0) {
+        printk("%s : can't open the report file\n", __func__);
+        return;
+    }
+
+    switch (modem_debug.modem_ssr_event) {
+        case MODEM_SSR_ERR_FATAL:
+            ret = sys_write(fd, modem_debug.save_ssr_reason, strlen(modem_debug.save_ssr_reason));
+            break;
+        case MODEM_SSR_WATCHDOG_BITE:
+            ret = sys_write(fd, watchdog_bite, sizeof(watchdog_bite) - 1);
+            break;
+        case MODEM_SSR_UNEXPECTED_RESET1:
+            ret = sys_write(fd, unexpected_reset1, sizeof(unexpected_reset1) - 1);
+            break;
+        case MODEM_SSR_UNEXPECTED_RESET2:
+            ret = sys_write(fd, unexpected_reset2, sizeof(unexpected_reset2) - 1);
+            break;
+        default:
+            printk("%s : modem_ssr_event error %d\n", __func__, modem_debug.modem_ssr_event);
+            break;
+    }
+
+    if (ret < 0) {
+        printk("%s : can't write the report file\n", __func__);
+        return;
+    }
+
+    ret = sys_close(fd);
+
+    if (ret < 0) {
+        printk("%s : can't close the report file\n", __func__);
+        return;
+    }
+
+    sys_sync();
+    set_fs(oldfs);
+}
+#endif
 
 static void log_modem_sfr(void)
 {
@@ -88,43 +212,52 @@ static void log_modem_sfr(void)
 	strlcpy(reason, smem_reason, min(size, sizeof(reason)));
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
-/*                                       */
-	strlcpy(ssr_noti, smem_reason, min(size, sizeof(ssr_noti)));
-/*                                     */
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+    if (modem_debug.modem_ssr_level != RESET_SOC) {
+        strlcpy(modem_debug.save_ssr_reason, smem_reason, min(size, sizeof(reason)));
+        modem_debug.modem_ssr_event = MODEM_SSR_ERR_FATAL;
+        queue_work(modem_debug.modem_ssr_queue, &modem_debug.modem_ssr_report_work);
+    }
+#endif
 
-	smem_reason[0] = '\0';
-	wmb();
+    smem_reason[0] = '\0';
+    wmb();
+
 }
 
 static void restart_modem(struct modem_data *drv)
 {
+
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+    modem_debug.modem_ssr_level = subsys_get_restart_level(drv->subsys);
+#endif
+
 	log_modem_sfr();
 	drv->ignore_errors = true;
 	subsystem_restart_dev(drv->subsys);
 }
 
-static int check_modem_reset(void)
+static int check_modem_reset(struct modem_data *drv)
 {
 	u32 size;
-	int ret;
+	int ret = -EPERM;
 	struct lge_hw_smem_id2_type *smem_id2;
 
 	smem_id2 = smem_get_entry(SMEM_ID_VENDOR2, &size);
 
-/*                                                            */
-	if(smem_id2 != 0 && smem_id2->modem_reset != 1) {
-		return 1;
+	if (smem_id2 == NULL) {
+		pr_err("%s: smem_id2 is NULL.\n", __func__);
+		return ret;
 	}
 
-	printk("modem reset command is invoked.\n");
-	ret = subsys_modem_restart();
-
-	if(smem_id2 != 0) {
-		smem_id2->modem_reset = 0;
+	if(smem_id2->modem_reset != 1) {
+		ret = 1;
+	} else {
+		wmb();
+		drv->ignore_errors = true;
+		subsys_modem_restart();
+		ret = 0;
 	}
-	wmb();
-/*                                                          */
-
 	return ret;
 }
 
@@ -132,15 +265,16 @@ static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 {
 	struct modem_data *drv = subsys_to_drv(dev_id);
 
-	if(check_modem_reset() == 0)
-		return IRQ_HANDLED;
-
 	/* Ignore if we're the one that set the force stop GPIO */
 	if (drv->crash_shutdown)
 		return IRQ_HANDLED;
 
 	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, true);
+
+	if (check_modem_reset(drv) == 0)
+		return IRQ_HANDLED;
+
 	restart_modem(drv);
 	return IRQ_HANDLED;
 }
@@ -180,11 +314,6 @@ static int modem_powerup(const struct subsys_desc *subsys)
 	struct modem_data *drv = subsys_to_drv(subsys);
 	int ret;
 
-#ifdef CONFIG_MACH_LGE
-	pr_info("%s : modem is powering up\n", __func__);
-	dump_stack();
-#endif
-
 	if (subsys->is_not_loadable)
 		return 0;
 	/*
@@ -194,11 +323,6 @@ static int modem_powerup(const struct subsys_desc *subsys)
 	 */
 	INIT_COMPLETION(drv->stop_ack);
 	drv->ignore_errors = false;
-
-	/* START : subsys_modem_restart : testmode */
-	ignore_errors_by_subsys_modem_restart = false;
-	/* END : subsys_modem_restart : testmode */
-
 	ret = pil_boot(&drv->q6->desc);
 	if (ret)
 		return ret;
@@ -257,17 +381,18 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	struct modem_data *drv = subsys_to_drv(dev_id);
 	if (drv->ignore_errors)
 		return IRQ_HANDLED;
-
-	/* START : subsys_modem_restart : testmode */
-	if (ignore_errors_by_subsys_modem_restart) {
-		pr_err("IGNORE watchdog bite received from modem software!\n");		
-		return IRQ_HANDLED;
-	}
-	/* END : subsys_modem_restart : testmode */
-
 	pr_err("Watchdog bite received from modem software!\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
+
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+    modem_debug.modem_ssr_level = subsys_get_restart_level(drv->subsys);
+    if (modem_debug.modem_ssr_level != RESET_SOC) {
+        modem_debug.modem_ssr_event = MODEM_SSR_WATCHDOG_BITE;
+        queue_work(modem_debug.modem_ssr_queue, &modem_debug.modem_ssr_report_work);
+    }
+#endif
+
 	return IRQ_HANDLED;
 }
 
@@ -305,10 +430,6 @@ static int __devinit pil_subsys_init(struct modem_data *drv,
 {
 	int ret;
 
-#ifdef CONFIG_MACH_LGE
-	pr_info("pil_subsys_init : exter init\n");
-#endif
-
 	drv->subsys_desc.name = "modem";
 	drv->subsys_desc.dev = &pdev->dev;
 	drv->subsys_desc.owner = THIS_MODULE;
@@ -344,9 +465,6 @@ static int __devinit pil_subsys_init(struct modem_data *drv,
 			__func__, ret);
 		goto err_irq;
 	}
-#ifdef CONFIG_MACH_LGE
-	pr_info("pil_subsys_init : exit init\n");
-#endif
 
 	return 0;
 
@@ -445,23 +563,12 @@ static int __devinit pil_mss_loadable_init(struct modem_data *drv,
 	ret = pil_desc_init(q6_desc);
 	if (ret)
 		return ret;
-#ifdef CONFIG_MACH_LGE
-	if (q6_desc && q6_desc->name)
-		dev_info(&pdev->dev, " %s description init success",
-				q6_desc->name);
-#endif
 
 	mba_desc = &mba->desc;
 	mba_desc->name = "modem";
 	mba_desc->dev = &pdev->dev;
 	mba_desc->ops = &pil_msa_mba_ops;
 	mba_desc->owner = THIS_MODULE;
-
-#ifdef CONFIG_MACH_LGE
-	if (mba_desc && mba_desc->name)
-		dev_info(&pdev->dev, " %s description init success",
-				mba_desc->name);
-#endif
 
 	ret = pil_desc_init(mba_desc);
 	if (ret)
@@ -480,10 +587,6 @@ static int __devinit pil_mss_driver_probe(struct platform_device *pdev)
 	struct modem_data *drv;
 	int ret, is_not_loadable;
 
-#ifdef CONFIG_MACH_LGE
-	dev_info(&pdev->dev, "probing\n");
-#endif
-
 	drv = devm_kzalloc(&pdev->dev, sizeof(*drv), GFP_KERNEL);
 	if (!drv)
 		return -ENOMEM;
@@ -500,6 +603,17 @@ static int __devinit pil_mss_driver_probe(struct platform_device *pdev)
 	}
 	init_completion(&drv->stop_ack);
 
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+    modem_debug.modem_ssr_queue = alloc_workqueue("modem_ssr_queue", 0, 0);
+    if (!modem_debug.modem_ssr_queue) {
+        printk("could not create modem_ssr_queue\n");
+    }
+
+    modem_debug.modem_ssr_event = 0;
+    modem_debug.modem_ssr_level = RESET_SOC;
+    INIT_WORK(&modem_debug.modem_ssr_report_work, modem_ssr_report_work_fn);
+#endif
+
 	return pil_subsys_init(drv, pdev);
 }
 
@@ -513,6 +627,14 @@ static int __devexit pil_mss_driver_exit(struct platform_device *pdev)
 	destroy_ramdump_device(drv->ramdump_dev);
 	pil_desc_release(&drv->mba->desc);
 	pil_desc_release(&drv->q6->desc);
+
+#ifdef FEATURE_LGE_MODEM_DEBUG_INFO
+    if (modem_debug.modem_ssr_queue) {
+        destroy_workqueue(modem_debug.modem_ssr_queue);
+        modem_debug.modem_ssr_queue = NULL;
+    }
+#endif
+
 	return 0;
 }
 

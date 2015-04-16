@@ -335,9 +335,6 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		if (state)
 			input_event(input, type, button->code, button->value);
 	} else {
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-		printk(KERN_INFO "[KEY] Report Key %d, %s\n", button->code, (!!state) ? "pressed" : "released");
-#endif
 		input_event(input, type, button->code, !!state);
 	}
 	input_sync(input);

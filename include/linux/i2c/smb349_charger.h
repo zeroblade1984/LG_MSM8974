@@ -14,7 +14,6 @@
 #define __SMB349_H__
 
 #define SMB349_NAME		"smb349"
-
 /**
  * struct smb349_platform_data
  * structure to pass board specific information to the smb137b charger driver
@@ -32,7 +31,7 @@ struct smb349_platform_data {
 	int chg_current_ma;
 	int stat_gpio;
 	int term_current_ma;
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_G3_LGU_EVB) || defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
 	int otg_en_gpio;
 #endif
 };

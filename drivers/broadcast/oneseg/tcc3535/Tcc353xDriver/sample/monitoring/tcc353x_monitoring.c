@@ -44,6 +44,8 @@ static void Tcc353xUpdateMonitoringStatus(I32S _moduleIndex,
 					  Tcc353xStatus_t * pISDBStatData);
 extern I32S Tcc353xApiOpStatusRead(I32S _moduleIndex, I32S _diversityIndex,
 			   I32U _dataSize, I32U * _datas);
+extern I32S Tcc353xApiGetTMCCInfo(I32S _moduleIndex, I32S _diversityIndex,
+			   tmccInfo_t * _tmccInfo);
 
 /*---------------------------------------------------------------------
  * Function name
@@ -291,15 +293,106 @@ I32S Tcc353xMonitoringApiGetStatus(I32S _moduleIndex, I32S _diversityIndex,
 					(I32U)((opStatusData[7]>>16)&0xFFFF);
 		pISDBStatData->opstat.BRsCnt = 
 					(I32U)((opStatusData[7])&0xFFFF);
+#if defined (_SUPPORT_C_LAYER_)
+
+		if(pISDBStatData->opstat.ASegNo >= 1 &&
+		   pISDBStatData->opstat.ASegNo <= 13 &&
+		   pISDBStatData->opstat.BSegNo >= 1 &&
+		   pISDBStatData->opstat.BSegNo <= 13 &&
+		   (pISDBStatData->opstat.ASegNo +
+		    pISDBStatData->opstat.BSegNo<13)) {
+			/* need C Layer Information */
+			tmccInfo_t tmccinfo;
+			mailbox_t mailbox;
+
+			I64U c_rs_error;
+			I32U c_rs_count;
+			I32U c_rs_over;
+
+			TcpalMemset(&tmccinfo, 0x00, sizeof(tmccInfo_t));
+			ret = Tcc353xApiGetTMCCInfo(_moduleIndex, 0, &tmccinfo);
+			if(ret != TCC353X_RETURN_SUCCESS)
+				return TCC353X_RETURN_FAIL;
+
+			pISDBStatData->opstat.CMod =
+			    ((tmccinfo.currentInfo.transParammLayerC>>10)
+			    & 0x07);
+			pISDBStatData->opstat.CCr =
+			    ((tmccinfo.currentInfo.transParammLayerC>>7)
+			    & 0x07);
+			pISDBStatData->opstat.CIntLen =
+			    ((tmccinfo.currentInfo.transParammLayerC>>4)
+			    & 0x07);
+			pISDBStatData->opstat.CSegNo =
+			    (tmccinfo.currentInfo.transParammLayerC & 0x0F);
+
+			ret = Tcc353xApiMailboxRead(_moduleIndex,
+				_diversityIndex, ((0x2 << 11) | 0x02),
+				&mailbox);
+
+			if(ret != TCC353X_RETURN_SUCCESS)
+				return TCC353X_RETURN_FAIL;
+
+			pISDBStatData->pcber[2] =
+			    ((mailbox.data_array[0]) & 0xFFFF);
+
+			c_rs_error = (mailbox.data_array[1] |
+			    ((I64U) (mailbox.data_array[2]) << 32));;
+			c_rs_count = mailbox.data_array[4];
+			c_rs_over = mailbox.data_array[3];
+
+			if(Tcc353xStatus[_moduleIndex][_diversityIndex].
+			    opstat.oldResyncCnt !=
+			    pISDBStatData->opstat.ResyncCnt) {
+				/* resynced status */
+				pISDBStatData->opstat.CRsErrorCnt = c_rs_error;
+				pISDBStatData->opstat.CRsCnt = c_rs_count;
+				pISDBStatData->opstat.CRsOverCnt = c_rs_over;
+			} else {
+				pISDBStatData->opstat.CRsErrorCnt =
+					(I32U)((c_rs_error -
+					pISDBStatData->opstat.
+					c_rs_error_old_mailbox)&0x7FFFFFFF);
+				pISDBStatData->opstat.CRsCnt =
+					(I32U)((c_rs_count -
+					pISDBStatData->opstat.
+					c_rs_count_old_mailbox)&0x7FFFFFFF);
+				pISDBStatData->opstat.CRsOverCnt =
+					(I32U)((c_rs_over -
+					pISDBStatData->opstat.
+					c_rs_over_old_mailbox)&0x7FFFFFFF);
+			}
+			pISDBStatData->opstat.c_rs_error_old_mailbox =
+			    c_rs_error;
+			pISDBStatData->opstat.c_rs_count_old_mailbox =
+			    c_rs_count;
+			pISDBStatData->opstat.c_rs_over_old_mailbox =
+			    c_rs_over;
+
+		} else {
+			pISDBStatData->opstat.CMod = 0x03;
+			pISDBStatData->opstat.CCr = 0x07;
+			pISDBStatData->opstat.CIntLen = 0x07;
+			pISDBStatData->opstat.CSegNo = 0x0F;
+
+			pISDBStatData->opstat.CRsErrorCnt = 0;
+			pISDBStatData->opstat.CRsCnt = 0;
+			pISDBStatData->opstat.CRsOverCnt = 0;
+		}
+#endif
 
 		if(pISDBStatData->opstat.dataState) {
 			I32U tempA,tempB;
 			tempA = (I32U)(pISDBStatData->opstat.APcber);
 			tempB = (I32U)(pISDBStatData->opstat.BPcber);
 			
-			pISDBStatData->pcber[0] = (tempA<<pISDBStatData->opstat.ACr);
-			pISDBStatData->pcber[1] = (tempB<<pISDBStatData->opstat.BCr);
+			pISDBStatData->pcber[0] = 
+			    (tempA<<pISDBStatData->opstat.ACr);
+			pISDBStatData->pcber[1] =
+			    (tempB<<pISDBStatData->opstat.BCr);
+#if !defined (_SUPPORT_C_LAYER_)
 			pISDBStatData->pcber[2] = 0xFFFF000;	/* MAX */
+#endif
 		} else {
 			pISDBStatData->pcber[0] = 0xFFFF000;
 			pISDBStatData->pcber[1] = 0xFFFF000;

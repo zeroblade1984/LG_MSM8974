@@ -1,11 +1,11 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8050_demux.h
- 
+
  Description : baseband header file
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
 
 *******************************************************************************/
@@ -19,10 +19,10 @@ extern "C" {
 
 typedef enum ts_data_type
 {
-	TS_DAT_FIC,
-	TS_DAT_VIDEO_I,
-	TS_DAT_VIDEO_II,
-	TS_DAT_NVIDEO
+    TS_DAT_FIC,
+    TS_DAT_VIDEO_I,
+    TS_DAT_VIDEO_II,
+    TS_DAT_NVIDEO
 } ts_data_type;
 
 int fc8050_demux(fci_u8* data, fci_u32 length);

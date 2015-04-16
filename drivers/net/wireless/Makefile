@@ -59,13 +59,7 @@ obj-$(CONFIG_IWM)	+= iwmc3200wifi/
 
 obj-$(CONFIG_MWIFIEX)	+= mwifiex/
 
-#[BEGIN][LGE_WIFI][moon-wifi@lge.com] seperate bcm4334/bcm4335(bcm4339)
-ifneq ($(CONFIG_BCM4334),)
-obj-$(CONFIG_BCMDHD)    += bcm4334/
-else
 obj-$(CONFIG_BCMDHD)	+= bcmdhd/
-endif
-#[END][LGE_WIFI][moon-wifi@lge.com] seperate bcm4334/bcm4335/bcm4339
 
 obj-$(CONFIG_BRCMFMAC)	+= brcm80211/
 obj-$(CONFIG_BRCMSMAC)	+= brcm80211/

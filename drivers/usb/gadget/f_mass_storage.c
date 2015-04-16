@@ -316,15 +316,15 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
 
-/*                                       
-                                  
-                                   
+/* Belows are LGE-customized SCSI cmd and
+ * sub-cmd for autorun processing.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 #define SC_LGE_SPE              0xF1
 #define SUB_CODE_MODE_CHANGE    0x01
 #define SUB_CODE_GET_VALUE      0x02
 #define SUB_CODE_PROBE_DEV      0xff
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 #define SUB_CODE_SET_VALUE	0x05
 #endif
@@ -344,7 +344,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #define TYPE_MOD_CHG2_TO_TET    0x87
 #define TYPE_MOD_CHG2_TO_FDG    0x88
 #define TYPE_MOD_CHG2_TO_PTP    0x89
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 #define TYPE_SET_VAL_USB_DRV_INSTALLED		0x30
 #define TYPE_SET_VAL_USB_DRV_UNINSTALLED	0x31
@@ -362,7 +362,14 @@ static const char fsg_string_interface[] = "Mass Storage";
 #define SUB_ACK_STATUS_CGO      0x04
 #define SUB_ACK_STATUS_TET      0x05
 #define SUB_ACK_STATUS_PTP      0x06
-#endif /*                                  */
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+/*For multiple configuration, but actually ISO don't know this.
+ *TODO : Need to clear this interface.
+ */
+#define SUB_ACK_STATUS_MUL      0x07
+#endif
+
+#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
 
 #include "storage_common.c"
 
@@ -375,9 +382,9 @@ static int csw_hack_sent;
 struct fsg_dev;
 struct fsg_common;
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/*                                             
-                                     
-                                   
+/* Belows are uevent string to communicate with
+ * android framework and application.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 static char *envp_ack[2] = {"AUTORUN=ACK", NULL};
 
@@ -396,7 +403,7 @@ static char *envp_mode[][2] = {
 	{"AUTORUN=device_info", NULL},
 };
 #endif
-#ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW
+#ifdef CONFIG_DWC3_MSM_BC_12_VZW_SUPPORT
 static char *usb_drv_envp_mode[][2] = {
 	{"USB_DRV=uninstalled", NULL},
 	{"USB_DRV=installed", NULL},
@@ -433,6 +440,9 @@ enum check_mode_state {
 	ACK_STATUS_CGO = SUB_ACK_STATUS_CGO,
 	ACK_STATUS_TET = SUB_ACK_STATUS_TET,
 	ACK_STATUS_PTP = SUB_ACK_STATUS_PTP,
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	ACK_STATUS_MUL = SUB_ACK_STATUS_MUL,
+#endif
 	ACK_STATUS_ERR,
 };
 
@@ -540,7 +550,7 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-	/*                         */
+	/* LGE-customized USB mode */
 	enum chg_mode_state mode_state;
 #endif
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW
@@ -1438,8 +1448,8 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	return 36;
 }
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/*                                                           
-                                   
+/* Add function which handles LGE-customized command from PC.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 static int do_ack_status(struct fsg_common *common, struct fsg_buffhd *bh, u8 ack)
 {
@@ -1689,7 +1699,6 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
 	return 20;
 #endif
-
 }
 
 static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -2320,7 +2329,7 @@ static int check_command_size_in_blocks(struct fsg_common *common,
 			mask, needs_medium, name);
 }
 
-#ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW
+#ifdef CONFIG_DWC3_MSM_BC_12_VZW_SUPPORT
 void send_drv_state_uevent(int installed)
 {
 	pr_info("%s: VZW_USB_DRV_STATE - %s\n", __func__,
@@ -2490,7 +2499,7 @@ static int do_scsi_command(struct fsg_common *common)
 			common->mode_state = MODE_STATE_PROBE_DEV;
 			reply = 0;
 			break;
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 		case SUB_CODE_SET_VALUE:
 			switch (common->cmnd[2]) {
@@ -2518,7 +2527,7 @@ static int do_scsi_command(struct fsg_common *common)
 			break;
 		} /* switch (common->cmnd[1]) */
 		break;
-#endif /*                                  */
+#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
 
 	case MODE_SELECT:
 		common->data_size_from_cmnd = common->cmnd[4];
@@ -3298,6 +3307,7 @@ static ssize_t fsg_show_usbmode(struct device *dev,
 {
 	int ret;
 	ret = sprintf(buf, "%d", user_mode);
+	pr_info("autorun read user mode : %d\n", user_mode);
 	return ret;
 }
 
@@ -3315,12 +3325,11 @@ static ssize_t fsg_store_usbmode(struct device *dev,
 	user_mode = (unsigned int)tmp;
 	mutex_unlock(&autorun_lock);
 
-	pr_info("autorun user mode : %d\n", user_mode);
+	pr_info("autorun write user mode : %d\n", user_mode);
 
 	return count;
 }
 #endif
-
 /*************************** DEVICE ATTRIBUTES ***************************/
 
 /* Write permission is checked per LUN in store_*() functions. */
@@ -3401,15 +3410,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	common->ep0 = gadget->ep0;
 	common->ep0req = cdev->req;
 	common->cdev = cdev;
-
-	/* Maybe allocate device-global string IDs, and patch descriptors */
-	if (fsg_strings[FSG_STRING_INTERFACE].id == 0) {
-		rc = usb_string_id(cdev);
-		if (unlikely(rc < 0))
-			goto error_release;
-		fsg_strings[FSG_STRING_INTERFACE].id = rc;
-		fsg_intf_desc.iInterface = rc;
-	}
 
 	/*
 	 * Create the LUNs, open their backing files, and register the

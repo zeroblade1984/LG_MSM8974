@@ -17,8 +17,6 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/power_supply.h>
-#include <linux/zwait.h>
-#include <linux/mock_power.h>
 #include "power_supply.h"
 
 /* exported for the APM Power driver, APM emulation */
@@ -27,26 +25,54 @@ EXPORT_SYMBOL_GPL(power_supply_class);
 
 static struct device_type power_supply_dev_type;
 
-#ifdef CONFIG_ZERO_WAIT
-static int forbid_change = 0;
-
-static inline bool psy_cannot_change(void)
+#ifdef CONFIG_LGE_PM
+int power_supply_set_floated_charger(struct power_supply *psy,
+				int is_float)
 {
-	return forbid_change;
-}
+	const union power_supply_propval ret = {is_float,};
 
-void power_supply_forbid_change_all(void)
-{
-	forbid_change = 1;
-}
+	if (psy->set_event_property)
+		return psy->set_event_property(psy, POWER_SUPPLY_PROP_FLOATED_CHARGER,
+								&ret);
 
-void power_supply_permit_change_all(void)
-{
-	forbid_change = 0;
+	return -ENXIO;
 }
-#else
-#define psy_cannot_change()	(0)
+EXPORT_SYMBOL_GPL(power_supply_set_floated_charger);
+int power_supply_set_usb_driver_uninstall(struct power_supply *psy,
+		int is_drv_uninstall)
+{
+	const union power_supply_propval ret = {is_drv_uninstall,};
+
+	if (psy->set_event_property)
+		return psy->set_event_property(psy, POWER_SUPPLY_PROP_DRIVER_UNINSTALL,
+				&ret);
+
+	return -ENXIO;
+}
+EXPORT_SYMBOL_GPL(power_supply_set_usb_driver_uninstall);
 #endif
+
+/**
+ * power_supply_set_voltage_limit - set current limit
+ * @psy:	the power supply to control
+ * @limit:	current limit in uV from the power supply.
+ *		0 will disable the power supply.
+ *
+ * This function will set a maximum supply current from a source
+ * and it will disable the charger when limit is 0.
+ */
+int power_supply_set_voltage_limit(struct power_supply *psy, int limit)
+{
+	const union power_supply_propval ret = {limit,};
+
+	if (psy->set_property)
+		return psy->set_property(psy, POWER_SUPPLY_PROP_VOLTAGE_MAX,
+								&ret);
+
+	return -ENXIO;
+}
+EXPORT_SYMBOL(power_supply_set_voltage_limit);
+
 
 /**
  * power_supply_set_current_limit - set current limit
@@ -236,9 +262,6 @@ void power_supply_changed(struct power_supply *psy)
 
 	dev_dbg(psy->dev, "%s\n", __func__);
 
-	if (psy_cannot_change())
-		return;
-
 	spin_lock_irqsave(&psy->changed_lock, flags);
 	psy->changed = true;
 	wake_lock(&psy->work_wake_lock);
@@ -391,20 +414,8 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 
 	power_supply_changed(psy);
 
-	rc = zw_power_supply_register(psy);
-	if (rc < 0)
-		goto zw_power_failed;
-
-	rc = mock_power_supply_register(psy);
-	if (rc < 0)
-		goto mock_power_failed;
-
 	goto success;
 
-mock_power_failed:
-	zw_power_supply_unregister(psy);
-zw_power_failed:
-	power_supply_remove_triggers(psy);
 create_triggers_failed:
 	wake_lock_destroy(&psy->work_wake_lock);
 	device_del(dev);
@@ -420,8 +431,6 @@ void power_supply_unregister(struct power_supply *psy)
 {
 	cancel_work_sync(&psy->changed_work);
 	sysfs_remove_link(&psy->dev->kobj, "powers");
-	mock_power_supply_unregister(psy);
-	zw_power_supply_unregister(psy);
 	power_supply_remove_triggers(psy);
 	wake_lock_destroy(&psy->work_wake_lock);
 	device_unregister(psy->dev);

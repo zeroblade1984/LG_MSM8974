@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -579,6 +579,15 @@ struct adm_cmd_matrix_mute_v5 {
 	/* Clients must set this field to zero.*/
 } __packed;
 
+#define ASM_PARAM_ID_AAC_STEREO_MIX_COEFF_SELECTION_FLAG_V2 (0x00010DD8)
+
+struct asm_aac_stereo_mix_coeff_selection_param_v2 {
+	struct apr_hdr          hdr;
+	u32                     param_id;
+	u32                     param_size;
+	u32                     aac_stereo_mix_coeff_flag;
+} __packed;
+
 /* Allows a client to connect the desired stream to
  * the desired AFE port through the stream router
  *
@@ -643,7 +652,6 @@ struct adm_cmd_connect_afe_port_v5 {
 #define RSVD_2 9
 #define RSVD_3 10
 #define DIGI_MIC_TX 11
-#define GLOBAL_CFG 12
 #define VOICE2_PLAYBACK_TX 0x8002
 #define VOICE_RECORD_RX 0x8003
 #define VOICE_RECORD_TX 0x8004
@@ -1031,6 +1039,29 @@ struct afe_loopback_cfg_v1 {
  */
 
 } __packed;
+
+#ifdef CONFIG_SND_SOC_CS35L32
+#define AFE_MODULE_RTIP_ENABLE         	0x000101FF
+#define AFE_PARAM_RTIP_ENABLE          	0x000102FF
+#define AFE_PARAM_RTIP_DEBUG		0x00010300
+#define AFE_PARAM_RTIP_PERF		0x00010301
+
+/*  Payload of the #AFE_PARAM_ID_LOOPBACK_CONFIG ,
+ * which enables/disables one AFE loopback.
+ */
+struct afe_param_rtip_enable {
+       u16 enable;
+       u16 reserved;
+} __attribute__ ((packed));
+
+
+struct afe_rtip_v1 {
+	struct apr_hdr	hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2    pdata;
+	struct afe_param_rtip_enable	 rtip_t;
+} __packed;
+#endif
 
 #define AFE_MODULE_SPEAKER_PROTECTION	0x00010209
 #define AFE_PARAM_ID_SPKR_PROT_CONFIG	0x0001020a
@@ -2256,6 +2287,7 @@ struct afe_port_cmdrsp_get_param_v2 {
 #define VPM_TX_SM_ECNS_COPP_TOPOLOGY			0x00010F71
 #define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY			0x00010F72
 #define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY		0x00010F75
+#define VPM_TX_DM_RFECNS_COPP_TOPOLOGY			0x00010F86
 
 /* Memory map regions command payload used by the
  * #ASM_CMD_SHARED_MEM_MAP_REGIONS ,#ADM_CMD_SHARED_MEM_MAP_REGIONS
@@ -2492,6 +2524,10 @@ struct asm_softvolume_params {
 #define ASM_STREAM_POSTPROC_TOPO_ID_DEFAULT 0x00010BE4
 
 #define ASM_STREAM_POSTPROC_TOPO_ID_NONE 0x00010C68
+
+#if defined(CONFIG_SND_LGE_EFFECT) || defined(CONFIG_SND_LGE_NORMALIZER) || defined(CONFIG_SND_LGE_MABL)
+#define ASM_STREAM_POSTPROC_TOPO_ID_DEFAULT_LGE 0x10009009
+#endif
 
 #define ASM_MEDIA_FMT_EVRCB_FS 0x00010BEF
 
@@ -4700,6 +4736,25 @@ struct asm_stream_cmd_open_write_compressed {
 
 } __packed;
 
+
+/*
+    Indicates the number of samples per channel to be removed from the
+    beginning of the stream.
+*/
+#define ASM_DATA_CMD_REMOVE_INITIAL_SILENCE 0x00010D67
+/*
+    Indicates the number of samples per channel to be removed from
+    the end of the stream.
+*/
+#define ASM_DATA_CMD_REMOVE_TRAILING_SILENCE 0x00010D68
+struct asm_data_cmd_remove_silence {
+	struct apr_hdr hdr;
+	u32	num_samples_to_remove;
+	/**< Number of samples per channel to be removed.
+
+	   @values 0 to (2@sscr{32}-1) */
+} __packed;
+
 #define ASM_STREAM_CMD_OPEN_READ_COMPRESSED                        0x00010D95
 
 struct asm_stream_cmd_open_read_compressed {
@@ -6856,6 +6911,7 @@ struct afe_param_id_clip_bank_sel {
 #define Q6AFE_LPASS_IBIT_CLK_1_P024_MHZ		 0xFA000
 #define Q6AFE_LPASS_IBIT_CLK_768_KHZ		 0xBB800
 #define Q6AFE_LPASS_IBIT_CLK_512_KHZ		 0x7D000
+#define Q6AFE_LPASS_IBIT_CLK_256_KHZ		 0x3E800
 #define Q6AFE_LPASS_IBIT_CLK_DISABLE		     0x0
 
 /* Supported LPASS CLK sources */
@@ -7153,7 +7209,7 @@ struct afe_svc_cmd_set_clip_bank_selection {
 /* Ultrasound supported formats */
 #define US_POINT_EPOS_FORMAT_V2 0x0001272D
 #define US_RAW_FORMAT_V2        0x0001272C
-#define US_PROX_FORMAT_V2       0x0001272E
+#define US_PROX_FORMAT_V4       0x0001273B
 #define US_RAW_SYNC_FORMAT      0x0001272F
 #define US_GES_SYNC_FORMAT      0x00012730
 

@@ -40,9 +40,12 @@
 
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
+#include <linux/workqueue.h>
+#include <linux/wakelock.h>
 
 #include <linux/input/lge_touch_core.h>
 #include <linux/input/touch_synaptics.h>
+#include <linux/firmware.h>
 
 
 /* Variables for F34 functionality */
@@ -133,63 +136,37 @@ char SynaFlashCommandStr[0x0C][0x20] =
 int FirmwareUpgrade (struct synaptics_ts_data *ts, const char* fw_path) {
 
 	int ret = 0;
-	int fd = -1;
-	mm_segment_t old_fs = 0;
-	struct stat fw_bin_stat;
-	unsigned long read_bytes;
+	const struct firmware *fw_entry = NULL;
 
-	if (unlikely(fw_path[0] != 0)) {
-		old_fs = get_fs();
-		set_fs(get_ds());
-
-		fd = sys_open((const char __user *) fw_path, O_RDONLY, 0);
-		if (fd < 0) {
-			TOUCH_ERR_MSG("Can not read FW binary from %s\n", fw_path);
-			ret = -EEXIST;
-			goto read_fail;
-		}
-		ret = sys_newstat((char __user *) fw_path, (struct stat *)&fw_bin_stat);
-		if (ret < 0) {
-			TOUCH_ERR_MSG("Can not read FW binary stat from %s\n", fw_path);
-			goto fw_mem_alloc_fail;
-		}
-
-		my_image_size = fw_bin_stat.st_size;
-		my_image_bin = kzalloc(sizeof(char) * (my_image_size+1), GFP_KERNEL);
-		if (my_image_bin == NULL) {
-			TOUCH_ERR_MSG("Can not allocate  memory\n");
-			ret = -ENOMEM;
-			goto fw_mem_alloc_fail;
-		}
-
-		read_bytes = sys_read(fd, (char __user *)my_image_bin, my_image_size);
-
-		/* for checksum */
-		*(my_image_bin+my_image_size) = 0xFF;
-
-		TOUCH_INFO_MSG("Touch FW image read %ld bytes from %s\n", read_bytes, fw_path);
-
-	} else {
-		my_image_size = ts->fw_info.fw_size-1;
-		my_image_bin = (unsigned char *)(&ts->fw_info.fw_start[0]);
+	if ((ret = request_firmware(&fw_entry, fw_path, &ts->client->dev)) != 0) {
+		TOUCH_ERR_MSG("request_firmware() failed %d\n", ret);
+		goto error;
 	}
 
+	my_image_size = fw_entry->size;
+	my_image_bin = kzalloc(sizeof(char) * (my_image_size+1), GFP_KERNEL);
+	if (my_image_bin == NULL) {
+		TOUCH_ERR_MSG("Can not allocate  memory\n");
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	memcpy(my_image_bin, fw_entry->data, my_image_size);
+
+	/* for checksum */
+	*(my_image_bin+my_image_size) = 0xFF;
+
+	strncpy(ts->fw_info.fw_image_product_id, &my_image_bin[0x0040], 6);
+	strncpy(ts->fw_info.fw_image_version, &my_image_bin[0x16d00], 4);
+
+	ts->fw_info.fw_start = (unsigned char*)&my_image_bin[0];
+	ts->fw_info.fw_size = my_image_size;
+
 	CompleteReflash(ts);
-	/*
-	   ret = CompleteReflash(ts);
-	   if (ret < 0) {
-	   TOUCH_ERR_MSG("CompleteReflash_Lockdown fail\n");
-	   }
-	   */
 
-	if (unlikely(fw_path[0] != 0))
-		kfree(my_image_bin);
-
-fw_mem_alloc_fail:
-	sys_close(fd);
-read_fail:
-	set_fs(old_fs);
-
+	return ret;
+error:
+	memset(&fw_entry, 0, sizeof(fw_entry));
 	return ret;
 }
 
@@ -518,12 +495,7 @@ void SynaEnableFlashing(struct synaptics_ts_data *ts)
 		SynaScanPDT(ts);
 
 		readRMI(ts->client, SynaF01QueryBase + 18, uData, 3);
-			firmware_version = uData[2] << 16 | uData[1] << 8 | uData[0];
-				TOUCH_ERR_MSG("fw_reflash_twice? =	%d\n", ts->fw_info.fw_reflash_twice);
-			if (firmware_version <= 1245782){
-				ts->fw_info.fw_reflash_twice = 1;
-				TOUCH_ERR_MSG("fw_reflash_twice =  %d\n", ts->fw_info.fw_reflash_twice);
-				}
+		firmware_version = uData[2] << 16 | uData[1] << 8 | uData[0];
 
 		// Read the "Program Enabled" bit of the F34 Control register, and proceed only if the
 		// bit is set.
@@ -577,16 +549,6 @@ void SynaFinalizeReflash(struct synaptics_ts_data *ts)
 {
 	unsigned char uData;
 
-	char deviceStatusStr[7][20] = {
-		"0x00",
-		"0x01",
-		"0x02",
-		"0x03",
-		"config CRC failed",
-		"firmware CRC failed",
-		"CRC in progress\n"
-	};
-
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	TOUCH_INFO_MSG("\nFinalizing Reflash...");
@@ -604,16 +566,6 @@ void SynaFinalizeReflash(struct synaptics_ts_data *ts)
 	SynaScanPDT(ts);
 
 	readRMI(ts->client, SynaF01DataBase, &uData, 1);
-
-	if ((uData & 0x40) != 0)
-	{
-		TOUCH_ERR_MSG("\nDevice is in bootloader mode (status: %s).\n", deviceStatusStr[uData & 0xF]);
-		ts->fw_info.fw_reflash_twice = 1;
-	}
-	else
-	{
-		TOUCH_ERR_MSG("\nReflash Completed and Succeed.\n");
-	}
 }
 
 /* SynaFlashFirmwareWrite writes the firmware section of the image block by block

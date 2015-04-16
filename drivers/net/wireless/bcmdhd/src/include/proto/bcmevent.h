@@ -1,7 +1,7 @@
 /*
  * Broadcom Event  protocol definitions
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  *
  * Dependencies: proto/bcmeth.h
  *
- * $Id: bcmevent.h 429124 2013-10-11 09:47:05Z $
+ * $Id: bcmevent.h 515139 2014-11-13 08:47:48Z $
  *
  */
 
@@ -154,11 +154,11 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_event {
 #define WLC_E_IF		54	/* I/F change (for dongle host notification) */
 #define WLC_E_P2P_DISC_LISTEN_COMPLETE	55	/* listen state expires */
 #define WLC_E_RSSI		56	/* indicate RSSI change based on configured levels */
-#define WLC_E_PFN_SCAN_COMPLETE	57	/* PFN completed scan of network list */
-/* PFN best network batching event, conflict/share with WLC_E_PFN_SCAN_COMPLETE */
+
+/* PFN best network batching event, re-use obsolete WLC_E_PFN_SCAN_COMPLETE */
 #define WLC_E_PFN_BEST_BATCHING	57
 #define WLC_E_EXTLOG_MSG	58
-#define WLC_E_ACTION_FRAME      59 	/* Action frame Rx */
+#define WLC_E_ACTION_FRAME      59	/* Action frame Rx */
 #define WLC_E_ACTION_FRAME_COMPLETE	60	/* Action frame Tx complete */
 #define WLC_E_PRE_ASSOC_IND	61	/* assoc request received */
 #define WLC_E_PRE_REASSOC_IND	62	/* re-assoc request received */
@@ -201,13 +201,8 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_event {
 #define WLC_E_SPEEDY_RECREATE_FAIL	93	/* fast assoc recreation failed */
 #define WLC_E_NATIVE			94	/* port-specific event and payload (e.g. NDIS) */
 #define WLC_E_PKTDELAY_IND		95	/* event for tx pkt delay suddently jump */
-#define WLC_E_AWDL_AW			96	/* AWDL AW period starts */
-#define WLC_E_AWDL_ROLE			97	/* AWDL Master/Slave/NE master role event */
-#define WLC_E_AWDL_EVENT		98	/* Generic AWDL event */
-#ifdef WLNIC
-#define WLC_E_NIC_AF_TXS		99	/* NIC AF txstatus */
-#define WLC_E_NIC_NIC_REPORT		100	/* NIC period report */
-#endif
+#define WLC_E_PSTA_PRIMARY_INTF_IND	99	/* psta primary interface indication */
+#define WLC_E_NAN			100     /* NAN event */
 #define WLC_E_BEACON_FRAME_RX		101
 #define WLC_E_SERVICE_FOUND		102	/* desired service found */
 #define WLC_E_GAS_FRAGMENT_RX		103	/* GAS fragment received */
@@ -215,36 +210,39 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_event {
 #define WLC_E_P2PO_ADD_DEVICE		105	/* New device found by p2p offload */
 #define WLC_E_P2PO_DEL_DEVICE		106	/* device has been removed by p2p offload */
 #define WLC_E_WNM_STA_SLEEP		107	/* WNM event to notify STA enter sleep mode */
-#define WLC_E_NONE			108	/* event removed, free to be reused */
+#define WLC_E_TXFAIL_THRESH		108	/* Indication of MAC tx failures (exhaustion of
+						 * 802.11 retries) exceeding threshold(s)
+						 */
 #define WLC_E_PROXD			109	/* Proximity Detection event */
 #define WLC_E_IBSS_COALESCE		110	/* IBSS Coalescing */
 #define WLC_E_AIBSS_TXFAIL		110	/* TXFAIL event for AIBSS, re using event 110 */
-#define WLC_E_AWDL_AW_EXT_END		111	/* AWDL extended period ends */
-#define WLC_E_AWDL_AW_EXT_START		112	/* SWDL AW extension start */
-#define WLC_E_AWDL_AW_START		113	/* AWDL start Event to inform host  */
-#define WLC_E_AWDL_RADIO_OFF		114	/* Radio Off  */
-#define WLC_E_AWDL_PEER_STATE		115	/* AWDL peer state open/close */
-#define WLC_E_AWDL_SYNC_STATE_CHANGED	116	/* AWDL sync role changed */
-#define WLC_E_AWDL_CHIP_RESET		117	/* infroms the interface of a chip rest */
-#define WLC_E_AWDL_INTERLEAVED_SCAN_START		118
-#define WLC_E_AWDL_INTERLEAVED_SCAN_STOP		119
-#define WLC_E_AWDL_PEER_CACHE_CONTROL			120
+#define WLC_E_BSS_LOAD			114	/* Inform host of beacon bss load */
 #define WLC_E_CSA_START_IND		121
 #define WLC_E_CSA_DONE_IND		122
 #define WLC_E_CSA_FAILURE_IND		123
 #define WLC_E_CCA_CHAN_QUAL		124	/* CCA based channel quality report */
-#define WLC_E_CCX_S69_RESP_RX	129
-#define WLC_E_LAST			130	/* highest val + 1 for range checking */
+#define WLC_E_BSSID		125	/* to report change in BSSID while roaming */
+#define WLC_E_TX_STAT_ERROR		126	/* tx error indication */
+#define WLC_E_BCMC_CREDIT_SUPPORT	127	/* credit check for BCMC supported */
+#define WLC_E_BT_WIFI_HANDOVER_REQ	130	/* Handover Request Initiated */
+#define WLC_E_SPW_TXINHIBIT		131     /* Southpaw TxInhibit notification */
+#define WLC_E_FBT_AUTH_REQ_IND		132	/* FBT Authentication Request Indication */
+#define WLC_E_RSSI_LQM			133	/* Enhancement addition for WLC_E_RSSI */
+#define WLC_E_PFN_GSCAN_FULL_RESULT		134 /* Full probe/beacon (IEs etc) results */
+#define WLC_E_PFN_SWC		135 /* Significant change in rssi of bssids being tracked */
+#define WLC_E_PFN_SCAN_COMPLETE	138	/* PFN completed scan of network list */
+
+#define WLC_E_RMC_EVENT			139	/* RMC event */
+#define WLC_E_LAST			140	/* highest val + 1 for range checking */
+
+#if (WLC_E_LAST > 140)
+#error "WLC_E_LAST: Invalid value for last event; must be <= 140."
+#endif /* WLC_E_LAST */
+
+/* define an API for getting the string name of an event */
+extern const char *bcmevent_get_name(uint event_type);
 
 
-/* Table of event name strings for UIs and debugging dumps */
-typedef struct {
-	uint event;
-	const char *name;
-} bcmevent_name_t;
-
-extern const bcmevent_name_t	bcmevent_names[];
-extern const int		bcmevent_names_size;
 
 /* Event status codes */
 #define WLC_E_STATUS_SUCCESS		0	/* operation was successful */
@@ -266,6 +264,8 @@ extern const int		bcmevent_names_size;
 #endif /* BCMCCX */
 #define WLC_E_STATUS_CS_ABORT		15	/* abort channel select */
 #define WLC_E_STATUS_ERROR		16	/* request failed due to error */
+#define WLC_E_STATUS_INVALID 0xff  /* Invalid status code to init variables. */
+
 
 /* roam reason codes */
 #define WLC_E_REASON_INITIAL_ASSOC	0	/* initial assoc */
@@ -281,9 +281,9 @@ extern const int		bcmevent_names_size;
 #define WLC_E_REASON_BETTER_AP		8	/* roamed due to finding better AP */
 #define WLC_E_REASON_MINTXRATE		9	/* roamed because at mintxrate for too long */
 #define WLC_E_REASON_TXFAIL		10	/* We can hear AP, but AP can't hear us */
-
-#define WLC_E_REASON_REQUESTED_ROAM 11	/* roamed due to BSS Mgmt Transition request by AP */
-
+/* retained for precommit auto-merging errors; remove once all branches are synced */
+#define WLC_E_REASON_REQUESTED_ROAM	11
+#define WLC_E_REASON_BSSTRANS_REQ	11	/* roamed due to BSS Transition request by AP */
 
 /* prune reason codes */
 #define WLC_E_PRUNE_ENCR_MISMATCH	1	/* encryption mismatch */
@@ -335,14 +335,6 @@ extern const int		bcmevent_names_size;
  * WLC_E_P2P_PROBREQ_MSG
  * WLC_E_ACTION_FRAME_RX
  */
-#ifdef WLAWDL
-#define WLC_E_AWDL_SCAN_START		1	/* Scan start indication to host */
-#define WLC_E_AWDL_SCAN_DONE		0	/* Scan Done indication to host */
-
-#define WLC_E_AWDL_RX_ACT_FRAME					1
-#define WLC_E_AWDL_RX_PRB_RESP					2
-
-#endif
 typedef BWL_PRE_PACKED_STRUCT struct wl_event_rx_frame_data {
 	uint16	version;
 	uint16	channel;	/* Matches chanspec_t format from bcmwifi_channels.h */
@@ -403,21 +395,11 @@ typedef struct wl_event_data_rssi {
 #define WLC_E_TDLS_PEER_CONNECTED		1
 #define WLC_E_TDLS_PEER_DISCONNECTED	2
 
-#ifdef WLAWDL
-/* WLC_E_AWDL_EVENT subtypes */
-#define WLC_E_AWDL_SCAN_STATUS	0
-#define WLC_E_AWDL_RX_ACT_FRAME	1
-#define WLC_E_AWDL_RX_PRB_RESP	2
-#define WLC_E_AWDL_PHYCAL_STATUS	3
-#define WLC_E_AWDL_WOWL_NULLPKT	4
-#define WLC_E_AWDL_OOB_AF_STATUS	5
+/* reason codes for WLC_E_RMC_EVENT event */
+#define WLC_E_REASON_RMC_NONE		0
+#define WLC_E_REASON_RMC_AR_LOST		1
+#define WLC_E_REASON_RMC_AR_NO_ACK		2
 
-/* WLC_E_AWDL_SCAN_STATUS status values */
-#define WLC_E_AWDL_SCAN_START		1	/* Scan start indication to host */
-#define WLC_E_AWDL_SCAN_DONE		0	/* Scan Done indication to host */
-#define WLC_E_AWDL_PHYCAL_START		1	/* Phy calibration start indication to host */
-#define WLC_E_AWDL_PHYCAL_DONE		0	/* Phy calibration done indication to host */
-#endif
 
 /* GAS event data */
 typedef BWL_PRE_PACKED_STRUCT struct wl_event_gas {
@@ -446,22 +428,90 @@ typedef BWL_PRE_PACKED_STRUCT struct wl_event_sd {
 } BWL_POST_PACKED_STRUCT wl_event_sd_t;
 
 /* Reason codes for WLC_E_PROXD */
-#define WLC_E_PROXD_FOUND	1	/* Found a proximity device */
-#define WLC_E_PROXD_GONE	2	/* Lost a proximity device */
+#define WLC_E_PROXD_FOUND		1	/* Found a proximity device */
+#define WLC_E_PROXD_GONE		2	/* Lost a proximity device */
+#define WLC_E_PROXD_START		3	/* used by: target  */
+#define WLC_E_PROXD_STOP		4	/* used by: target   */
+#define WLC_E_PROXD_COMPLETED		5	/* used by: initiator completed */
+#define WLC_E_PROXD_ERROR		6	/* used by both initiator and target */
+#define WLC_E_PROXD_COLLECT_START	7	/* used by: target & initiator */
+#define WLC_E_PROXD_COLLECT_STOP	8	/* used by: target */
+#define WLC_E_PROXD_COLLECT_COMPLETED	9	/* used by: initiator completed */
+#define WLC_E_PROXD_COLLECT_ERROR	10	/* used by both initiator and target */
+#define WLC_E_PROXD_NAN_EVENT		11	/* used by both initiator and target */
 
-/* WLC_E_AWDL_AW event data */
-typedef BWL_PRE_PACKED_STRUCT struct awdl_aws_event_data {
-	uint32	fw_time;			/* firmware PMU time */
-	struct	ether_addr current_master;	/* Current master Mac addr */
-	uint16	aw_counter;			/* AW seq# */
-	uint8	aw_ext_count;			/* AW extension count */
-	uint8	aw_role;			/* AW role */
-	uint8	flags;				/* AW event flag */
-	uint16	aw_chan;
-} BWL_POST_PACKED_STRUCT awdl_aws_event_data_t;
+/*  proxd_event data */
+typedef struct ftm_sample {
+	uint32 value;	/* RTT in ns */
+	int8 rssi;	/* RSSI */
+} ftm_sample_t;
 
-/* For awdl_aws_event_data_t.flags */
-#define AWDL_AW_LAST_EXT	0x01
+typedef BWL_PRE_PACKED_STRUCT struct proxd_event_data {
+	uint16 ver;			/* version */
+	uint16 mode;			/* mode: target/initiator */
+	uint16 method;			/* method: rssi/TOF/AOA */
+	uint8  err_code;		/* error classification */
+	uint8  TOF_type;		/* one way or two way TOF */
+	uint8  OFDM_frame_type;		/* legacy or VHT */
+	uint8  bandwidth;		/* Bandwidth is 20, 40,80, MHZ */
+	struct ether_addr peer_mac;	/* (e.g for tgt:initiator's */
+	uint32 distance;		/* dst to tgt, units meter */
+	uint32 meanrtt;			/* mean delta */
+	uint32 modertt;			/* Mode delta */
+	uint32 medianrtt;		/* median RTT */
+	uint32 sdrtt;			/* Standard deviation of RTT */
+	int    gdcalcresult;		/* Software or Hardware Kind of redundant, but if */
+					/* frame type is VHT, then we should do it by hardware */
+	int16  avg_rssi;		/* avg rssi accroos the ftm frames */
+	int16  validfrmcnt;		/* Firmware's valid frame counts */
+	char  *peer_router_info;	/* Peer router information if available in TLV, */
+					/* We will add this field later  */
+	int32 var1;			/* average of group delay */
+	int32 var2;			/* average of threshold crossing */
+	int32 var3;			/* difference between group delay and threshold crossing */
+					/* raw Fine Time Measurements (ftm) data */
+	uint16 ftm_unit;		/* ftm cnt resolution in picoseconds , 6250ps - default */
+	uint16 ftm_cnt;			/*  num of rtd measurments/length in the ftm buffer  */
+	ftm_sample_t ftm_buff[1];	/* 1 ... ftm_cnt  */
+} BWL_POST_PACKED_STRUCT wl_proxd_event_data_t;
+
+
+/* Video Traffic Interference Monitor Event */
+#define INTFER_EVENT_VERSION		1
+#define INTFER_STREAM_TYPE_NONTCP	1
+#define INTFER_STREAM_TYPE_TCP		2
+#define WLINTFER_STATS_NSMPLS		4
+typedef struct wl_intfer_event {
+	uint16 version;			/* version */
+	uint16 status;			/* status */
+	uint8 txfail_histo[WLINTFER_STATS_NSMPLS]; /* txfail histo */
+} wl_intfer_event_t;
+
+/* WLC_E_PSTA_PRIMARY_INTF_IND event data */
+typedef struct wl_psta_primary_intf_event {
+	struct ether_addr prim_ea;	/* primary intf ether addr */
+} wl_psta_primary_intf_event_t;
+
+
+/*  **********  NAN protocol events/subevents  ********** */
+#define NAN_EVENT_BUFFER_SIZE 512 /* max size */
+/* nan application events to the host driver */
+enum nan_app_events {
+	WL_NAN_EVENT_START = 1,     /* NAN cluster started */
+	WL_NAN_EVENT_JOIN = 2,      /* Joined to a NAN cluster */
+	WL_NAN_EVENT_ROLE = 3,      /* Role or State changed */
+	WL_NAN_EVENT_SCAN_COMPLETE = 4,
+	WL_NAN_EVENT_DISCOVERY_RESULT = 5,
+	WL_NAN_EVENT_REPLIED = 6,
+	WL_NAN_EVENT_TERMINATED = 7,	/* the instance ID will be present in the ev data */
+	WL_NAN_EVENT_RECEIVE = 8,
+	WL_NAN_EVENT_STATUS_CHG = 9,  /* generated on any change in nan_mac status */
+	WL_NAN_EVENT_MERGE = 10,      /* Merged to a NAN cluster */
+	WL_NAN_EVENT_STOP = 11,       /* NAN stopped */
+	WL_NAN_EVENT_INVALID = 12,	/* delimiter for max value */
+};
+#define IS_NAN_EVT_ON(var, evt) ((var & (1 << (evt-1))) != 0)
+/*  ******************* end of NAN section *************** */
 
 /* This marks the end of a packed structure section. */
 #include <packed_section_end.h>

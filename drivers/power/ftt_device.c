@@ -7,7 +7,7 @@
 /*
  * ****************************************************
  * bool wireless_online(void)
- * 
+ *
  * ****************************************************
  */
 bool wireless_online(int gpio)
@@ -20,8 +20,8 @@ bool wireless_online(int gpio)
 /*
  * ****************************************************
  * bool on_change_level(int level)
- * 
- * 
+ *
+ *
  * ****************************************************
  */
 bool on_change_level(int level)
@@ -34,8 +34,8 @@ bool on_change_level(int level)
 /*
  * ****************************************************
  * int get_ftt_gpio(void)
- * 
- * 
+ *
+ *
  * ****************************************************
  */
 int get_ftt_gpio(int gpio)

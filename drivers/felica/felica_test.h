@@ -28,7 +28,7 @@ extern "C" {
  */
 
 /* FUNCTION FEATURE */
-//#define FELICA_FN_DEVICE_TEST
+#define FELICA_FN_DEVICE_TEST
 
 /*
  *  ENUM

@@ -275,7 +275,7 @@ do {	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_1280x1024p60_5_4);	\
 	/*	MSM_HDMI_MODES_SET_TIMING(__lut,	\
-			HDMI_VFRMT_2560x1600p60_16_9);*/	\
+			HDMI_VFRMT_2560x1600p60_16_9);*/\
 	}	\
 } while (0)
 

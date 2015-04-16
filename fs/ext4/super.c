@@ -43,6 +43,7 @@
 
 #include <linux/kthread.h>
 #include <linux/freezer.h>
+#include <linux/ratelimit.h>
 
 #include "ext4.h"
 #include "ext4_extents.h"
@@ -54,9 +55,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
 
-#ifdef CONFIG_EXT4_LGE_JOURNAL_RECOVERY
-#include <mach/board_lge.h>
-#endif
 static struct proc_dir_entry *ext4_proc_root;
 static struct kset *ext4_kset;
 static struct ext4_lazy_init *ext4_li_info;
@@ -503,7 +501,6 @@ void __ext4_error(struct super_block *sb, const char *function,
 	printk(KERN_CRIT "EXT4-fs error (device %s): %s:%d: comm %s: %pV\n",
 	       sb->s_id, function, line, current->comm, &vaf);
 	va_end(args);
-	save_error_info(sb, function, line);
 
 	ext4_handle_error(sb);
 }
@@ -662,10 +659,10 @@ void __ext4_abort(struct super_block *sb, const char *function,
 			jbd2_journal_abort(EXT4_SB(sb)->s_journal, -EIO);
 		save_error_info(sb, function, line);
 	#ifdef CONFIG_MACH_LGE
-	/*
-                          
-                                             
- */
+	/* LGE_CHANGE
+	 * put panic when ext4 partition is remounted as Read Only
+	 * 2014-04-15, B2-BSP-FS@lge.com
+	 */
 	panic("EXT4-fs panic from previous error. remounted as RO \n");
 	#endif
 
@@ -682,7 +679,7 @@ void ext4_msg(struct super_block *sb, const char *prefix, const char *fmt, ...)
 	va_start(args, fmt);
 	vaf.fmt = fmt;
 	vaf.va = &args;
-	printk("%sEXT4-fs (%s): %pV\n", prefix, sb->s_id, &vaf);
+	printk_ratelimited("%sEXT4-fs (%s): %pV\n", prefix, sb->s_id, &vaf);
 	va_end(args);
 }
 
@@ -1016,6 +1013,11 @@ static int init_inodecache(void)
 
 static void destroy_inodecache(void)
 {
+	/*
+	 * Make sure all delayed rcu free inodes are flushed before we
+	 * destroy cache.
+	 */
+	rcu_barrier();
 	kmem_cache_destroy(ext4_inode_cachep);
 }
 
@@ -1829,20 +1831,17 @@ static int ext4_setup_super(struct super_block *sb, struct ext4_super_block *es,
 	if (le32_to_cpu(es->s_rev_level) > EXT4_MAX_SUPP_REV) {
 		ext4_msg(sb, KERN_ERR, "revision level too high, "
 			 "forcing read-only mode");
-		/*                         */
 		res = MS_RDONLY;
-		/*                         */
 	}
 	if (read_only)
 		goto done;
 	if (!(sbi->s_mount_state & EXT4_VALID_FS))
 		ext4_msg(sb, KERN_WARNING, "warning: mounting unchecked fs, "
 			 "running e2fsck is recommended");
-	else if ((sbi->s_mount_state & EXT4_ERROR_FS)){
+	else if ((sbi->s_mount_state & EXT4_ERROR_FS))
 		ext4_msg(sb, KERN_WARNING,
 			 "warning: mounting fs with errors, "
 			 "running e2fsck is recommended");
-	}
 	else if ((__s16) le16_to_cpu(es->s_max_mnt_count) > 0 &&
 		 le16_to_cpu(es->s_mnt_count) >=
 		 (unsigned short) (__s16) le16_to_cpu(es->s_max_mnt_count))
@@ -3150,9 +3149,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		       "feature flags set on rev 0 fs, "
 		       "running e2fsck is recommended");
 
-	if (test_opt(sb, ERRORS_PANIC))
-		printk("<choi> mount option is panic\n");
-
 	if (IS_EXT2_SB(sb)) {
 		if (ext2_feature_set_ok(sb))
 			ext4_msg(sb, KERN_INFO, "mounting ext2 file system "
@@ -3612,6 +3608,7 @@ no_journal:
 		ret = -ENOMEM;
 		goto failed_mount4;
 	}
+
 	ext4_setup_super(sb, es, sb->s_flags & MS_RDONLY);
 
 	/* determine the minimum size of new large inodes, if present */
@@ -3690,47 +3687,60 @@ no_journal:
 		mod_timer(&sbi->s_err_report, jiffies + 300*HZ); /* 5 minutes */
 
 	kfree(orig_data);
-
 	return 0;
 
 cantfind_ext4:
 	if (!silent)
 		ext4_msg(sb, KERN_ERR, "VFS: Can't find ext4 filesystem");
 #ifdef CONFIG_MACH_LGE
-/*
-                         
-                                             
-*/
+/* LGE_CHANGE
+ * add return code if ext4 superblock is damaged
+ * 2014-01-16, B2-BSP-FS@lge.com
+ */
 	ret = -ESUPER;
 #endif
 	goto failed_mount;
 
 failed_mount7:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount7\n");
+#endif
 	ext4_unregister_li_request(sb);
 failed_mount6:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount6\n");
+#endif
 	ext4_mb_release(sb);
 failed_mount5:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount5\n");
+#endif
 	ext4_ext_release(sb);
 	ext4_release_system_zone(sb);
 failed_mount4a:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount4a\n");
+#endif
 	dput(sb->s_root);
 	sb->s_root = NULL;
 failed_mount4:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount4\n");
+#endif
 	ext4_msg(sb, KERN_ERR, "mount failed");
 	destroy_workqueue(EXT4_SB(sb)->dio_unwritten_wq);
 failed_mount_wq:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount_wq\n");
+#endif
 	if (sbi->s_journal) {
 		jbd2_journal_destroy(sbi->s_journal);
 		sbi->s_journal = NULL;
 	}
 failed_mount3:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount3\n");
+#endif
 	del_timer(&sbi->s_err_report);
 	if (sbi->s_flex_groups)
 		ext4_kvfree(sbi->s_flex_groups);
@@ -3741,15 +3751,17 @@ failed_mount3:
 	if (sbi->s_mmp_tsk)
 		kthread_stop(sbi->s_mmp_tsk);
 failed_mount2:
-	printk(KERN_ERR "EXT4-fs: failed_mount2\n");
 #ifdef CONFIG_MACH_LGE
-ret = -ESUPER;
+	printk(KERN_ERR "EXT4-fs: failed_mount2\n");
+	ret = -ESUPER;
 #endif
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	ext4_kvfree(sbi->s_group_desc);
 failed_mount:
+#ifdef CONFIG_MACH_LGE
 	printk(KERN_ERR "EXT4-fs: failed_mount\n");
+#endif
 	if (sbi->s_proc) {
 		remove_proc_entry("options", sbi->s_proc);
 		remove_proc_entry(sb->s_id, ext4_proc_root);
@@ -4279,16 +4291,6 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 #endif
 	char *orig_data = kstrdup(data, GFP_KERNEL);
 
-#ifdef CONFIG_MACH_LGE
-	/*                                      
-                        
-  */
-	if (*flags & MS_RDONLY)
-		ext4_msg(sb, KERN_INFO, "re-mount start. with ro");
-	else
-		ext4_msg(sb, KERN_INFO, "re-mount start. with rw");
-#endif
-
 	/* Store the original options */
 	lock_super(sb);
 	old_sb_flags = sb->s_flags;
@@ -4443,11 +4445,7 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (enable_quota)
 		dquot_resume(sb, -1);
 
-#ifdef CONFIG_MACH_LGE
-	ext4_msg(sb, KERN_INFO, "re-mounted. end. Opts: %s", orig_data);
-#else
 	ext4_msg(sb, KERN_INFO, "re-mounted. Opts: %s", orig_data);
-#endif
 	kfree(orig_data);
 	return 0;
 

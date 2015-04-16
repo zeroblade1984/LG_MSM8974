@@ -39,7 +39,6 @@
 
 MODULE_DESCRIPTION("Diag Char Driver for MTS");
 MODULE_LICENSE("GPL v2");
-/* MODULE_VERSION("3.1.0"); */
 
 /* Identifier for data from MDM */
 #define MDM_TOKEN				-1

@@ -862,7 +862,13 @@ EXPORT_SYMBOL(mod_timer);
  *
  * mod_timer_pinned() is a way to update the expire field of an
  * active timer (if the timer is inactive it will be activated)
- * and not allow the timer to be migrated to a different CPU.
+ * and to ensure that the timer is scheduled on the current CPU.
+ *
+ * Note that this does not prevent the timer from being migrated
+ * when the current CPU goes offline.  If this is a problem for
+ * you, use CPU-hotplug notifiers to handle it correctly, for
+ * example, cancelling the timer when the corresponding CPU goes
+ * offline.
  *
  * mod_timer_pinned(timer, expires) is equivalent to:
  *
@@ -1648,7 +1654,6 @@ static int __cpuinit init_timers_cpu(int cpu)
 	int j;
 	struct tvec_base *base;
 	static char __cpuinitdata tvec_base_done[NR_CPUS];
-	unsigned long flags;
 
 	if (!tvec_base_done[cpu]) {
 		static char boot_done;
@@ -1687,7 +1692,6 @@ static int __cpuinit init_timers_cpu(int cpu)
 	}
 
 
-	spin_lock_irqsave(&base->lock, flags);
 	for (j = 0; j < TVN_SIZE; j++) {
 		INIT_LIST_HEAD(base->tv5.vec + j);
 		INIT_LIST_HEAD(base->tv4.vec + j);
@@ -1699,7 +1703,6 @@ static int __cpuinit init_timers_cpu(int cpu)
 
 	base->timer_jiffies = jiffies;
 	base->next_timer = base->timer_jiffies;
-	spin_unlock_irqrestore(&base->lock, flags);
 	return 0;
 }
 

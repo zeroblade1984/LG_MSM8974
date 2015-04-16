@@ -53,11 +53,11 @@ static int lge_battery_id_get_property(struct power_supply *psy,
 			psy_batt_id);
 
 	switch (psp) {
-		case POWER_SUPPLY_PROP_BATTERY_ID_CHECKER:
-			val->intval = info->batt_info;
-			break;
-		default:
-			return -EINVAL;
+	case POWER_SUPPLY_PROP_BATTERY_ID_CHECKER:
+		val->intval = info->batt_info;
+		break;
+	default:
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -67,7 +67,7 @@ static __devinit int lge_battery_id_probe(struct platform_device *pdev)
 	struct lge_battery_id_platform_data *pdata =
 		dev_get_platdata(&pdev->dev);
 	struct lge_battery_id_info *info;
-	//struct power_supply *psy;
+	/*struct power_supply *psy;*/
 	int ret = 0;
 	uint *smem_batt = 0;
 
@@ -87,17 +87,21 @@ static __devinit int lge_battery_id_probe(struct platform_device *pdev)
 	info->pullup = pdata->pullup;
 	smem_batt = (uint *)smem_alloc(SMEM_BATT_INFO, sizeof(smem_batt));
 	if (smem_batt == NULL) {
-		pr_err("%s : smem_alloc returns NULL\n",__func__);
+		pr_err("%s : smem_alloc returns NULL\n", __func__);
 		info->batt_info = 0;
 	} else {
+#if defined(CONFIG_LGE_LOW_BATT_LIMIT)
+		info->batt_info = (*smem_batt >> 8) & 0x00ff;
+#else
 		info->batt_info = *smem_batt;
+#endif
 	}
 
 	info->psy_batt_id.name		= "battery_id";
 	info->psy_batt_id.type		= POWER_SUPPLY_TYPE_BATTERY;
 	info->psy_batt_id.get_property	= lge_battery_id_get_property;
 	info->psy_batt_id.properties	= lge_battery_id_battery_props;
-	info->psy_batt_id.num_properties=
+	info->psy_batt_id.num_properties =
 		ARRAY_SIZE(lge_battery_id_battery_props);
 
 	ret = power_supply_register(&pdev->dev, &info->psy_batt_id);
@@ -127,14 +131,14 @@ static int __devexit lge_battery_id_remove(struct platform_device *pdev)
 #if defined(CONFIG_PM)
 static int lge_battery_id_suspend(struct device *dev)
 {
-	//struct lge_battery_id_info *info = dev_get_drvdata(dev);
+	/*struct lge_battery_id_info *info = dev_get_drvdata(dev);*/
 
 	return 0;
 }
 
 static int lge_battery_id_resume(struct device *dev)
 {
-	//struct lge_battery_id_info *info = dev_get_drvdata(dev);
+	/*struct lge_battery_id_info *info = dev_get_drvdata(dev);*/
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,10 +38,6 @@
 #include <mach/board_lge.h>
 #endif
 
-#ifndef CUST_G2_TOUCH
-#define CUST_G2_TOUCH
-#endif
-
 /* QPNP VADC register definition */
 #define QPNP_VADC_REVISION1				0x0
 #define QPNP_VADC_REVISION2				0x1
@@ -64,6 +60,7 @@
 #define QPNP_VADC_STATUS2_CONV_SEQ_TIMEOUT_STS			BIT(0)
 #define QPNP_VADC_STATUS2_CONV_SEQ_STATE_SHIFT			4
 #define QPNP_VADC_CONV_TIMEOUT_ERR				2
+
 #ifdef CONFIG_MACH_LGE
 #define QPNP_VADC_RBREG_LOCK				0xd0
 #define QPNP_VADC_RESET_CTL3				0xda
@@ -71,8 +68,9 @@
 #define QPNP_VADC_INT_EN_SET				0x15
 #define QPNP_VADC_INT_EN_CLR				0x16
 #define QPNP_VADC_INT_LATCHED_STS			0x18
-#define	EADCFAIL				100
+#define EADCFAIL                            100
 #endif
+
 #define QPNP_VADC_MODE_CTL					0x40
 #define QPNP_VADC_OP_MODE_SHIFT					4
 #define QPNP_VADC_VREF_XO_THM_FORCE				BIT(2)
@@ -120,6 +118,13 @@
 #define QPNP_ADC_COMPLETION_TIMEOUT				HZ
 #define QPNP_VADC_ERR_COUNT					20
 
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS)
+extern void check_touch_xo_therm(int type);
+int touch_thermal_mode = 0;
+#endif
+#endif
+
 struct qpnp_vadc_chip {
 	struct device			*dev;
 	struct qpnp_adc_drv		*adc;
@@ -156,6 +161,7 @@ static struct qpnp_vadc_scale_fn vadc_scale_fn[] = {
 	[SCALE_THERM_150K_PULLUP] = {qpnp_adc_scale_therm_pu1},
 	[SCALE_QRD_BATT_THERM] = {qpnp_adc_scale_qrd_batt_therm},
 	[SCALE_QRD_SKUAA_BATT_THERM] = {qpnp_adc_scale_qrd_skuaa_batt_therm},
+	[SCALE_QRD_SKUG_BATT_THERM] = {qpnp_adc_scale_qrd_skug_batt_therm},
 };
 
 static int32_t qpnp_vadc_read_reg(struct qpnp_vadc_chip *vadc, int16_t reg,
@@ -288,13 +294,12 @@ static int32_t qpnp_vadc_enable(struct qpnp_vadc_chip *vadc, bool state)
 	return 0;
 }
 
-/*                                                                   */
 #ifdef CONFIG_MACH_LGE
 /* Reg. address list which is possible to be read , related to PM8941 VADC1_USR_VADC */
-static int adc_reg[] = {	0x04, 0x05, 0x08, 0x09, 0x10, 0x11, 0x12
+static int adc_reg[] = {  0x04, 0x05, 0x08, 0x09, 0x10, 0x11, 0x12
 			, 0x13, 0x15, 0x16, 0x18, 0x19, 0x1a, 0x1b, 0x40
-, 0x46, 0x48, 0x50, 0x51, 0x54, 0x55, 0x57, 0x59
-, 0x5a, 0x5b, 0x5c, 0x5d, 0x5f, 0x60, 0x61, 0};
+			, 0x46, 0x48, 0x50, 0x51, 0x54, 0x55, 0x57, 0x59
+			, 0x5a, 0x5b, 0x5c, 0x5d, 0x5f, 0x60, 0x61, 0   };
 
 bool is_dumped;
 
@@ -314,9 +319,7 @@ static int32_t qpnp_vadc_full_reg_print(struct qpnp_vadc_chip *vadc)
 
 	return 0;
 }
-
 #endif
-/*                          */
 
 static int32_t qpnp_vadc_status_debug(struct qpnp_vadc_chip *vadc)
 {
@@ -632,63 +635,52 @@ static int32_t qpnp_vadc_version_check(struct qpnp_vadc_chip *dev)
 #define QPNP_VBAT_COEFF_13	102640000
 #define QPNP_VBAT_COEFF_14	22220000
 #define QPNP_VBAT_COEFF_15	83060000
-
-#define QPNP_VADC_REV_ID_8941_3_1	1
-#define QPNP_VADC_REV_ID_8026_1_0	2
-#define QPNP_VADC_REV_ID_8026_2_0	3
-
-static void qpnp_temp_comp_version_check(struct qpnp_vadc_chip *vadc,
-							int32_t *version)
-{
-	if (vadc->revision_dig_major == 3 &&
-			vadc->revision_ana_minor == 2)
-		*version = QPNP_VADC_REV_ID_8941_3_1;
-	else if (vadc->revision_dig_major == 1 &&
-			vadc->revision_ana_minor == 2)
-		*version = QPNP_VADC_REV_ID_8026_1_0;
-	else if (vadc->revision_dig_major == 2 &&
-			vadc->revision_ana_minor == 2)
-		*version = QPNP_VADC_REV_ID_8026_2_0;
-	else
-		*version = -EINVAL;
-
-	return;
-}
+#define QPNP_VBAT_COEFF_16	2810
+#define QPNP_VBAT_COEFF_17	5260
+#define QPNP_VBAT_COEFF_18	8027
+#define QPNP_VBAT_COEFF_19	2347
+#define QPNP_VBAT_COEFF_20	6043
+#define QPNP_VBAT_COEFF_21	1914
+#define QPNP_VBAT_OFFSET_SMIC	9446
+#define QPNP_VBAT_OFFSET_GF	9441
+#define QPNP_OCV_OFFSET_SMIC	4596
+#define QPNP_OCV_OFFSET_GF	5896
+#define QPNP_VBAT_COEFF_22	6800
+#define QPNP_VBAT_COEFF_23	3500
+#define QPNP_VBAT_COEFF_24	4360
+#define QPNP_VBAT_COEFF_25	8060
 
 static int32_t qpnp_ocv_comp(int64_t *result,
 			struct qpnp_vadc_chip *vadc, int64_t die_temp)
 {
 	int64_t temp_var = 0;
 	int64_t old = *result;
-	int32_t version;
+	int version;
 
-	qpnp_temp_comp_version_check(vadc, &version);
+	version = qpnp_adc_get_revid_version(vadc->dev);
 	if (version == -EINVAL)
 		return 0;
 
-	if (die_temp < 25000)
-		return 0;
-
-	if (die_temp > 60000)
-		die_temp = 60000;
+	if (version == QPNP_REV_ID_8026_2_2) {
+		if (die_temp > 25000)
+			return 0;
+	}
 
 	switch (version) {
-	case QPNP_VADC_REV_ID_8941_3_1:
+	case QPNP_REV_ID_8941_3_1:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
-			temp_var = (((die_temp *
-			(-QPNP_VBAT_COEFF_4))
-			+ QPNP_VBAT_COEFF_5));
+			 temp_var = ((die_temp - 25000) *
+			(-QPNP_VBAT_COEFF_4));
 			break;
 		default:
 		case COMP_ID_GF:
-			temp_var = (((die_temp *
-			(-QPNP_VBAT_COEFF_1))
-			+ QPNP_VBAT_COEFF_2));
+			temp_var = ((die_temp - 25000) *
+			(-QPNP_VBAT_COEFF_1));
 			break;
 		}
 		break;
-	case QPNP_VADC_REV_ID_8026_1_0:
+	case QPNP_REV_ID_8026_1_0:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
 			temp_var = (((die_temp *
@@ -703,16 +695,53 @@ static int32_t qpnp_ocv_comp(int64_t *result,
 			break;
 		}
 		break;
-	case QPNP_VADC_REV_ID_8026_2_0:
+	case QPNP_REV_ID_8026_2_0:
+	case QPNP_REV_ID_8026_2_1:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
-			temp_var = ((die_temp - 2500) *
+			temp_var = ((die_temp - 25000) *
 			(-QPNP_VBAT_COEFF_10));
 			break;
 		default:
 		case COMP_ID_GF:
-			temp_var = ((die_temp - 2500) *
+			temp_var = ((die_temp - 25000) *
 			(-QPNP_VBAT_COEFF_8));
+			break;
+		}
+		break;
+	case QPNP_REV_ID_8026_2_2:
+		switch (vadc->id) {
+		case COMP_ID_TSMC:
+			*result -= QPNP_VBAT_COEFF_22;
+			temp_var = (die_temp - 25000) *
+					QPNP_VBAT_COEFF_24;
+			break;
+		default:
+		case COMP_ID_GF:
+			*result -= QPNP_VBAT_COEFF_22;
+			temp_var = (die_temp - 25000) *
+					QPNP_VBAT_COEFF_25;
+			break;
+		}
+		break;
+	case QPNP_REV_ID_8110_2_0:
+		switch (vadc->id) {
+		case COMP_ID_SMIC:
+			*result -= QPNP_OCV_OFFSET_SMIC;
+			if (die_temp < 25000)
+				temp_var = QPNP_VBAT_COEFF_18;
+			else
+				temp_var = QPNP_VBAT_COEFF_19;
+			temp_var = (die_temp - 25000) * temp_var;
+			break;
+		default:
+		case COMP_ID_GF:
+			*result -= QPNP_OCV_OFFSET_GF;
+			if (die_temp < 25000)
+				temp_var = QPNP_VBAT_COEFF_20;
+			else
+				temp_var = QPNP_VBAT_COEFF_21;
+			temp_var = (die_temp - 25000) * temp_var;
 			break;
 		}
 		break;
@@ -738,35 +767,36 @@ static int32_t qpnp_vbat_sns_comp(int64_t *result,
 {
 	int64_t temp_var = 0;
 	int64_t old = *result;
-	int32_t version;
+	int version;
 
-	qpnp_temp_comp_version_check(vadc, &version);
+	version = qpnp_adc_get_revid_version(vadc->dev);
 	if (version == -EINVAL)
 		return 0;
 
-	if (die_temp < 25000)
-		return 0;
-
-	/* min(die_temp_c, 60_degC) */
-	if (die_temp > 60000)
-		die_temp = 60000;
+	if (version != QPNP_REV_ID_8941_3_1) {
+		/* min(die_temp_c, 60_degC) */
+		if (die_temp > 60000)
+			die_temp = 60000;
+	}
 
 	switch (version) {
-	case QPNP_VADC_REV_ID_8941_3_1:
+	case QPNP_REV_ID_8941_3_1:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
-			temp_var = (die_temp *
+			temp_var = ((die_temp - 25000) *
 			(-QPNP_VBAT_COEFF_1));
 			break;
 		default:
 		case COMP_ID_GF:
-			temp_var = (((die_temp *
-			(-QPNP_VBAT_COEFF_6))
-			+ QPNP_VBAT_COEFF_7));
+			/* min(die_temp_c, 60_degC) */
+			if (die_temp > 60000)
+				die_temp = 60000;
+			temp_var = ((die_temp - 25000) *
+			(-QPNP_VBAT_COEFF_1));
 			break;
 		}
 		break;
-	case QPNP_VADC_REV_ID_8026_1_0:
+	case QPNP_REV_ID_8026_1_0:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
 			temp_var = (((die_temp *
@@ -781,16 +811,45 @@ static int32_t qpnp_vbat_sns_comp(int64_t *result,
 			break;
 		}
 		break;
-	case QPNP_VADC_REV_ID_8026_2_0:
+	case QPNP_REV_ID_8026_2_0:
+	case QPNP_REV_ID_8026_2_1:
 		switch (vadc->id) {
 		case COMP_ID_TSMC:
-			temp_var = ((die_temp - 2500) *
+			temp_var = ((die_temp - 25000) *
 			(-QPNP_VBAT_COEFF_11));
 			break;
 		default:
 		case COMP_ID_GF:
-			temp_var = ((die_temp - 2500) *
+			temp_var = ((die_temp - 25000) *
 			(-QPNP_VBAT_COEFF_9));
+			break;
+		}
+		break;
+	case QPNP_REV_ID_8026_2_2:
+		switch (vadc->id) {
+		case COMP_ID_TSMC:
+			*result -= QPNP_VBAT_COEFF_23;
+			temp_var = 0;
+			break;
+		default:
+		case COMP_ID_GF:
+			*result -= QPNP_VBAT_COEFF_23;
+			temp_var = 0;
+			break;
+		}
+		break;
+	case QPNP_REV_ID_8110_2_0:
+		switch (vadc->id) {
+		case COMP_ID_SMIC:
+			*result -= QPNP_VBAT_OFFSET_SMIC;
+			temp_var = ((die_temp - 25000) *
+			(QPNP_VBAT_COEFF_17));
+			break;
+		default:
+		case COMP_ID_GF:
+			*result -= QPNP_VBAT_OFFSET_GF;
+			temp_var = ((die_temp - 25000) *
+			(QPNP_VBAT_COEFF_16));
 			break;
 		}
 		break;
@@ -812,7 +871,7 @@ static int32_t qpnp_vbat_sns_comp(int64_t *result,
 }
 
 int32_t qpnp_vbat_sns_comp_result(struct qpnp_vadc_chip *vadc,
-						int64_t *result)
+					int64_t *result, bool is_pon_ocv)
 {
 	struct qpnp_vadc_result die_temp_result;
 	int rc = 0;
@@ -828,7 +887,12 @@ int32_t qpnp_vbat_sns_comp_result(struct qpnp_vadc_chip *vadc,
 		return rc;
 	}
 
-	rc = qpnp_ocv_comp(result, vadc, die_temp_result.physical);
+	if (is_pon_ocv)
+		rc = qpnp_ocv_comp(result, vadc, die_temp_result.physical);
+	else
+		rc = qpnp_vbat_sns_comp(result, vadc,
+				die_temp_result.physical);
+
 	if (rc < 0)
 		pr_err("Error with vbat compensation\n");
 
@@ -929,7 +993,14 @@ static int32_t qpnp_vadc_calib_device(struct qpnp_vadc_chip *vadc)
 	}
 
 	pr_debug("absolute reference raw: 625mV:0x%x 1.25V:0x%x\n",
-				calib_read_1, calib_read_2);
+				calib_read_2, calib_read_1);
+
+	if (calib_read_1 == calib_read_2) {
+		pr_err("absolute reference raw: 625mV:0x%x 1.25V:0x%x\n",
+				calib_read_2, calib_read_1);
+		rc = -EINVAL;
+		goto calib_fail;
+	}
 
 	vadc->adc->amux_prop->chan_prop->adc_graph[CALIB_ABSOLUTE].dy =
 					(calib_read_1 - calib_read_2);
@@ -1009,6 +1080,14 @@ static int32_t qpnp_vadc_calib_device(struct qpnp_vadc_chip *vadc)
 
 	pr_debug("ratiometric reference raw: VDD:0x%x GND:0x%x\n",
 				calib_read_1, calib_read_2);
+
+	if (calib_read_1 == calib_read_2) {
+		pr_err("ratiometric reference raw: VDD:0x%x GND:0x%x\n",
+				calib_read_1, calib_read_2);
+		rc = -EINVAL;
+		goto calib_fail;
+	}
+
 	vadc->adc->amux_prop->chan_prop->adc_graph[CALIB_RATIOMETRIC].dy =
 					(calib_read_1 - calib_read_2);
 	vadc->adc->amux_prop->chan_prop->adc_graph[CALIB_RATIOMETRIC].dx =
@@ -1110,11 +1189,6 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 
 	mutex_lock(&vadc->adc->adc_lock);
 
-	if (vadc->vadc_poll_eoc) {
-		pr_debug("requesting vadc eoc stay awake\n");
-		pm_stay_awake(vadc->dev);
-	}
-
 	if (!vadc->vadc_init_calib) {
 		rc = qpnp_vadc_version_check(vadc);
 		if (rc)
@@ -1151,6 +1225,7 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 			vadc->adc->adc_channels[dt_index].hw_settle_time;
 	vadc->adc->amux_prop->fast_avg_setup =
 			vadc->adc->adc_channels[dt_index].fast_avg_setup;
+
 	if (trigger_channel < ADC_SEQ_NONE)
 		vadc->adc->amux_prop->mode_sel = (ADC_OP_CONVERSION_SEQUENCER
 						<< QPNP_VADC_OP_MODE_SHIFT);
@@ -1242,6 +1317,8 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 		qpnp_vadc_amux_scaling_ratio[amux_prescaling].num;
 	vadc->adc->amux_prop->chan_prop->offset_gain_denominator =
 		 qpnp_vadc_amux_scaling_ratio[amux_prescaling].den;
+	vadc->adc->amux_prop->chan_prop->calib_type =
+		vadc->adc->adc_channels[dt_index].calib_type;
 
 	scale_type = vadc->adc->adc_channels[dt_index].adc_scale_fn;
 	if (scale_type >= SCALE_NONE) {
@@ -1253,11 +1330,6 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 		vadc->adc->adc_prop, vadc->adc->amux_prop->chan_prop, result);
 
 fail_unlock:
-	if (vadc->vadc_poll_eoc) {
-		pr_debug("requesting vadc eoc stay awake\n");
-		pm_relax(vadc->dev);
-	}
-
 	mutex_unlock(&vadc->adc->adc_lock);
 
 	return rc;
@@ -1430,16 +1502,8 @@ fail:
 	return rc;
 }
 EXPORT_SYMBOL(qpnp_vadc_iadc_sync_complete_request);
-#ifndef CONFIG_TOUCHSCREEN_ATMEL_S540
-#ifdef CUST_G2_TOUCH
-extern  void check_touch_xo_therm(int type);
-int touch_thermal_mode;
-int thermal_threshold = 3;
-#endif
-#endif
 
 #ifdef CONFIG_MACH_LGE
-/*                                      */
 void xo_therm_logging(void)
 {
 	struct qpnp_vadc_result tmp;
@@ -1453,36 +1517,49 @@ void xo_therm_logging(void)
 	}
 
 	rc = qpnp_vadc_read_lge(LR_MUX3_PU2_XO_THERM, &tmp);
-#else
-	/* MUST BE IMPLEMENT :
-	 * After MSM8974 AC and later version(PMIC combination change),
-	 * ADC AMUX of PMICs are separated in each dual PMIC.
-	 *
-	 * Ref.
-	 * qpnp-adc-voltage.c : *qpnp_get_vadc(), qpnp_vadc_read().
-	 * qpnp-charger.c     : new implementation by QCT.
-	 */
-	 return;
-#endif
-
 	if (rc)
 		pr_err("VADC read error with %d\n", rc);
-#ifndef CONFIG_TOUCHSCREEN_ATMEL_S540
-#ifdef CUST_G2_TOUCH
-#if !defined(CONFIG_MACH_MSM8974_G2_KDDI) && !defined(CONFIG_MACH_MSM8974_G2_OPEN_COM) && !defined(CONFIG_MACH_MSM8974_G2_OPT_AU)
-	if (touch_thermal_mode == 0 && tmp.physical >= 50) {
-		touch_thermal_mode = 1;
-		check_touch_xo_therm(1);
-	} else if (touch_thermal_mode == 1 && tmp.physical <
-		(50-thermal_threshold)) {
-		touch_thermal_mode = 0;
-		check_touch_xo_therm(0);
-	}
-#endif
-#endif
-#endif
 	printk(KERN_INFO "[XO_THERM] Result:%lld Raw:%d\n",
 		tmp.physical, tmp.adc_code);
+
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS)
+#define TOUCH_HIGH_TEMPERATURE	50
+#define TOUCH_LOW_TEMPERATURE	47
+			if (touch_thermal_mode == 0 && tmp.physical >= TOUCH_HIGH_TEMPERATURE) {
+				touch_thermal_mode = 1;
+				check_touch_xo_therm(1);
+			} else if (touch_thermal_mode == 1 && tmp.physical < TOUCH_LOW_TEMPERATURE) {
+				touch_thermal_mode = 0;
+				check_touch_xo_therm(0);
+			}
+#endif /*  CONFIG_TOUCHSCREEN_SYNAPTICS_G2 */
+#endif /*  CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4 */
+#else
+	if (qpnp_vadc) {
+		rc = qpnp_vadc_read(qpnp_vadc, LR_MUX3_PU2_XO_THERM, &tmp);
+		if (rc)
+			pr_err("VADC read error with %d\n", rc);
+		else {
+			printk(KERN_INFO "[XO_THERM] Result:%lld Raw:%d\n",
+					tmp.physical, tmp.adc_code);
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G3)
+#define TOUCH_HIGH_TEMPERATURE	55
+#define TOUCH_LOW_TEMPERATURE	52
+			{
+				extern int touch_thermal_status;
+				if (tmp.physical >= TOUCH_HIGH_TEMPERATURE)
+					touch_thermal_status = 1;
+				else if (tmp.physical <= TOUCH_LOW_TEMPERATURE)
+					touch_thermal_status = 0;
+			}
+#endif /*  CONFIG_TOUCHSCREEN_SYNAPTICS_G3 */
+#endif /* CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4  */
+		}
+	} else
+		pr_err("Can't find vadc_chip\n");
+#endif
 }
 #endif
 
@@ -1539,6 +1616,7 @@ hwmon_err_sens:
 	pr_err("Init HWMON failed for qpnp_adc with %d\n", rc);
 	return rc;
 }
+
 #ifdef CONFIG_MAX17050_FUELGAUGE
 static void __devinit max17050_initial_quickstart_check_with_batt_temp(void)
 {
@@ -1573,6 +1651,7 @@ static void __devinit max17050_initial_quickstart_check_with_batt_temp(void)
 	return;
 }
 #endif
+
 static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 {
 	struct qpnp_vadc_chip *vadc;
@@ -1628,7 +1707,6 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "failed to initialize qpnp hwmon adc\n");
 		return rc;
 	}
-
 	vadc->vadc_hwmon = hwmon_device_register(&vadc->adc->spmi->dev);
 	vadc->vadc_init_calib = false;
 	vadc->max_channels_available = count_adc_channel_list;
@@ -1690,11 +1768,11 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 	rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_INT_LATCHED_STS, &value);
 	if (rc < 0)
 		pr_err("failed to read vadc reg. %x(rc=%d)\n",
-			QPNP_VADC_INT_LATCHED_STS, rc);
-	else{
+				QPNP_VADC_INT_LATCHED_STS, rc);
+	else {
 		if (value) {
 			rc = qpnp_vadc_write_reg(vadc,
-				QPNP_VADC_INT_LATCHED_CLR, value & 0xFF);
+					QPNP_VADC_INT_LATCHED_CLR, value & 0xFF);
 			if (!rc)
 				pr_err("success to clear LATCHED Interrupt value %x\n", value);
 			else
@@ -1740,8 +1818,6 @@ static int __devexit qpnp_vadc_remove(struct spmi_device *spmi)
 	}
 	hwmon_device_unregister(vadc->vadc_hwmon);
 	list_del(&vadc->list);
-	if (vadc->vadc_poll_eoc)
-		pm_relax(vadc->dev);
 	dev_set_drvdata(&spmi->dev, NULL);
 
 	return 0;
@@ -1770,10 +1846,33 @@ static const struct of_device_id qpnp_vadc_match_table[] = {
 	{}
 };
 
+static int qpnp_vadc_suspend_noirq(struct device *dev)
+{
+	struct qpnp_vadc_chip *vadc = dev_get_drvdata(dev);
+	u8 status = 0;
+
+	if (vadc->vadc_poll_eoc) {
+		qpnp_vadc_read_reg(vadc, QPNP_VADC_STATUS1, &status);
+		status &= QPNP_VADC_STATUS1_REQ_STS_EOC_MASK;
+		pr_debug("vadc conversion status=%d\n", status);
+		if (status != QPNP_VADC_STATUS1_EOC) {
+			pr_err(
+				"Aborting suspend, adc conversion requested while suspending\n");
+			return -EBUSY;
+		}
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops qpnp_vadc_pm_ops = {
+	.suspend_noirq	= qpnp_vadc_suspend_noirq,
+};
+
 static struct spmi_driver qpnp_vadc_driver = {
 	.driver		= {
 		.name	= "qcom,qpnp-vadc",
 		.of_match_table = qpnp_vadc_match_table,
+		.pm		= &qpnp_vadc_pm_ops,
 	},
 	.probe		= qpnp_vadc_probe,
 	.remove		= qpnp_vadc_remove,

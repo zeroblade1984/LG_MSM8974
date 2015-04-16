@@ -471,9 +471,6 @@ struct input_keymap_entry {
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-#define KEY_QUICK_CLIP	250 /*                     */
-#endif
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
 #define BTN_MISC		0x100
@@ -853,6 +850,7 @@ struct input_keymap_entry {
 #define SW_HPHL_OVERCURRENT    0x0e  /* set = over current on left hph */
 #define SW_HPHR_OVERCURRENT    0x0f  /* set = over current on right hph */
 #define SW_UNSUPPORT_INSERT	0x10  /* set = unsupported device inserted */
+#define SW_MICROPHONE2_INSERT   0x11  /* set = inserted */
 #define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)
 
@@ -1516,7 +1514,7 @@ void input_inject_event(struct input_handle *handle, unsigned int type, unsigned
 
 static inline void input_report_key(struct input_dev *dev, unsigned int code, int value)
 {
-	input_event(dev, EV_KEY, code, value);
+	input_event(dev, EV_KEY, code, !!value);
 }
 
 static inline void input_report_rel(struct input_dev *dev, unsigned int code, int value)

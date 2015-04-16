@@ -243,6 +243,7 @@ fci_s32 fc8080_tuner_init(HANDLE handle, fci_u32 band)
 	fc8080_write(handle, 0x27, 0x82);
 	fc8080_write(handle, 0x28, 0x33);
 	fc8080_write(handle, 0x33, 0x43);
+	fc8080_write(handle, 0x34, 0x41);
 	fc8080_write(handle, 0x53, 0x41);
 	fc8080_write(handle, 0x54, 0x01);
 	fc8080_write(handle, 0x66, 0xf6);

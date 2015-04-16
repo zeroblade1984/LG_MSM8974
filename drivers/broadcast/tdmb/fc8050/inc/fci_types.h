@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fci_types.h
- 
- Description : 
- 
- History : 
+
+ Description :
+
+ History :
  ----------------------------------------------------------------------
- 2009/08/31 	jason		initial
+ 2009/08/31     jason        initial
 *******************************************************************************/
 
 #ifndef __FCI_TYPES_H__
@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 #ifndef HANDLE
-typedef void 		*HANDLE;
+typedef void         *HANDLE;
 #endif
 
 typedef char fci_s8;
@@ -30,19 +30,19 @@ typedef unsigned int fci_u32;
 
 
 #ifndef TRUE
-#define TRUE		1
+#define TRUE        1
 #endif
 
 #ifndef FALSE
-#define	FALSE		0
+#define    FALSE        0
 #endif
 
 #ifndef NULL
-#define NULL		0
+#define NULL        0
 #endif
 
-#define BBM_OK		0
-#define BBM_NOK 	1
+#define BBM_OK        0
+#define BBM_NOK     1
 
 #define BBM_E_FAIL              0x00000001
 #define BBM_E_HOSTIF_SELECT     0x00000002

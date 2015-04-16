@@ -32,9 +32,7 @@
 */
 static int felica_cal_open (struct inode *inode, struct file *fp)
 {
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_open\n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_open\n");
 
   return 0;
 }
@@ -46,9 +44,7 @@ static int felica_cal_open (struct inode *inode, struct file *fp)
 */
 static int felica_cal_release (struct inode *inode, struct file *fp)
 {
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_release \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_release \n");
 
   return 0;
 }
@@ -63,32 +59,30 @@ static ssize_t felica_cal_read(struct file *fp, char *buf, size_t count, loff_t 
   unsigned char read_buf = 0x00;
   int rc = -1;
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_read - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_read - start \n");
 
 /* Check error */
   if(NULL == fp)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR fp \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR fp \n");
     return -1;
   }
 
   if(NULL == buf)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR buf \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR buf \n");
     return -1;
   }
 
   if(1 != count)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR count \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR count \n");
     return -1;
   }
 
   if(NULL == pos)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR file \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR file \n");
     return -1;
   }
 
@@ -97,24 +91,20 @@ static ssize_t felica_cal_read(struct file *fp, char *buf, size_t count, loff_t 
   rc = felica_i2c_read(FELICA_I2C_REG_ADDRSS_01, &read_buf, 1);
   if(rc)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] felica_i2c_read : %d \n",rc);
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] felica_i2c_read : %d \n",rc);
     return -1;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal : 0x%02x \n",read_buf);
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal : 0x%02x \n",read_buf);
 
   rc = copy_to_user(buf, &read_buf, count);
   if(rc)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR - copy_from_user \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR - copy_from_user \n");
     return -1;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_read - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_read - end \n");
 
   return 1;
 }
@@ -129,32 +119,30 @@ static ssize_t felica_cal_write(struct file *fp, const char *buf, size_t count, 
   unsigned char write_buf = 0x00, read_buf = 0x00;
   int rc = -1;
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_write - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_write - start \n");
 
 /* Check error */
   if(NULL == fp)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR file \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR file \n");
     return -1;
   }
 
   if(NULL == buf)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR buf \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR buf \n");
     return -1;
   }
 
   if(1 != count)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL]ERROR count \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL]ERROR count \n");
     return -1;
   }
 
   if(NULL == pos)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR file \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR file \n");
     return -1;
   }
 
@@ -162,13 +150,11 @@ static ssize_t felica_cal_write(struct file *fp, const char *buf, size_t count, 
   rc = copy_from_user(&write_buf, buf, count);
   if(rc)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR - copy_from_user \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR - copy_from_user \n");
     return -1;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] write_buf : 0x%02x \n",write_buf);
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] write_buf : 0x%02x \n",write_buf);
 
   /* read register value before writing new value */
   rc = felica_i2c_read(FELICA_I2C_REG_ADDRSS_01, &read_buf, 1);
@@ -183,9 +169,7 @@ static ssize_t felica_cal_write(struct file *fp, const char *buf, size_t count, 
   rc = felica_i2c_read(FELICA_I2C_REG_ADDRSS_01, &read_buf, 1);
   udelay(50);
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_write - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_write - end \n");
 
   return 1;
 }
@@ -220,21 +204,17 @@ static int felica_cal_init(void)
 {
   int rc = -1;
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_init - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_init - start \n");
 
   /* register the device file */
   rc = misc_register(&felica_cal_device);
   if (rc < 0)
   {
-    FELICA_DEBUG_MSG("[FELICA_CAL] ERROR - can not register felica_cal \n");
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CAL] ERROR - can not register felica_cal \n");
     return rc;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_init - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_init - end \n");
 
   return 0;
 }
@@ -245,16 +225,12 @@ static int felica_cal_init(void)
 */
 static void felica_cal_exit(void)
 {
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_exit - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_exit - start \n");
 
   /* deregister the device file */
   misc_deregister(&felica_cal_device);
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CAL] felica_cal_exit - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CAL] felica_cal_exit - end \n");
 }
 
 module_init(felica_cal_init);

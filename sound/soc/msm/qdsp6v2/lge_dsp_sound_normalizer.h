@@ -21,6 +21,7 @@
 #define APPI_LGE_SOUND_NORMALIZER_COMPRESSOR_THRESHOLD 0x1000a017
 #define APPI_LGE_SOUND_NORMALIZER_COMPRESSOR_SLOPE     0x1000a018
 #define APPI_LGE_SOUND_NORMALIZER_ON_OFF               0x1000a019
+#define APPI_LGE_SOUND_NORMALIZER_ALL_PARAM            0x1000a01a
 
 
 struct asm_lgesoundnormalizer_param_devicespeaker {
@@ -82,7 +83,32 @@ struct asm_lgesoundnormalizer_param_onoff {
 	int32_t                  OnOff;
 } __packed;
 
+struct asm_lgesoundnormalizer_param_allparam {
+	struct apr_hdr  hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+    int32_t                  enable_flag;
+    int32_t                  MakeupGain;
+    int32_t                  PreFilter;
+    int32_t                  LimiterThreshold;
+    int32_t                  LimiterSlope;
+    int32_t                  CompressorThreshold;
+    int32_t                  CompressorSlope;
+    int32_t                  DeviceSpeaker;
+    int32_t                  OnOff;
+} __packed;
 
+struct lgesoundnormalizer_allparam_st {
+    int32_t                  enable_flag;
+    int32_t                  MakeupGain;
+    int32_t                  PreFilter;
+    int32_t                  LimiterThreshold;
+    int32_t                  LimiterSlope;
+    int32_t                  CompressorThreshold;
+    int32_t                  CompressorSlope;
+    int32_t                  OnOff;
+    int32_t                  DeviceSpeaker;
+} __packed;
 
 int q6asm_set_lgesoundnormalizer_enable(struct audio_client *ac, int enable);
 int q6asm_set_lgesoundnormalizer_devicespeaker(struct audio_client *ac, int devicespeaker);
@@ -93,3 +119,4 @@ int q6asm_set_lgesoundnormalizer_limiterslope(struct audio_client *ac, int limit
 int q6asm_set_lgesoundnormalizer_compressorthreshold(struct audio_client *ac, int compressorthreshold);
 int q6asm_set_lgesoundnormalizer_compressorslope(struct audio_client *ac, int compressorslope);
 int q6asm_set_lgesoundnormalizer_onoff(struct audio_client *ac, int onoff);
+int q6asm_set_lgesoundnormalizer_allparam(struct audio_client *ac, struct lgesoundnormalizer_allparam_st *param);

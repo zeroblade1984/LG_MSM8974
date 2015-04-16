@@ -1,7 +1,7 @@
 /*
  * DHD Protocol Module for CDC and BDC.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_cdc.c 441178 2013-12-05 07:05:25Z $
+ * $Id: dhd_cdc.c 492377 2014-07-21 19:54:06Z $
  *
  * BDC is like CDC, except it includes a header for data packets to convey
  * packet priority over the bus, and flags (e.g. to indicate checksum status
@@ -212,9 +212,9 @@ done:
 	return ret;
 }
 
-#if defined(CUSTOMER_HW10) && defined(CONFIG_PM_LOCK)
+#if defined(CUSTOMER_HW4) && defined(CONFIG_CONTROL_PM)
 extern bool g_pm_control;
-#endif 
+#endif /* CUSTOMER_HW4 & CONFIG_CONTROL_PM */
 
 static int
 dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8 action)
@@ -239,15 +239,15 @@ dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8
 		return -EIO;
 	}
 
-#if defined(CUSTOMER_HW4) || defined(CUSTOMER_HW10)
+#ifdef CUSTOMER_HW4
 	if (cmd == WLC_SET_PM) {
-#if defined(CONFIG_PM_LOCK)
+#ifdef CONFIG_CONTROL_PM
 		if (g_pm_control == TRUE) {
 			DHD_ERROR(("%s: SET PM ignored!(Requested:%d)\n",
 				__FUNCTION__, *(char *)buf));
 			goto done;
 		}
-#endif 
+#endif /* CONFIG_CONTROL_PM */
 		DHD_ERROR(("%s: SET PM to %d\n", __FUNCTION__, *(char *)buf));
 	}
 #endif /* CUSTOMER_HW4 */
@@ -373,8 +373,7 @@ dhd_prot_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf)
 {
 	bcm_bprintf(strbuf, "Protocol CDC: reqid %d\n", dhdp->prot->reqid);
 #ifdef PROP_TXSTATUS
-	if (dhdp->wlfc_state)
-		dhd_wlfc_dump(dhdp, strbuf);
+	dhd_wlfc_dump(dhdp, strbuf);
 #endif
 }
 
@@ -410,6 +409,17 @@ dhd_prot_hdrpush(dhd_pub_t *dhd, int ifidx, void *PKTBUF)
 	BDC_SET_IF_IDX(h, ifidx);
 }
 #undef PKTBUF	/* Only defined in the above routine */
+
+uint
+dhd_prot_hdrlen(dhd_pub_t *dhd, void *PKTBUF)
+{
+	uint hdrlen = 0;
+#ifdef BDC
+	/* Length of BDC(+WLFC) headers pushed */
+	hdrlen = BDC_HEADER_LEN + (((struct bdc_header *)PKTBUF)->dataOffset * 4);
+#endif
+	return hdrlen;
+}
 
 int
 dhd_prot_hdrpull(dhd_pub_t *dhd, int *ifidx, void *pktbuf, uchar *reorder_buf_info,
@@ -468,42 +478,22 @@ dhd_prot_hdrpull(dhd_pub_t *dhd, int *ifidx, void *pktbuf, uchar *reorder_buf_in
 	PKTPULL(dhd->osh, pktbuf, BDC_HEADER_LEN);
 #endif /* BDC */
 
+
 #ifdef PROP_TXSTATUS
-	dhd_os_wlfc_block(dhd);
-	if (dhd->wlfc_state &&
-		((athost_wl_status_info_t*)dhd->wlfc_state)->proptxstatus_mode
-		!= WLFC_FCMODE_NONE &&
-		(!DHD_PKTTAG_PKTDIR(PKTTAG(pktbuf)))) {
+	if (!DHD_PKTTAG_PKTDIR(PKTTAG(pktbuf))) {
 		/*
 		- parse txstatus only for packets that came from the firmware
 		*/
 		dhd_wlfc_parse_header_info(dhd, pktbuf, (data_offset << 2),
 			reorder_buf_info, reorder_info_len);
-		((athost_wl_status_info_t*)dhd->wlfc_state)->stats.dhd_hdrpulls++;
 
 	}
-	dhd_os_wlfc_unblock(dhd);
 #endif /* PROP_TXSTATUS */
 
 exit:
-		PKTPULL(dhd->osh, pktbuf, (data_offset << 2));
+	PKTPULL(dhd->osh, pktbuf, (data_offset << 2));
 	return 0;
 }
-
-#if defined(PROP_TXSTATUS)
-void
-dhd_wlfc_trigger_pktcommit(dhd_pub_t *dhd)
-{
-	dhd_os_wlfc_block(dhd);
-	if (dhd->wlfc_state &&
-		(((athost_wl_status_info_t*)dhd->wlfc_state)->proptxstatus_mode
-		!= WLFC_FCMODE_NONE)) {
-		dhd_wlfc_commit_packets(dhd->wlfc_state, (f_commitpkt_t)dhd_bus_txdata,
-			(void *)dhd->bus, NULL);
-	}
-	dhd_os_wlfc_unblock(dhd);
-}
-#endif
 
 
 int
@@ -511,11 +501,10 @@ dhd_prot_attach(dhd_pub_t *dhd)
 {
 	dhd_prot_t *cdc;
 
-	if (!(cdc = (dhd_prot_t *)DHD_OS_PREALLOC(dhd->osh, DHD_PREALLOC_PROT,
-		sizeof(dhd_prot_t)))) {
-			DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
-			goto fail;
-		}
+	if (!(cdc = (dhd_prot_t *)DHD_OS_PREALLOC(dhd, DHD_PREALLOC_PROT, sizeof(dhd_prot_t)))) {
+		DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
+		goto fail;
+	}
 	memset(cdc, 0, sizeof(dhd_prot_t));
 
 	/* ensure that the msg buf directly follows the cdc msg struct */
@@ -532,10 +521,8 @@ dhd_prot_attach(dhd_pub_t *dhd)
 	return 0;
 
 fail:
-#ifndef CONFIG_DHD_USE_STATIC_BUF
 	if (cdc != NULL)
-		MFREE(dhd->osh, cdc, sizeof(dhd_prot_t));
-#endif /* CONFIG_DHD_USE_STATIC_BUF */
+		DHD_OS_PREFREE(dhd, cdc, sizeof(dhd_prot_t));
 	return BCME_NOMEM;
 }
 
@@ -545,19 +532,16 @@ dhd_prot_detach(dhd_pub_t *dhd)
 {
 #ifdef PROP_TXSTATUS
 	dhd_wlfc_deinit(dhd);
-	if (dhd->plat_deinit)
-		dhd->plat_deinit((void *)dhd);
 #endif
-#ifndef CONFIG_DHD_USE_STATIC_BUF
-	MFREE(dhd->osh, dhd->prot, sizeof(dhd_prot_t));
-#endif /* CONFIG_DHD_USE_STATIC_BUF */
+	DHD_OS_PREFREE(dhd, dhd->prot, sizeof(dhd_prot_t));
 	dhd->prot = NULL;
 }
 
 void
 dhd_prot_dstats(dhd_pub_t *dhd)
 {
-	/* No stats from dongle added yet, copy bus stats */
+	/*  copy bus stats */
+
 	dhd->dstats.tx_packets = dhd->tx_packets;
 	dhd->dstats.tx_errors = dhd->tx_errors;
 	dhd->dstats.rx_packets = dhd->rx_packets;
@@ -568,7 +552,7 @@ dhd_prot_dstats(dhd_pub_t *dhd)
 }
 
 int
-dhd_prot_init(dhd_pub_t *dhd)
+dhd_sync_with_dongle(dhd_pub_t *dhd)
 {
 	int ret = 0;
 	wlc_rev_info_t revinfo;
@@ -582,10 +566,13 @@ dhd_prot_init(dhd_pub_t *dhd)
 		goto done;
 
 
-#if defined(WL_CFG80211)
-	if (dhd_download_fw_on_driverload)
-#endif /* defined(WL_CFG80211) */
-		ret = dhd_preinit_ioctls(dhd);
+	dhd_process_cid_mac(dhd, TRUE);
+
+	ret = dhd_preinit_ioctls(dhd);
+
+	if (!ret)
+		dhd_process_cid_mac(dhd, FALSE);
+
 	/* Always assumes wl for now */
 	dhd->iswl = TRUE;
 
@@ -593,10 +580,15 @@ done:
 	return ret;
 }
 
+int dhd_prot_init(dhd_pub_t *dhd)
+{
+	return TRUE;
+}
+
 void
 dhd_prot_stop(dhd_pub_t *dhd)
 {
-	/* Nothing to do for CDC */
+/* Nothing to do for CDC */
 }
 
 
@@ -604,7 +596,6 @@ static void
 dhd_get_hostreorder_pkts(void *osh, struct reorder_info *ptr, void **pkt,
 	uint32 *pkt_count, void **pplast, uint8 start, uint8 end)
 {
-	uint i;
 	void *plast = NULL, *p;
 	uint32 pkt_cnt = 0;
 
@@ -615,15 +606,7 @@ dhd_get_hostreorder_pkts(void *osh, struct reorder_info *ptr, void **pkt,
 		*pkt = NULL;
 		return;
 	}
-	if (start == end)
-		i = ptr->max_idx + 1;
-	else {
-		if (start > end)
-			i = ((ptr->max_idx + 1) - start) + end;
-		else
-			i = end - start;
-	}
-	while (i) {
+	do {
 		p = (void *)(ptr->p[start]);
 		ptr->p[start] = NULL;
 
@@ -636,12 +619,13 @@ dhd_get_hostreorder_pkts(void *osh, struct reorder_info *ptr, void **pkt,
 			plast = p;
 			pkt_cnt++;
 		}
-		i--;
-		if (start++ == ptr->max_idx)
+		start++;
+		if (start > ptr->max_idx)
 			start = 0;
-	}
+	} while (start != end);
 	*pplast = plast;
-	*pkt_count = (uint32)pkt_cnt;
+	*pkt_count = pkt_cnt;
+	ptr->pend_pkts -= (uint8)pkt_cnt;
 }
 
 int
@@ -789,7 +773,6 @@ dhd_process_pkt_reorder_info(dhd_pub_t *dhd, uchar *reorder_info_buf, uint reord
 
 			dhd_get_hostreorder_pkts(dhd->osh, ptr, pkt, &cnt, &plast,
 				cur_idx, exp_idx);
-			ptr->pend_pkts -= (uint8)cnt;
 			*pkt_count = cnt;
 			DHD_REORDER(("%s: freeing up buffers %d, still pending %d\n",
 				__FUNCTION__, cnt, ptr->pend_pkts));
@@ -846,7 +829,6 @@ dhd_process_pkt_reorder_info(dhd_pub_t *dhd, uchar *reorder_info_buf, uint reord
 			end_idx =  exp_idx;
 
 		dhd_get_hostreorder_pkts(dhd->osh, ptr, pkt, &cnt, &plast, ptr->exp_idx, end_idx);
-		ptr->pend_pkts -= (uint8)cnt;
 		if (plast)
 			PKTSETNEXT(dhd->osh, plast, cur_pkt);
 		else

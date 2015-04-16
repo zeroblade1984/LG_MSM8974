@@ -33,6 +33,9 @@ extern    "C"
 #include "tcc353x_common.h"
 
 #define _READ_OPSTATUS_
+#if defined (_READ_OPSTATUS_)
+#define _SUPPORT_C_LAYER_
+#endif
 
 #define ISDB_MAX_MOV_AVG     4
 
@@ -140,6 +143,21 @@ typedef struct {
 	I16U resynced;
 
 	I08U EEW; 	/* Earthquake Early Warning */
+
+#if defined (_SUPPORT_C_LAYER_)
+	I08U CMod;	/* refer EnumMOD */
+	I08U CCr;	/* refer EnumCR */
+	I08U CIntLen;	/* interleaving length */
+	I08U CSegNo;
+
+	I32U CRsErrorCnt;
+	I32U CRsCnt;
+	I32U CRsOverCnt;
+
+	I64U c_rs_error_old_mailbox;
+	I32U c_rs_count_old_mailbox;
+	I32U c_rs_over_old_mailbox;
+#endif
 } Tcc353xOpStatus_t;
 
 typedef struct {

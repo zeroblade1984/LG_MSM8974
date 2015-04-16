@@ -15,21 +15,15 @@
 #include <linux/smb347-charger.h>
 #endif
 
-/*#define MAX17048_DEBUG*/
 #define CONFIG_MAX17048_SOC_ALERT
-#ifdef CONFIG_LGE_PM
-/*#define CONFIG_MAX17048_POLLING*/	/*It is just for debugging*/
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
-#define CONFIG_MAX17048_LOW_POLLING
-#endif
-#endif
 #define CONFIG_MAX17048_CUSTOM
 
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
 enum cell_type{
  LGC_LLL,
  TCD_AAC
 };
+
 #define BATT_DS2704_L   32
 #define BATT_DS2704_C   48
 #define BATT_ISL6296_N  73
@@ -38,9 +32,7 @@ enum cell_type{
 #endif
 
 struct max17048_battery_model {
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR)
 	int empty;
-#endif
 #ifdef CONFIG_LGE_PM
 	int rcomp;
 	int temp_co_hot;
@@ -50,8 +42,8 @@ struct max17048_battery_model {
 	int full_design;
 #else
 	uint8_t rcomp;
-	uint8_t soccheck_A;
-	uint8_t soccheck_B;
+	uint8_t soccheck_a;
+	uint8_t soccheck_b;
 	uint8_t bits;
 	uint8_t alert_threshold;
 	uint8_t one_percent_alerts;

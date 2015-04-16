@@ -470,10 +470,6 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
-	if (ccs_socket_post_recvmsg_permission(sk, skb, flags)) {
-		err = -EAGAIN; /* Hope less harmful than -EPERM. */
-		goto out;
-	}
 
 	copied = skb->len;
 	if (copied > len) {
@@ -765,6 +761,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 	memset(&fl6, 0, sizeof(fl6));
 
 	fl6.flowi6_mark = sk->sk_mark;
+	fl6.flowi6_uid = sock_i_uid(sk);
 
 	if (sin6) {
 		if (addr_len < SIN6_LEN_RFC2133)

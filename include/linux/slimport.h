@@ -29,7 +29,7 @@
 
 #define CBL_910K 11
 
-#define LOG_TAG "[anx7808]"
+#define LOG_TAG "[anx7812]"
 
 extern bool sp_tx_hw_lt_done;
 extern bool  sp_tx_hw_lt_enable;
@@ -56,7 +56,7 @@ void sp_set_link_bw(unchar link_bw);
 void slimport_set_hdmi_hpd(int on);
 #endif
 
-#ifdef CONFIG_SLIMPORT_ANX7808
+#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 bool slimport_is_connected(void);
 #else
 static inline bool slimport_is_connected(void)

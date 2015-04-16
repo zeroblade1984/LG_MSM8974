@@ -34,7 +34,6 @@ struct sym_entry {
 	unsigned int len;
 	unsigned int start_pos;
 	unsigned char *sym;
-	unsigned char stype;
 };
 
 struct text_range {
@@ -55,7 +54,6 @@ static struct text_range text_ranges[] = {
 static struct sym_entry *table;
 static unsigned int table_size, table_cnt;
 static int all_symbols = 0;
-static int lineloc_symbols = 0;
 static char symbol_prefix_char = '\0';
 static unsigned long long kernel_start_addr = 0;
 
@@ -107,33 +105,17 @@ static int read_symbol_tr(const char *sym, unsigned long long addr)
 
 static int read_symbol(FILE *in, struct sym_entry *s)
 {
-	static char str[500];
-	static char tstr[500];
+	char str[500];
 	char *sym, stype;
 	int rc;
-	static int read_elf_time = 0;
 
-	if (!fgets(tstr, 500, in))
-		return -1;
-	if (!read_elf_time)
-		rc = sscanf(tstr, "%llx %c %499s\n", &s->addr, &stype, str);
-	else
-		goto do_read_elf;
-
+	rc = fscanf(in, "%llx %c %499s\n", &s->addr, &stype, str);
 	if (rc != 3) {
-		if (lineloc_symbols)
-do_read_elf:
-			rc = sscanf(tstr, "%499s %llx\n", str, &s->addr);
-		if (rc == 2) {
-			stype = 0xff;
-			sym = str;
-			read_elf_time = 1;
-			goto got_sym;
-		}
+		if (rc != EOF && fgets(str, 500, in) == NULL)
+			fprintf(stderr, "Read error or end of file.\n");
 		return -1;
 	}
 
-got_sym:
 	sym = str;
 	/* skip prefix char */
 	if (symbol_prefix_char && str[0] == symbol_prefix_char)
@@ -173,8 +155,8 @@ got_sym:
 			"unable to allocate required amount of memory\n");
 		exit(EXIT_FAILURE);
 	}
-	s->stype = stype;
-	strcpy((char *)s->sym, str);
+	strcpy((char *)s->sym + 1, str);
+	s->sym[0] = stype;
 
 	return 0;
 }
@@ -208,20 +190,19 @@ static int symbol_valid(struct sym_entry *s)
 		"kallsyms_markers",
 		"kallsyms_token_table",
 		"kallsyms_token_index",
-		"kallsyms_type_table",
 
 	/* Exclude linker generated symbols which vary between passes */
 		"_SDA_BASE_",		/* ppc */
 		"_SDA2_BASE_",		/* ppc */
 		NULL };
 	int i;
-	int offset = 0;
+	int offset = 1;
 
 	if (s->addr < kernel_start_addr)
 		return 0;
 
 	/* skip prefix char */
-	if (symbol_prefix_char && *(s->sym) == symbol_prefix_char)
+	if (symbol_prefix_char && *(s->sym + 1) == symbol_prefix_char)
 		offset++;
 
 	/* if --all-symbols is not specified, then symbols outside the text
@@ -376,18 +357,6 @@ static void write_src(void)
 		printf("\n");
 
 		off += table[i].len + 1;
-	}
-	printf("\n");
-
-	output_label("kallsyms_type_table");
-	off = 0;
-	for (i = 0; i < table_cnt; i++) {
-		printf("\t.byte 0x%02x", table[i].stype);
-		for (k = 0; k < 15 && i < table_cnt; k++) {
-			i++;
-			printf(", 0x%02x", table[i].stype);
-		}
-		printf("\n");
 	}
 	printf("\n");
 
@@ -678,8 +647,6 @@ int main(int argc, char **argv)
 		for (i = 1; i < argc; i++) {
 			if(strcmp(argv[i], "--all-symbols") == 0)
 				all_symbols = 1;
-			else if (strcmp(argv[i], "--ll-symbols") == 0)
-				lineloc_symbols = 1;
 			else if (strncmp(argv[i], "--symbol-prefix=", 16) == 0) {
 				char *p = &argv[i][16];
 				/* skip quote */

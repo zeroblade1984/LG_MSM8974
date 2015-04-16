@@ -335,12 +335,12 @@ int msm_init_ois(enum ois_ver_t ver)
 			rc = msm_ois_t.ois_func_tbl->ois_on(ver);
 			if (rc < 0) {
 				msm_ois_t.ois_func_tbl = NULL;
-				CDBG("%s: ois open fail\n", __func__);
+				printk("%s: ois open fail\n", __func__);
 			}
 		}
 		else
 		{
-			CDBG("%s: No OIS support!\n",__func__);
+			printk("%s: No OIS support!\n",__func__);
 		}
 		mutex_unlock(msm_ois_t.ois_mutex);
 	}

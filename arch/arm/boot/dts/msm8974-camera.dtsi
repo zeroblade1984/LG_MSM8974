@@ -191,6 +191,13 @@
 		qcom,cci-master = <0>;
 	};
 
+	qcom,proxy@29 {
+		cell-index = <998>;
+		reg = <0x29 0x0>;
+		compatible = "qcom,proxy";
+		qcom,cci-master = <0>;
+	};
+
 	cci: qcom,cci@fda0C000 {
 		cell-index = <0>;
 		compatible = "qcom,cci";

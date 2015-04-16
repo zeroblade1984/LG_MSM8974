@@ -13,9 +13,20 @@
 
 #ifdef CONFIG_LGE_PM
 extern int32_t qpnp_charger_is_ready(void);
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_G2_KDDI)
 extern int32_t external_qpnp_enable_charging(bool enable);
 #endif
+#ifdef CONFIG_LGE_QC_2_0_SCENARIO
+enum qpnp_quick_charging_state {
+	QC20_STATUS_NONE		= 0,
+	QC20_STATUS_LCD_ON	= 1,
+	QC20_STATUS_LCD_OFF 	= 2,
+	QC20_STATUS_CALL_ON	= 3,
+	QC20_STATUS_CALL_OFF	= 4,
+	QC20_STATUS_THERMAL_ON = 5,
+	QC20_STATUS_THERMAL_OFF	= 6,
+};
+void qpnp_qc20_set_qc_state( int qc_state);
 #endif
+
 
 #endif

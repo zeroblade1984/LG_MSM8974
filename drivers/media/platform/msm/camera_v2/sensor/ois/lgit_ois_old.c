@@ -376,7 +376,7 @@ int OnsemiI2CCheck(void)
 int	IniSet( void )
 {
 	
-	WitTim(5);
+	//WitTim(5);
 	RegWriteA( SOFRES1	, 0x00 );	// Software Reset 
 	WitTim(5);
 	RegWriteA( SOFRES1	, 0x11 );
@@ -2153,12 +2153,12 @@ int32_t	lgit_ois_on( enum ois_ver_t ver )
 	{
 		case OIS_VER_RELEASE:
 		{
-			usleep(20000);
+			//usleep(20000);
 			rc = IniSet();
 			if (rc < 0) { return rc;}
 			usleep(5000);
 			RtnCen(0);
-			usleep(100000);
+			//usleep(100000);
 			
 		}
 		break;	
@@ -2453,7 +2453,7 @@ int32_t lgit_ois_move_lens(int16_t target_x, int16_t target_y)
 	||((abs(hally1-hally2) < LENS_MOVE_THRESHOLD*HALL_SCALE_FACTOR) && (oldy != offset_y)))
 	{
 		rc = OIS_FAIL;	
-		CDBG("%s : fail \n",__func__);
+		printk("%s : fail \n",__func__);
 	}
 	else
 	{

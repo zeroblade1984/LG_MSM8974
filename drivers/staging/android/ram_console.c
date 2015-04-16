@@ -28,11 +28,10 @@ static struct persistent_ram_zone *ram_console_zone;
 static const char *bootinfo;
 static size_t bootinfo_size;
 
-/*                                                                    
-                                                                       
+/* LGE : not use Reed-solmon ECC check for ram-console data integrity.
+  * this ECC use cpu-power intensively that lead  slow down a boot time
   */
 #define USE_RAM_CONSOLE_ECC	false
-
 static void
 ram_console_write(struct console *console, const char *s, unsigned int count)
 {

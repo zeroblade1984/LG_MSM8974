@@ -5,7 +5,7 @@
  *
  * Definitions subject to change without notice.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhdioctl.h 419132 2013-08-19 21:33:05Z $
+ * $Id: dhdioctl.h 515169 2014-11-13 13:19:49Z $
  */
 
 #ifndef _dhdioctl_h_
@@ -53,7 +53,8 @@ typedef struct dhd_ioctl {
 /* Underlying BUS definition */
 enum {
 	BUS_TYPE_USB = 0, /* for USB dongles */
-	BUS_TYPE_SDIO /* for SDIO dongles */
+	BUS_TYPE_SDIO, /* for SDIO dongles */
+	BUS_TYPE_PCIE /* for PCIE dongles */
 };
 
 /* per-driver magic numbers */
@@ -92,6 +93,7 @@ enum {
 #define DHD_NOCHECKDIED_VAL		0x20000 /* UTF WAR */
 #define DHD_WL_VAL2		0x40000
 #define DHD_PNO_VAL		0x80000
+#define DHD_RTT_VAL		0x100000
 
 #ifdef SDTEST
 /* For pktgen iovar */

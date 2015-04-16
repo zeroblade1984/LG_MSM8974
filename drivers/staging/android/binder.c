@@ -101,7 +101,7 @@ enum {
 	BINDER_DEBUG_BUFFER_ALLOC_ASYNC     = 1U << 15,
 	BINDER_DEBUG_TOP_ERRORS		    = 1U << 16,
 };
-static uint32_t binder_debug_mask = BINDER_DEBUG_USER_ERROR | BINDER_DEBUG_FAILED_TRANSACTION | BINDER_DEBUG_DEAD_TRANSACTION;
+static uint32_t binder_debug_mask;
 module_param_named(debug_mask, binder_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 static bool binder_debug_no_lock;
@@ -664,9 +664,6 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate,
 				     "for page at %p\n", proc->pid, page_addr);
 			goto err_alloc_page_failed;
 		}
-#ifdef CONFIG_LGE_MEMORY_INFO
-		__inc_zone_page_state(*page, NR_BINDER_PAGES);
-#endif
 		tmp_area.addr = page_addr;
 		tmp_area.size = PAGE_SIZE + PAGE_SIZE /* guard page? */;
 		page_array_ptr = page;
@@ -706,9 +703,6 @@ free_range:
 err_vm_insert_page_failed:
 		unmap_kernel_range((unsigned long)page_addr, PAGE_SIZE);
 err_map_kernel_failed:
-#ifdef CONFIG_LGE_MEMORY_INFO
-		__dec_zone_page_state(*page, NR_BINDER_PAGES);
-#endif
 		__free_page(*page);
 		*page = NULL;
 err_alloc_page_failed:
@@ -1410,6 +1404,7 @@ static void binder_transaction(struct binder_proc *proc,
 	struct binder_transaction *t;
 	struct binder_work *tcomplete;
 	size_t *offp, *off_end;
+	size_t off_min;
 	struct binder_proc *target_proc;
 	struct binder_thread *target_thread = NULL;
 	struct binder_node *target_node = NULL;
@@ -1610,18 +1605,23 @@ static void binder_transaction(struct binder_proc *proc,
 		goto err_bad_offset;
 	}
 	off_end = (void *)offp + tr->offsets_size;
+	off_min = 0;
 	for (; offp < off_end; offp++) {
 		struct flat_binder_object *fp;
 		if (*offp > t->buffer->data_size - sizeof(*fp) ||
+		    *offp < off_min ||
 		    t->buffer->data_size < sizeof(*fp) ||
-		    !IS_ALIGNED(*offp, sizeof(void *))) {
-			binder_user_error("binder: %d:%d got transaction with "
-				"invalid offset, %zd\n",
-				proc->pid, thread->pid, *offp);
+		    !IS_ALIGNED(*offp, sizeof(u32))) {
+			binder_user_error("%d:%d got transaction with invalid offset, %lld (min %lld, max %lld)\n",
+					  proc->pid, thread->pid, (u64)*offp,
+					  (u64)off_min,
+					  (u64)(t->buffer->data_size -
+					  sizeof(*fp)));
 			return_error = BR_FAILED_REPLY;
 			goto err_bad_offset;
 		}
 		fp = (struct flat_binder_object *)(t->buffer->data + *offp);
+		off_min = *offp + sizeof(struct flat_binder_object);
 		switch (fp->type) {
 		case BINDER_TYPE_BINDER:
 		case BINDER_TYPE_WEAK_BINDER: {
@@ -2853,9 +2853,15 @@ static void binder_vma_close(struct vm_area_struct *vma)
 	binder_defer_work(proc, BINDER_DEFERRED_PUT_FILES);
 }
 
+static int binder_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return VM_FAULT_SIGBUS;
+}
+
 static struct vm_operations_struct binder_vm_ops = {
 	.open = binder_vma_open,
 	.close = binder_vma_close,
+	.fault = binder_vm_fault,
 };
 
 static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -3134,9 +3140,6 @@ static void binder_deferred_release(struct binder_proc *proc)
 					     page_addr);
 				unmap_kernel_range((unsigned long)page_addr,
 					PAGE_SIZE);
-#ifdef CONFIG_LGE_MEMORY_INFO
-				__dec_zone_page_state(proc->pages[i], NR_BINDER_PAGES);
-#endif
 				__free_page(proc->pages[i]);
 				page_count++;
 			}

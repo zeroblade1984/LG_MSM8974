@@ -78,7 +78,7 @@ static void *emergency_dload_mode_addr;
 
 /* Download mode master kill-switch */
 static int dload_set(const char *val, struct kernel_param *kp);
-static int download_mode;
+static int download_mode = 0;
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
 static int panic_prep_restart(struct notifier_block *this,
@@ -119,6 +119,10 @@ static void enable_emergency_dload_mode(void)
 		__raw_writel(EMERGENCY_DLOAD_MAGIC3,
 				emergency_dload_mode_addr +
 				(2 * sizeof(unsigned int)));
+
+		/* Need disable the pmic wdt, then the emergency dload mode
+		 * will not auto reset. */
+		qpnp_pon_wd_config(0);
 		mb();
 	}
 }
@@ -143,6 +147,7 @@ static int dload_set(const char *val, struct kernel_param *kp)
 	if (lge_get_laf_mode() == LGE_LAF_MODE_LAF)
 		download_mode = 1;
 #endif
+
 	set_dload_mode(download_mode);
 
 	return 0;
@@ -276,8 +281,12 @@ static void msm_restart_prepare(const char *cmd)
 	pm8xxx_reset_pwr_off(1);
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-	/*                                                                          */
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE : there's no reason to forcing a hard reset on reboot request */
 	if (true || get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
+#else
+	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
+#endif
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
@@ -287,17 +296,23 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
 			__raw_writel(0x77665502, restart_reason);
-#ifdef CONFIG_LGE_BNR_RECOVERY_REBOOT
-			/* PC Sync B&R : Add restart reason */
+		} else if (!strncmp(cmd, "fota", 4)) {
+			__raw_writel(0x77665566, restart_reason);
 		} else if (!strncmp(cmd, "--bnr_recovery", 14)) {
 			__raw_writel(0x77665555, restart_reason);
+		} else if (!strcmp(cmd, "rtc")) {
+			__raw_writel(0x77665503, restart_reason);
+        } else if (!strcmp(cmd, "aat_write")) {
+            __raw_writel(0x77665580, restart_reason);
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+        } else if (!strncmp(cmd, "FOTA LCD off", 12)) {
+			__raw_writel(0x77665560, restart_reason);
+        } else if (!strncmp(cmd, "FOTA OUT LCD off", 16)) {
+			__raw_writel(0x77665561, restart_reason);
 #endif
+		} else if (!strcmp(cmd, "aat_enter")) {
+            __raw_writel(0x77665581, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
-			/*
-			 * oem-10 : used diag comand 250-105-1 power off
-			 * oem-11 : battery remove insert irq restart
-			 * oem-52 : laf download restart
-			 */
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
 			__raw_writel(0x6f656d00 | code, restart_reason);
@@ -307,6 +322,7 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
+
 #ifdef CONFIG_LGE_HANDLE_PANIC
 	else
 		__raw_writel(0x77665503, restart_reason);

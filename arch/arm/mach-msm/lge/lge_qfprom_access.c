@@ -31,7 +31,7 @@
 #include <linux/buffer_head.h>
 
 
-#define LGE_QFPROM_INTERFACE_NAME "lge-msm8974-qfprom"
+#define LGE_QFPROM_INTERFACE_NAME "lge-qfprom"
 /* service ID inside tzbsp */
 #define QFPROM_SVC_ID		8
 #define QFPROM_WRITE_CMD	0x3
@@ -66,7 +66,11 @@
 
 #define HW_KEY_LSB_FEC_MASK 0xC1FF83FF
 #define HW_KEY_MSB_FEC_MASK 0x007FE0FF
+#if defined(CONFIG_MACH_MSM8974_G3_TMO_US)
+#define FUSING_COMPLETED_STATE 0x3F
+#else
 #define FUSING_COMPLETED_STATE 0x1F
+#endif
 
 /* command buffer to write */
 struct qfprom_write_cmd_buffer {
@@ -101,15 +105,37 @@ int qfuse_write_single_row(u32 fuse_addr, u32 fuse_lsb, u32 fuse_msb);
 int qfuse_read_single_row(u32 fuse_addr, u32 addr_type, u32 *r_buf);
 u32 qfprom_read(u32 fuse_addr);
 
+#if defined(CONFIG_MACH_MSM8974_G3_TMO_US)
 static struct qfprom_blow_data blow_data[] = {
 		/* Don't change array order !!!!!!!!!!!!!!*/
 		/* addr	 			 LSB		MSB*/
-		{ QFPROM_OEM_CONFIG, 		0x00310000, 	0x00000000},		/* OEM ID        */
+		{ QFPROM_OEM_CONFIG, 		0x00310000, 	0x00000262},		/* OEM ID + OEM_PRODUCT_ID*/
 		{ QFPROM_SECURE_BOOT_ENABLE, 	0x00202020, 	0x00000000},		/* SECURE ENABLE */
 		{ QFPROM_DEBUG_DISABLE, 	0x3FC00000, 	0x040001FE},		/* JTAG DISABLE   */
 		{ QFPROM_CHECK_HW_KEY,		0x0,            0x0	  },
-		{ QFPROM_RD_WR_PERMISSION, 	0x00400000, 	0xc5c20200},	    	/* READ WRITE PERMISSION */
+		{ QFPROM_RD_WR_PERMISSION, 	0x00400000, 	0xC5C28204},	    	/* READ WRITE PERMISSION */
 };
+#elif defined(CONFIG_MACH_MSM8974_G3)
+static struct qfprom_blow_data blow_data[] = {
+		/* Don't change array order !!!!!!!!!!!!!!*/
+		/* addr	 			 LSB		MSB*/
+		{ QFPROM_OEM_CONFIG, 		0x00310000, 	0x00000000},		/* OEM ID + OEM_PRODUCT_ID*/
+		{ QFPROM_SECURE_BOOT_ENABLE, 	0x00202020, 	0x00000000},		/* SECURE ENABLE */
+		{ QFPROM_DEBUG_DISABLE, 	0x3FC00000, 	0x040001FE},		/* JTAG DISABLE   */
+		{ QFPROM_CHECK_HW_KEY,		0x0,            0x0	  },
+		{ QFPROM_RD_WR_PERMISSION, 	0x00400000, 	0xC5C28204},	    	/* READ WRITE PERMISSION */
+};
+#else
+static struct qfprom_blow_data blow_data[] = {
+		/* Don't change array order !!!!!!!!!!!!!!*/
+		/* addr	 			 LSB		MSB*/
+		{ QFPROM_OEM_CONFIG, 		0x00310000, 	0x00000000},		/* OEM ID + OEM_PRODUCT_ID*/
+		{ QFPROM_SECURE_BOOT_ENABLE, 	0x00202020, 	0x00000000},		/* SECURE ENABLE */
+		{ QFPROM_DEBUG_DISABLE, 	0x3FC00000, 	0x040001FE},		/* JTAG DISABLE   */
+		{ QFPROM_CHECK_HW_KEY,		0x0,            0x0	  },
+		{ QFPROM_RD_WR_PERMISSION, 	0x00400000, 	0xC5C20200},	    	/* READ WRITE PERMISSION */
+};
+#endif
 
 /* this api handle diag command(fusing check command) from ATD
  * if fusing value 0 ==> is not fused
@@ -129,7 +155,7 @@ static ssize_t qfusing_show(struct device *dev, struct device_attribute *attr, c
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		printk(KERN_INFO "%s end\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 		verification_check_value = 0;
 		printk(KERN_ERR "%s: verification fail 1\n", __func__);
 	}
@@ -142,7 +168,7 @@ static ssize_t qfusing_show(struct device *dev, struct device_attribute *attr, c
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		printk(KERN_INFO "%s end\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 		verification_check_value = 0;
 		printk(KERN_ERR "%s: verification fail 2\n", __func__);
 	}
@@ -155,7 +181,7 @@ static ssize_t qfusing_show(struct device *dev, struct device_attribute *attr, c
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		printk(KERN_INFO "%s end\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 		verification_check_value = 0;
 		printk(KERN_ERR "%s: verification fail 3\n", __func__);
 		printk(KERN_ERR "%s end\n", __func__);
@@ -184,7 +210,7 @@ static ssize_t qfusing_verification_show(struct device *dev, struct device_attri
 
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 
 		printk(KERN_ERR "%s: verification fail 1\n", __func__);
 	}
@@ -196,7 +222,7 @@ static ssize_t qfusing_verification_show(struct device *dev, struct device_attri
 
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 		printk(KERN_ERR "%s: verification fail 2\n", __func__);
 	}
 	verification_check_value = qfprom_verification_blow_data();
@@ -205,7 +231,7 @@ static ssize_t qfusing_verification_show(struct device *dev, struct device_attri
 	if (verification_check_value == FUSING_COMPLETED_STATE) {
 		printk(KERN_INFO "%s: verification success\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
-	}else{
+	} else{
 		printk(KERN_ERR "%s: verification fail 3\n", __func__);
 		return sprintf(buf, "%x\n", verification_check_value);
 	}
@@ -258,19 +284,18 @@ int qfprom_read_one_row(u32 address, u32 *buf)
 	int ret = 0;
 	printk(KERN_INFO "%s : address %x\n", __func__, address);
 
-	switch (qfprom_read_kind)
-	{
-		case 0:
-			ret = qfuse_read_single_row(address, 0, buf);
-			break;
-		case 1:
-			ret = 0;
-			buf[0] = qfprom_read(address);
-			buf[1] = qfprom_read(address + 4);
-			break;
-		case 2:
-			/* ret = qfprom_read_from_misc(address, &buf[0], &buf[1]); */
-			break;
+	switch (qfprom_read_kind) {
+	case 0:
+		ret = qfuse_read_single_row(address, 0, buf);
+		break;
+	case 1:
+		ret = 0;
+		buf[0] = qfprom_read(address);
+		buf[1] = qfprom_read(address + 4);
+		break;
+	case 2:
+		/* ret = qfprom_read_from_misc(address, &buf[0], &buf[1]); */
+		break;
 	}
 	printk(KERN_INFO "%s : return %x\n", __func__, ret);
 
@@ -295,7 +320,7 @@ static ssize_t qfprom_read_store(struct device *dev, struct device_attribute *at
 		printk(KERN_ERR "%s : buffer memory alloc fail\n", __func__);
 		return -ENOMEM;
 	}
-	
+
 	ret = qfprom_read_one_row(qfprom_address, p_buf);
 
 	qfprom_address = 0;
@@ -504,10 +529,15 @@ u32 qfprom_verification_blow_data(void)
 		if (((p_buf[0]&blow_data[i].lsb_data) == blow_data[i].lsb_data) &&
 			((p_buf[1]&blow_data[i].msb_data) == blow_data[i].msb_data)) {
 			printk(KERN_INFO "%s: 0x%x check complete\n", __func__, blow_data[i].qfprom_addr);
+
+			if ((FUSING_COMPLETED_STATE == 0x3F) && (blow_data[i].qfprom_addr == QFPROM_OEM_CONFIG)) {
+				/*  For Product ID Check */
+				fusing_verification |= (0x1 << (i+5));
+			}
 			fusing_verification |= (0x1<<i);
 			printk(KERN_INFO "%s: %d fusing_verification\n", __func__, fusing_verification);
 		} else {
-			printk(KERN_INFO "%s: 0x%x fusing value is not match\n",__func__, blow_data[i].qfprom_addr);
+			printk(KERN_INFO "%s: 0x%x fusing value is not match\n", __func__, blow_data[i].qfprom_addr);
 			/* msleep(10); */
 		}
 	}

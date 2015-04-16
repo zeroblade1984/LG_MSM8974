@@ -29,27 +29,10 @@ config USB_LGE_USB3_REDRIVER
 	help
 	 Say Y to enalbe LGE specific USB3 Redriver feature.
 	default n
-
-config USB_LGE_RELIABILITY
-	bool "LGE reliability feature"
+config USB_DWC3_LGE_SINGLE_PSY
+	bool "Use only usb psy"
 	help
-	 kernel usb reliabilty feature 
-	default n
+	  Say y if not ac psy used, but use usb psy only.
 
-config USB_LGE_LPM_STATE
-	bool "LGE LPM state"
-	help
-	 no init lpm and keep no lpm state is added to previous DWC3 lpm state. 
-	default n
-
-#CONFIG_USB_DWC3_MSM_VZW_SUPPORT
-config USB_DWC3_MSM_VZW_SUPPORT
-	bool "VZW specific DWC3_MSM support in LGE Android"
-	depends on USB_DWC3_MSM
-	help
-	  It supports VZW specific DWC3_MSM feature for USB BC 1.2 event. 
-	  note that this must be used in VZW devices.
-
-	  Say y if this must be needed.
 	default n
 endif

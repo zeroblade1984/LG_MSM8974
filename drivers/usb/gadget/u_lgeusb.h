@@ -21,6 +21,10 @@ enum lgeusb_mode {
 	LGEUSB_ANDROID_MODE,
 	LGEUSB_DEFAULT_MODE,
 };
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+#define MAC_OS_TYPE		0x02
+#define WIN_LINUX_TYPE	0xFF
+#endif
 
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
 int lgeusb_get_autorun_user_mode(void);
@@ -29,7 +33,12 @@ int lgeusb_get_phone_id(char *);
 int lgeusb_get_sw_ver(char *);
 int lgeusb_get_sub_ver(char *);
 
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+void lgeusb_set_host_os(u16);
+bool lgeusb_get_host_os(void);
+#endif
+
 int debug_pmic_register_for_usb(void);
 #endif
 
-#endif /*                */
+#endif /* __U_LGEUSB_H__ */

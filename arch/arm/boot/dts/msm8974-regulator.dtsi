@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@
 	};
 
 	pm8941_mvs1: regulator@8300 {
-		parent-supply = <&pm8941_boost>;
+		parent-supply = <&pm8941_chg_otg>;
 		qcom,enable-time = <1000>;
 		qcom,pull-down-enable = <1>;
 		interrupts = <0x1 0x83 0x2>;
@@ -288,9 +288,9 @@
 	rpm-regulator-ldoa11 {
 		status = "okay";
 		pm8941_l11: regulator-l11 {
-			regulator-min-microvolt = <1225000>;
-			regulator-max-microvolt = <1225000>;
-			qcom,init-voltage = <1225000>;
+			regulator-min-microvolt = <1050000>;
+			regulator-max-microvolt = <1350000>;
+			qcom,init-voltage = <1050000>;
 			status = "okay";
 		};
 	};
@@ -365,9 +365,9 @@
 	rpm-regulator-ldoa18 {
 		status = "okay";
 		pm8941_l18: regulator-l18 {
-			regulator-min-microvolt = <2850000>;
+			regulator-min-microvolt = <2700000>;
 			regulator-max-microvolt = <2850000>;
-			qcom,init-voltage = <2850000>;
+			qcom,init-voltage = <2700000>;
 			status = "okay";
 		};
 	};
@@ -465,6 +465,8 @@
 		ranges;
 		qcom,pfm-threshold = <76>;
 		qcom,use-phase-scaling-factor;
+		qcom,phase-scaling-factor-bits-pos = <16>;
+		qcom,valid-scaling-factor-versions = <0 1 0 0>;
 
 		krait0_vreg: regulator@f9088000 {
 			compatible = "qcom,krait-regulator";
@@ -534,6 +536,7 @@
 	spi_eth_vreg: spi_eth_phy_vreg {
 		compatible = "regulator-fixed";
 		regulator-name = "ethernet_phy";
+		gpio = <&pm8941_mpps 5 0>;
 		enable-active-high;
 	};
 
@@ -565,4 +568,8 @@
 
 &pm8941_chg_otg {
 	regulator-name = "8941_smbb_otg";
+};
+
+&pm8941_chg_chgr {
+	regulator-name = "flash_wa";
 };

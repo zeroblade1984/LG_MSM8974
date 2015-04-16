@@ -30,6 +30,10 @@
 #include "diag_masks.h"
 #include "diagfwd_bridge.h"
 
+#ifdef CONFIG_LGE_DIAG_BYPASS
+extern int diag_bypass_enable;
+#endif
+
 struct diag_bridge_dev *diag_bridge;
 
 /* diagfwd_connect_bridge is called when the USB mdm channel is connected */
@@ -133,7 +137,6 @@ int diagfwd_disconnect_bridge(int process_cable)
 			/* If the usb cable is being disconnected */
 			if (process_cable) {
 				diag_bridge[i].usb_connected = 0;
-				usb_diag_free_req(diag_bridge[i].ch);
 			}
 
 			if (i == SMUX) {
@@ -383,8 +386,6 @@ void diagfwd_bridge_exit(void)
 	for (i = 0; i < MAX_BRIDGES; i++) {
 		if (diag_bridge[i].enabled) {
 #ifdef CONFIG_DIAG_OVER_USB
-			if (diag_bridge[i].usb_connected)
-				usb_diag_free_req(diag_bridge[i].ch);
 			usb_diag_close(diag_bridge[i].ch);
 #endif
 			kfree(diag_bridge[i].usb_buf_out);
@@ -395,3 +396,27 @@ void diagfwd_bridge_exit(void)
 	}
 	kfree(driver->write_ptr_mdm);
 }
+#ifdef CONFIG_LGE_DIAG_BYPASS
+int diag_bypass_request_bridge(const unsigned char *buf, int count)
+{
+//    index = (int)(d_req->context);
+    int index = HSIC_DATA_CH;
+
+    /* buffer setting */
+    struct diag_request *d_req = diag_bridge[index].usb_read_ptr;
+    d_req->context = (void*)index;
+    d_req->actual = count;
+    diag_bridge[index].usb_buf_out = (unsigned char *)buf;
+    diag_bridge[index].read_len = count;
+
+    if(diag_bypass_enable) {
+
+        queue_work(diag_bridge[index].wq,
+                &diag_bridge[index].usb_read_complete_work);
+
+        return count;
+    }
+
+    return 0;
+}
+#endif

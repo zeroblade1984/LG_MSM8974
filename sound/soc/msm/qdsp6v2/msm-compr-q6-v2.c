@@ -37,9 +37,6 @@
 #include "msm-pcm-routing-v2.h"
 #include "audio_ocmem.h"
 #include <sound/tlv.h>
-#ifdef CONFIG_SND_LGE_EFFECT
-#include "lge_dsp_sound_effect.h"
-#endif
 
 #define COMPRE_CAPTURE_NUM_PERIODS	16
 /* Allocate the worst case frame size for compressed audio */
@@ -61,16 +58,9 @@
 
 const DECLARE_TLV_DB_LINEAR(compr_rx_vol_gain, 0,
 			    COMPRESSED_LR_VOL_MAX_STEPS);
-#ifdef CONFIG_SND_LGE_EFFECT
-struct snd_msm {
-	struct msm_audio *prtd;
-	atomic_t audio_ocmem_req;
-};
-#else
 struct snd_msm {
 	atomic_t audio_ocmem_req;
 };
-#endif
 static struct snd_msm compressed_audio;
 
 static struct audio_locks the_locks;
@@ -676,10 +666,6 @@ static int msm_compr_open(struct snd_pcm_substream *substream)
 		pr_debug("%s: req: %d\n", __func__,
 			atomic_read(&compressed_audio.audio_ocmem_req));
 	}
-
-#ifdef CONFIG_SND_LGE_EFFECT
-	compressed_audio.prtd =  &compr->prtd;
-#endif
 	return 0;
 }
 
@@ -709,88 +695,6 @@ static int compressed_set_volume(struct msm_audio *prtd, uint32_t volume)
 	return rc;
 }
 
-#if 0//                         
-int lgesoundeffect_set_enable(int enable)
-{
-	int rc = 0;
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	pr_info("%s: enable %d\n", __func__, enable);
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	if (compressed_audio.prtd && compressed_audio.prtd->audio_client) {
-		rc = q6asm_set_lgesoundeffect_enable(compressed_audio.prtd->audio_client, enable);
-		if (rc < 0) {
-			pr_err("%s: lgesoundeffect_set_enable command failed rc=%d\n",
-						__func__, rc);
-		}
-	}
-	return rc;
-}
-
-int lgesoundeffect_set_modetype(int modetype)
-{
-	int rc = 0;
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	pr_info("%s: modetype %d\n", __func__, modetype);
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	if (compressed_audio.prtd && compressed_audio.prtd->audio_client) {
-		rc = q6asm_set_lgesoundeffect_modetype(compressed_audio.prtd->audio_client, modetype);
-		if (rc < 0) {
-			pr_err("%s: lgesoundeffect_set_modetype command failed rc=%d\n",
-						__func__, rc);
-		}
-	}
-	return rc;
-}
-
-int lgesoundeffect_set_mediatype(int mediatype)
-{
-	int rc = 0;
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	pr_info("%s: mediatype %d\n", __func__, mediatype);
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	if (compressed_audio.prtd && compressed_audio.prtd->audio_client) {
-		rc = q6asm_set_lgesoundeffect_mediatype(compressed_audio.prtd->audio_client, mediatype);
-		if (rc < 0) {
-			pr_err("%s: lgesoundeffect_set_mediatype command failed rc=%d\n",
-						__func__, rc);
-		}
-	}
-	return rc;
-}
-
-int lgesoundeffect_set_outputdevicetype(int outputdevicetype)
-{
-	int rc = 0;
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	pr_info("%s: outputdevicetype %d\n", __func__, outputdevicetype);
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	if (compressed_audio.prtd && compressed_audio.prtd->audio_client) {
-		rc = q6asm_set_lgesoundeffect_outputdevicetype(compressed_audio.prtd->audio_client, outputdevicetype);
-		if (rc < 0) {
-			pr_err("%s: lgesoundeffect_set_outputdevicetype command failed rc=%d\n",
-						__func__, rc);
-		}
-	}
-	return rc;
-}
-
-int lgesoundeffect_set_geq(int bandnum, int bandgain)
-{
-	int rc = 0;
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	pr_info("%s: bandnum %d, bandgain:%d\n", __func__, bandnum, bandgain);
-	pr_info("+++++++++++++++++++++++++++++++++++++\n");
-	if (compressed_audio.prtd && compressed_audio.prtd->audio_client) {
-		rc = q6asm_set_lgesoundeffect_geq(compressed_audio.prtd->audio_client, bandnum, bandgain);
-		if (rc < 0) {
-			pr_err("%s: lgesoundeffect_set_geq command failed rc=%d\n",
-						__func__, rc);
-		}
-	}
-	return rc;
-}
-#endif
-
 static int msm_compr_playback_close(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -813,9 +717,6 @@ static int msm_compr_playback_close(struct snd_pcm_substream *substream)
 		atomic_read(&compressed_audio.audio_ocmem_req));
 	prtd->pcm_irq_pos = 0;
 	q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-#ifdef CONFIG_SND_LGE_EFFECT
-	compressed_audio.prtd = NULL;
-#endif
 	q6asm_audio_client_buf_free_contiguous(dir,
 				prtd->audio_client);
 		msm_pcm_routing_dereg_phy_stream(
@@ -1129,12 +1030,19 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			int i;
 			struct snd_dec_ddp *ddp =
 				&compr->info.codec_param.codec.options.ddp;
-			uint32_t params_length = ddp->params_length*sizeof(int);
+			uint32_t params_length = 0;
+			/* check integer overflow */
+			if (ddp->params_length > UINT_MAX/sizeof(int)) {
+				pr_err("%s: Integer overflow ddp->params_length %d\n",
+				__func__, ddp->params_length);
+				return -EINVAL;
+			}
+			params_length = ddp->params_length*sizeof(int);
 			if (params_length > MAX_AC3_PARAM_SIZE) {
 				/*MAX is 36*sizeof(int) this should not happen*/
-				pr_err("params_length(%d) is greater than %d",
-				params_length, MAX_AC3_PARAM_SIZE);
-				params_length = MAX_AC3_PARAM_SIZE;
+				pr_err("%s: params_length(%d) is greater than %zd\n",
+				__func__, params_length, MAX_AC3_PARAM_SIZE);
+				return -EINVAL;
 			}
 			pr_debug("SND_AUDIOCODEC_AC3\n");
 			compr->codec = FORMAT_AC3;
@@ -1166,12 +1074,18 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			int i;
 			struct snd_dec_ddp *ddp =
 				&compr->info.codec_param.codec.options.ddp;
-			uint32_t params_length = ddp->params_length*sizeof(int);
+			uint32_t params_length = 0;
+			/* check integer overflow */
+			if (ddp->params_length > UINT_MAX/sizeof(int)) {
+				pr_err("%s: Integer overflow ddp->params_length %d\n",
+				__func__, ddp->params_length);
+				return -EINVAL;
+			}
 			if (params_length > MAX_AC3_PARAM_SIZE) {
 				/*MAX is 36*sizeof(int) this should not happen*/
-				pr_err("params_length(%d) is greater than %d",
-				params_length, MAX_AC3_PARAM_SIZE);
-				params_length = MAX_AC3_PARAM_SIZE;
+				pr_err("%s: params_length(%d) is greater than %d\n",
+				__func__, params_length, MAX_AC3_PARAM_SIZE);
+				return -EINVAL;
 			}
 			pr_debug("SND_AUDIOCODEC_EAC3\n");
 			compr->codec = FORMAT_EAC3;

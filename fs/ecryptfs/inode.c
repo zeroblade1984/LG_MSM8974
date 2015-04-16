@@ -228,6 +228,11 @@ static int ecryptfs_initialize_file(struct dentry *ecryptfs_dentry,
 			goto out;
 		}
 	}
+
+    if(ecryptfs_asecFileSearch(ecryptfs_dentry->d_name.name)){
+        crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
+        goto out;
+    }
 #endif //FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION
 #if 1 // FEATURE_SDCARD_ENCRYPTION
 	if (mount_crypt_stat && (mount_crypt_stat->flags

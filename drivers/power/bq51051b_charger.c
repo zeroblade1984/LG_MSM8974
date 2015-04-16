@@ -29,15 +29,19 @@
 #include <linux/i2c/smb349_charger.h>
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 #include <linux/qpnp/pin.h>
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 #include <linux/delay.h>
 
 #define	LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
+#define I2C_SUSPEND_WORKAROUND 1
+#ifdef I2C_SUSPEND_WORKAROUND
+extern bool i2c_suspended;
+#endif
 
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 int at_batt_temp;
 int at_batt_temp_flag;
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 enum {
@@ -46,16 +50,16 @@ enum {
 	WLC_TEMP_UNDIER_M10		= 2,
 	WLC_TEMP_OVER_60		= 3,
 };
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 static int wlc_temp_state;
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 struct bq51051b_wlc_chip {
 	struct device *dev;
 	struct power_supply wireless_psy;
-	struct work_struct wireless_interrupt_work;
+	struct delayed_work wireless_interrupt_work;
 	struct wake_lock wireless_chip_wake_lock;
 	unsigned int chg_ctrl_gpio;
 	unsigned int half_chg_ctrl_gpio;
@@ -64,6 +68,11 @@ struct bq51051b_wlc_chip {
 	unsigned int wlc_ts_mpp;
 	unsigned int track_gpio;
 	unsigned int wireless_charging;
+
+#if I2C_SUSPEND_WORKAROUND
+	struct delayed_work 	check_suspended_work;
+	int suspended;
+#endif //I2C_SUSPEND_WORKAROUND
 };
 
 static const struct platform_device_id bq51051b_id[] = {
@@ -160,7 +169,7 @@ static void wireless_current_control(bool state)
 
 	WLC_DBG_INFO("half_current : %d\n", state);
 }
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 static void wireless_ts_control(bool state)
@@ -182,7 +191,7 @@ static void wireless_ts_control(bool state)
 
 	return;
 }
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 void wireless_temp_satate(int temp_state)
@@ -211,7 +220,7 @@ void wireless_temp_satate(int temp_state)
 
 	return;
 }
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 void wireless_temp_monitor(int batt_temp)
@@ -257,13 +266,13 @@ void wireless_temp_monitor(int batt_temp)
 
 	return;
 }
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 void wireless_current_ctl(int batt_temp)
 {
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 	wireless_temp_monitor(batt_temp);
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 	return;
 }
 EXPORT_SYMBOL(wireless_current_ctl);
@@ -272,7 +281,7 @@ static void wireless_interrupt_worker(struct work_struct *work)
 {
 	struct bq51051b_wlc_chip *chip =
 	    container_of(work, struct bq51051b_wlc_chip,
-			 wireless_interrupt_work);
+			 wireless_interrupt_work.work);
 
 	WLC_DBG_INFO("wireless_interrupt_worker\n");
 
@@ -290,10 +299,34 @@ static irqreturn_t wireless_interrupt_handler(int irq, void *data)
 
 	/* todo delete below 2lines */
 	chg_state = wireless_charger_is_plugged(chip);
+
 	WLC_DBG_INFO("\nwireless is plugged state = %d\n\n", chg_state);
-	schedule_work(&chip->wireless_interrupt_work);
+
+#if I2C_SUSPEND_WORKAROUND
+	schedule_delayed_work(&chip->check_suspended_work, msecs_to_jiffies(100));
+#else
+	schedule_delayed_work(&chip->wireless_interrupt_work, 0);
+#endif
 	return IRQ_HANDLED;
 }
+#if I2C_SUSPEND_WORKAROUND
+static void wlc_check_suspended_worker(struct work_struct *work)
+{
+        struct bq51051b_wlc_chip *chip =
+                container_of(work, struct bq51051b_wlc_chip, check_suspended_work.work);
+
+        if (chip->suspended && i2c_suspended)
+	{
+		WLC_DBG_INFO("WLC suspended. try i2c operation after 100ms.\n");
+		schedule_delayed_work(&chip->check_suspended_work, msecs_to_jiffies(100));
+	}
+	else
+	{
+		WLC_DBG_INFO("WLC resumed. .\n");
+		schedule_delayed_work(&chip->wireless_interrupt_work, 0);
+	}
+}
+#endif //I2C_SUSPEND_WORKAROUND
 
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 static ssize_t at_temp_show(struct device *dev,
@@ -321,11 +354,11 @@ static ssize_t at_temp_store(struct device *dev,
 
 	return size;
 }
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 DEVICE_ATTR(at_temp, 0660, at_temp_show, at_temp_store);
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 
 static int __devinit bq51051b_wlc_hw_init(struct bq51051b_wlc_chip *chip)
 {
@@ -398,12 +431,28 @@ err_active_n:
 
 static int bq51051b_wlc_resume(struct device *dev)
 {
+	struct bq51051b_wlc_chip *chip = dev_get_drvdata(dev);
+	if (!chip) {
+		pr_err("called before init\n");
+		return 0;
+	}
+#if I2C_SUSPEND_WORKAROUND
+	chip->suspended = 0;
+#endif //I2C_SUSPEND_WORKAROUND
 	return 0;
 }
 
 static int bq51051b_wlc_suspend(struct device *dev)
 {
-	return 0;
+	struct bq51051b_wlc_chip *chip = dev_get_drvdata(dev);
+	if (!chip) {
+		pr_err("called before init\n");
+		return 0;
+	}
+#if I2C_SUSPEND_WORKAROUND
+		chip->suspended = 1;
+#endif //I2C_SUSPEND_WORKAROUND
+		return 0;
 }
 
 static void bq51051b_parse_dt(struct device *dev,
@@ -431,7 +480,7 @@ static int __devinit bq51051b_wlc_probe(struct platform_device *pdev)
 	struct bq51051b_wlc_platform_data *pdata;
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 	int err = 0;
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 	WLC_DBG_INFO("probe\n");
 
 	if (pdev->dev.of_node) {
@@ -497,14 +546,17 @@ static int __devinit bq51051b_wlc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, chip);
 	the_chip = chip;
+#if I2C_SUSPEND_WORKAROUND
+	INIT_DELAYED_WORK(&chip->check_suspended_work,wlc_check_suspended_worker);
+#endif //I2C_SUSPEND_WORKAROUND
 
-	INIT_WORK(&chip->wireless_interrupt_work, wireless_interrupt_worker);
+	INIT_DELAYED_WORK(&chip->wireless_interrupt_work, wireless_interrupt_worker);
 	wake_lock_init(&chip->wireless_chip_wake_lock, WAKE_LOCK_SUSPEND,
 		       "bq51051b_wireless_chip");
 
 #ifdef CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO
 	wlc_temp_state = WLC_TEMP_NORMAL;
-#endif/*                                    */
+#endif/*CONFIG_LGE_WLC_CHARGER_TEMP_SCENARIO*/
 
 	/* For Booting Wireless_charging and For Power Charging Logo In Wireless Charging */
 	if (wireless_charger_is_plugged(chip))
@@ -512,7 +564,7 @@ static int __devinit bq51051b_wlc_probe(struct platform_device *pdev)
 
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 	err = device_create_file(&pdev->dev, &dev_attr_at_temp);
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 	WLC_DBG_INFO("probe success\n");
 	return 0;
 
@@ -540,7 +592,7 @@ static int __devexit bq51051b_wlc_remove(struct platform_device *pdev)
 	kfree(chip);
 #ifdef LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS
 	device_remove_file(&pdev->dev, &dev_attr_at_temp);
-#endif/*                                   */
+#endif/*LGE_WLC_CHARGER_TEMP_SCENARIO_SYSFS*/
 	return 0;
 }
 

@@ -276,7 +276,7 @@ fci_s32 fc8080_init(HANDLE handle)
 	fc8080_reset(handle);
 	fc8080_set_xtal(handle);
 
-	bbm_write(handle, BBM_LDO_VCTRL, 0x33);
+	bbm_write(handle, BBM_LDO_VCTRL, 0x35);
 	bbm_write(handle, BBM_XTAL_CCTRL, 0x14);
 	bbm_write(handle, BBM_RF_XTAL_EN, 0x0f);
 	bbm_write(handle, BBM_ADC_OPMODE, 0x67);

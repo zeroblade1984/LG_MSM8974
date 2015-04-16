@@ -17,6 +17,14 @@
 #include <linux/workqueue.h>
 #include <linux/leds.h>
 
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+#ifdef CONFIG_LGE_PM_CHARGING_TEMP_SCENARIO_V1_7
+#include <mach/lge_charging_scenario_v1_7.h>
+#else
+#include <mach/lge_charging_scenario.h>
+#endif
+#endif
+
 struct device;
 
 /*
@@ -45,6 +53,7 @@ enum {
 	POWER_SUPPLY_CHARGE_TYPE_NONE,
 	POWER_SUPPLY_CHARGE_TYPE_TRICKLE,
 	POWER_SUPPLY_CHARGE_TYPE_FAST,
+	POWER_SUPPLY_CHARGE_TYPE_TAPER,
 };
 
 enum {
@@ -106,6 +115,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_INPUT_CURRENT_MAX,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_TRIM,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
+	POWER_SUPPLY_PROP_VCHG_LOOP_DBC_BYPASS,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_POWER_NOW,
@@ -158,17 +168,53 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_FTT_ANNTENA_LEVEL,
 #endif
 #ifdef CONFIG_MAX17050_FUELGAUGE
-/*                                                      */
 	POWER_SUPPLY_PROP_BATTERY_CONDITION,
 	POWER_SUPPLY_PROP_BATTERY_AGE,
 #endif
-#ifdef CONFIG_SMB349_VZW_FAST_CHG
-	POWER_SUPPLY_PROP_VZW_CHG_STATE,
+#if defined(CONFIG_CHARGER_UNIFIED_WLC)
+	POWER_SUPPLY_PROP_WIRELESS_CHARGER_SWITCH,
+#ifdef CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT
+	POWER_SUPPLY_PROP_ALIGNMENT,
+#if defined(CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT_IDT9025A) && defined(CONFIG_CHARGER_FACTORY_MODE)
+	POWER_SUPPLY_PROP_FREQUENCY,
+#elif defined(CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT_BQ5102X) && defined(CONFIG_CHARGER_FACTORY_MODE)
+	POWER_SUPPLY_PROP_VRECT,
+#endif
+#endif
+#endif
+#if defined(CONFIG_LGE_PM_LLK_MODE)
+	POWER_SUPPLY_PROP_STORE_DEMO_ENABLED,
 #endif
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
+};
+
+enum power_supply_event_type {
+	POWER_SUPPLY_PROP_UNKNOWN,
+#if defined(CONFIG_CHARGER_UNIFIED_WLC)
+	POWER_SUPPLY_PROP_WIRELESS_DCIN_PRESENT,
+	POWER_SUPPLY_PROP_WIRELESS_USB_PRESENT,
+	POWER_SUPPLY_PROP_WIRELESS_CHARGE_ENABLED,
+	POWER_SUPPLY_PROP_WIRELESS_CHARGE_COMPLETED,
+	POWER_SUPPLY_PROP_WIRELESS_ONLINE,
+	POWER_SUPPLY_PROP_WIRELESS_ONLINE_OTG,
+	POWER_SUPPLY_PROP_WIRELESS_FAKE_OTG,
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+	POWER_SUPPLY_PROP_WIRELESS_THERMAL_MITIGATION,
+#endif
+#endif
+	POWER_SUPPLY_PROP_ABNORMAL_TA,
+#if defined(CONFIG_LGE_SMART_CHARGING)
+	POWER_SUPPLY_PROP_SMART_CHARGING_ENABLE,
+	POWER_SUPPLY_PROP_SMART_CHARGING_CHG_CURRENT,
+	POWER_SUPPLY_PROP_SMART_CHARGING_FORCE_UPDATE,
+#endif
+#ifdef CONFIG_LGE_PM
+	POWER_SUPPLY_PROP_FLOATED_CHARGER,
+	POWER_SUPPLY_PROP_DRIVER_UNINSTALL,
+#endif
 };
 
 enum power_supply_type {
@@ -180,7 +226,7 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port */
 	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port */
 	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters */
-#ifdef CONFIG_WIRELESS_CHARGER
+#if defined(CONFIG_CHARGER_UNIFIED_WLC) || defined(CONFIG_WIRELESS_CHARGER)
 	POWER_SUPPLY_TYPE_WIRELESS,
 #endif
 	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
@@ -205,6 +251,12 @@ struct power_supply {
 			    union power_supply_propval *val);
 	int (*set_property)(struct power_supply *psy,
 			    enum power_supply_property psp,
+			    const union power_supply_propval *val);
+	int (*get_event_property)(struct power_supply *psy,
+			enum power_supply_event_type psp,
+			union power_supply_propval *val);
+	int (*set_event_property)(struct power_supply *psy,
+			enum power_supply_event_type psp,
 			    const union power_supply_propval *val);
 	int (*property_is_writeable)(struct power_supply *psy,
 				     enum power_supply_property psp);
@@ -233,6 +285,10 @@ struct power_supply {
 	struct led_trigger *charging_blink_full_solid_trig;
 	char *charging_blink_full_solid_trig_name;
 #endif
+#ifdef CONFIG_LGE_PM
+	int is_floated_charger;
+	int is_usb_driver_uninstall;
+#endif
 };
 
 /*
@@ -255,11 +311,16 @@ struct power_supply_info {
 };
 
 #if defined(CONFIG_POWER_SUPPLY) || defined(CONFIG_POWER_SUPPLY_MODULE)
+#ifdef CONFIG_LGE_PM
+int power_supply_set_floated_charger(struct power_supply *psy, int is_float);
+int power_supply_set_usb_driver_uninstall(struct power_supply *psy, int is_float);
+#endif
 extern struct power_supply *power_supply_get_by_name(char *name);
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_battery_charged(struct power_supply *psy);
 extern int power_supply_set_current_limit(struct power_supply *psy, int limit);
+extern int power_supply_set_voltage_limit(struct power_supply *psy, int limit);
 extern int power_supply_set_online(struct power_supply *psy, bool enable);
 extern int power_supply_set_health_state(struct power_supply *psy, int health);
 extern int power_supply_set_present(struct power_supply *psy, bool enable);
@@ -272,12 +333,6 @@ extern int power_supply_register(struct device *parent,
 				 struct power_supply *psy);
 extern void power_supply_unregister(struct power_supply *psy);
 extern int power_supply_powers(struct power_supply *psy, struct device *dev);
-
-#ifdef CONFIG_ZERO_WAIT
-extern void power_supply_forbid_change_all(void);
-extern void power_supply_permit_change_all(void);
-#endif	/* CONFIG_ZERO_WAIT */
-
 #else
 static inline struct power_supply *power_supply_get_by_name(char *name)
 							{ return NULL; }
@@ -285,6 +340,9 @@ static inline void power_supply_changed(struct power_supply *psy) { }
 static inline int power_supply_am_i_supplied(struct power_supply *psy)
 							{ return -ENOSYS; }
 static inline int power_supply_set_battery_charged(struct power_supply *psy)
+							{ return -ENOSYS; }
+static inline int power_supply_set_voltage_limit(struct power_supply *psy,
+							int limit)
 							{ return -ENOSYS; }
 static inline int power_supply_set_current_limit(struct power_supply *psy,
 							int limit)
@@ -315,12 +373,6 @@ static inline void power_supply_unregister(struct power_supply *psy) { }
 static inline int power_supply_powers(struct power_supply *psy,
 				      struct device *dev)
 							{ return -ENOSYS; }
-
-#ifdef CONFIG_ZERO_WAIT
-static inline void power_supply_forbid_change_all(struct power_supply *psy) { }
-static inline void power_supply_permit_change_all(struct power_supply *psy) { }
-#endif	/* CONFIG_ZERO_WAIT */
-
 #endif
 
 /* For APM emulation, think legacy userspace. */

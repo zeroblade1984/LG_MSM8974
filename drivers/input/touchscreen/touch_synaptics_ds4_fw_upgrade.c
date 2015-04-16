@@ -1,26 +1,26 @@
 /*
    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   Copyright (c) 2012 Synaptics, Inc.
-
-   Permission is hereby granted, free of charge, to any person obtaining a copy of
-   this software and associated documentation files (the "Software"), to deal in
-   the Software without restriction, including without limitation the rights to use,
-   copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
-   Software, and to permit persons to whom the Software is furnished to do so,
+   Copyright (c) 2011 Synaptics, Inc.
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy of 
+   this software and associated documentation files (the "Software"), to deal in 
+   the Software without restriction, including without limitation the rights to use, 
+   copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the 
+   Software, and to permit persons to whom the Software is furnished to do so, 
    subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
+   
+   The above copyright notice and this permission notice shall be included in all 
    copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
    SOFTWARE.
 
-
+  
    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 */
 #include <linux/module.h>
@@ -36,8 +36,13 @@
 #include <linux/jiffies.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
+#if defined(CONFIG_MACH_MSM8974_G3_KDDI_EVB)
+#include <linux/input/lge_touch_core_kddi_evb.h>
+#include <linux/input/touch_synaptics_kddi_evb.h>
+#else
 #include <linux/input/lge_touch_core.h>
 #include <linux/input/touch_synaptics.h>
+#endif
 
 /* Variables for F34 functionality */
 unsigned short SynaF34DataBase;
@@ -55,7 +60,6 @@ unsigned short SynaF34ReflashQuery_FirmwareBlockSize;
 unsigned short SynaF34ReflashQuery_FirmwareBlockCount;
 unsigned short SynaF34ReflashQuery_ConfigBlockSize;
 unsigned short SynaF34ReflashQuery_ConfigBlockCount;
-unsigned short SynaF34ReflashQuery_BlockSize;
 
 unsigned short SynaFirmwareBlockSize;
 unsigned short SynaFirmwareBlockCount;
@@ -74,10 +78,12 @@ unsigned char *SynaconfigImgData;
 unsigned char *SynalockImgData;
 unsigned int SynafirmwareImgVersion;
 
+#ifdef CUST_G_TOUCH
 unsigned char *my_image_bin;
 unsigned long my_image_size;
 u8	fw_image_product_id[7];
 u8	fw_image_config_id[5];
+#endif
 
 int CompleteReflash(struct synaptics_ts_data *ts);
 int ConfigBlockReflash(struct synaptics_ts_data *ts);
@@ -90,7 +96,15 @@ int SynaProgramFirmware(struct synaptics_ts_data *ts);
 int SynaProgramConfiguration(struct synaptics_ts_data *ts);
 int SynaFinalizeReflash(struct synaptics_ts_data *ts);
 int SynaWaitForATTN(int time, struct synaptics_ts_data *ts);
+//void waitATTN(void);
 
+//called from .c//////////////// start
+//FIXME
+/*int FirmwareUpgrade(struct synaptics_ts_data *ts){
+	CompleteReflash(ts);
+
+	return 0;
+}*/
 int FirmwareUpgrade(struct synaptics_ts_data *ts, const char* fw_path){
 
 	int ret = 0;
@@ -98,7 +112,7 @@ int FirmwareUpgrade(struct synaptics_ts_data *ts, const char* fw_path){
 	mm_segment_t old_fs = 0;
 	struct stat fw_bin_stat;
 	unsigned long read_bytes;
-
+	
 	if(unlikely(fw_path[0] != 0)) {
 		old_fs = get_fs();
 		set_fs(get_ds());
@@ -129,30 +143,51 @@ int FirmwareUpgrade(struct synaptics_ts_data *ts, const char* fw_path){
 		*(my_image_bin+my_image_size) = 0xFF;
 
 		TOUCH_INFO_MSG("Touch FW image read %ld bytes from %s\n", read_bytes, fw_path);
-
+		
 	} else {
+#ifdef CUST_G_TOUCH
 		my_image_size = ts->fw_info.fw_size-1;
 		my_image_bin = (unsigned char *)(&ts->fw_info.fw_start[0]);
-		}
-
+#endif
+	}
+	
+#ifdef CUST_G_TOUCH
 	strncpy(fw_image_config_id, &my_image_bin[0xb100], 4);
 	//if firmware version is less than E046(TM2000), E002(TM2372), product id is null
-	strncpy(fw_image_product_id, &my_image_bin[0x0040], 6);
+	strncpy(fw_image_product_id, &my_image_bin[0x0040], 6);	
 	TOUCH_INFO_MSG("fw_image_confid_id = %s, fw_image_product_id=%s\n", fw_image_config_id, fw_image_product_id);
 
-	if(!strcmp(ts->fw_info.product_id, fw_image_product_id)) {
-		TOUCH_INFO_MSG("TOUCH FIRMWARE UPGRADE G2\n");
-		} else {
-			TOUCH_ERR_MSG("TOUCH FIRMWARE PRODUCT ID MISMATCH\n");
-		ret = -1;
-		goto fw_version_mismatch;
+	switch( ts->ic_panel_type ) {
+		case G_IC7020_G2_LGIT:		/* G */
+		case G_IC7020_G2_TPK:		/* G */
+		case GJ_IC7020_GFF_H_PTN: 	/* GJ */
+		case GV_IC7020_G2_H_PTN_LGIT: 	/* GV */
+		case GV_IC7020_G2_H_PTN_TPK :   /* GV */
+		case GK_IC7020_G1F: 		/* GK */
+		case GK_IC7020_GFF_SUNTEL:	/* GK */
+		case GK_IC7020_GFF_LGIT:	/* GK */
+		case GK_IC7020_GFF_LGIT_HYBRID:	/* GK */
+			if(!strcmp(ts->fw_info.product_id, fw_image_product_id)) {
+				TOUCH_INFO_MSG("TOUCH FIRMWARE UPGRADE ts->ic_panel_type=%d\n", ts->ic_panel_type);
+			} else {
+				TOUCH_ERR_MSG("TOUCH FIRMWARE PRODUCT ID MISMATCH\n");
+				ret = -1;
+				goto fw_version_mismatch;
 			}
-
+			break;
+		default:
+			TOUCH_ERR_MSG("DO NOT EXECUTE FW UPDATE\n");
+			ret = -1;
+			goto fw_version_mismatch;
+			break;
+	}
+#endif
+	
 	//CompleteReflash(ts);
 	ret = CompleteReflash_Lockdown(ts);
 	if(ret < 0) {
 		TOUCH_ERR_MSG("CompleteReflash_Lockdown fail\n");
-		}
+	}
 
 fw_version_mismatch:
 	if(unlikely(fw_path[0] != 0))
@@ -166,14 +201,17 @@ read_fail:
 	return ret;
 	//return 0;
 }
+///////////////////////////////// end
 
 static int writeRMI(struct i2c_client *client, u8 uRmiAddress, u8 *data, unsigned int length)
 {
+	//return synaptics_ts_write(client, uRmiAddress, data, length);
 	return touch_i2c_write(client, uRmiAddress, length, data);
 }
 
 static int readRMI(struct i2c_client *client, u8 uRmiAddress, u8 *data, unsigned int length)
 {
+	//return synaptics_ts_read(client, uRmiAddress, length, data);
 	return touch_i2c_read(client, uRmiAddress, length, data);
 }
 
@@ -186,7 +224,7 @@ static int readRMI(struct i2c_client *client, u8 uRmiAddress, u8 *data, unsigned
 /* End: Variables for F34 functionality */
 
 /* SynaSetup scans the Page Description Table (PDT) and sets up the necessary variables
- * for the reflash process. This function is a "slim" version of the PDT scan function in
+ * for the reflash process. This function is a "slim" version of the PDT scan function in 
  * in PDT.c, since only F34 and F01 are needed for reflash.
  */
 void SynaSetup(struct synaptics_ts_data *ts)
@@ -197,7 +235,7 @@ void SynaSetup(struct synaptics_ts_data *ts)
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	for (address = 0xe9; address > 0xd0; address = address - 6)
-{
+	{
     	readRMI(ts->client, address, &buffer[0], 6);
 
 		if(!buffer[5]) break;
@@ -215,18 +253,16 @@ void SynaSetup(struct synaptics_ts_data *ts)
 				SynaF01QueryBase = buffer[0];
 				break;
 		}
-}
+	}
 
 	SynaF34Reflash_BlockNum = SynaF34DataBase;
-	SynaF34Reflash_BlockData = SynaF34DataBase + 1;
+	SynaF34Reflash_BlockData = SynaF34DataBase + 2;
 	SynaF34ReflashQuery_BootID = SynaF34QueryBase;
-	SynaF34ReflashQuery_FlashPropertyQuery = SynaF34QueryBase + 1;
-	SynaF34ReflashQuery_FirmwareBlockSize = SynaF34QueryBase + 2;
-	SynaF34ReflashQuery_FirmwareBlockCount = SynaF34QueryBase +3;
-
-	readRMI(ts->client, SynaF34ReflashQuery_FirmwareBlockCount, buffer, 4);
-	SynaFirmwareBlockCount = buffer[0] | (buffer[1] << 8);
-	//SynaConfigBlockCount = buffer[2] | (buffer[3] << 8);
+	SynaF34ReflashQuery_FlashPropertyQuery = SynaF34QueryBase + 2;
+	SynaF34ReflashQuery_FirmwareBlockSize = SynaF34QueryBase + 3;
+	SynaF34ReflashQuery_FirmwareBlockCount = SynaF34QueryBase +5;
+	SynaF34ReflashQuery_ConfigBlockSize = SynaF34QueryBase + 3;
+	SynaF34ReflashQuery_ConfigBlockCount = SynaF34QueryBase + 7;
 
 	//SynafirmwareImgData = (unsigned char *)((&SynaFirmware[0])+0x100);
 	//SynafirmwareImgData = (unsigned char *)((&ts->fw_info->fw_start[0])+0x100);
@@ -237,8 +273,8 @@ void SynaSetup(struct synaptics_ts_data *ts)
 	SynafirmwareImgVersion = (unsigned int)(my_image_bin[7]);
 
      switch (SynafirmwareImgVersion)
-{
-	   case 2:
+	{
+	   case 2: 
 	          //SynalockImgData = (unsigned char *)((&SynaFirmware[0]) + 0xD0);
 	          //SynalockImgData = (unsigned char *)((&ts->fw_info->fw_start[0]) + 0xD0);
 	          SynalockImgData = (unsigned char *)((&my_image_bin[0]) + 0xD0);
@@ -255,13 +291,13 @@ void SynaSetup(struct synaptics_ts_data *ts)
 		   SynalockImgData = (unsigned char *)((&my_image_bin[0]) + 0xB0);
 		   break;
        default: break;
-}
+	}
 }
 
 /* SynaInitialize sets up the reflahs process
  */
 void SynaInitialize(struct synaptics_ts_data *ts)
-{
+{	
 	unsigned char uData[2];
 	//unsigned char uStatus;
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
@@ -284,13 +320,13 @@ void SynaInitialize(struct synaptics_ts_data *ts)
 	readRMI(ts->client, SynaF34ReflashQuery_FirmwareBlockSize, &uData[0], 2);
 
 	SynaFirmwareBlockSize = uData[0] | (uData[1] << 8);
-	}
+}
 
 /* SynaReadFirmwareInfo reads the F34 query registers and retrieves the block size and count
- * of the firmware section of the image to be reflashed
+ * of the firmware section of the image to be reflashed 
  */
 void SynaReadFirmwareInfo(struct synaptics_ts_data *ts)
-	{
+{
 	unsigned char uData[2];
 	uData[0] = 0;
 	uData[1] = 0;
@@ -305,25 +341,25 @@ void SynaReadFirmwareInfo(struct synaptics_ts_data *ts)
 	readRMI(ts->client, SynaF34ReflashQuery_FirmwareBlockCount, &uData[0], 2);
 	SynaFirmwareBlockCount = uData[0] | (uData[1] << 8);
 	SynaImageSize = SynaFirmwareBlockCount * SynaFirmwareBlockSize;
-	}
+}
 
 /* SynaReadConfigInfo reads the F34 query registers and retrieves the block size and count
- * of the configuration section of the image to be reflashed
-		  */
+ * of the configuration section of the image to be reflashed 
+ */
 void SynaReadConfigInfo(struct synaptics_ts_data *ts)
 {
-	unsigned char uData[4];
+	unsigned char uData[2];
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	TOUCH_INFO_MSG("\nRead Config Info");
 
-	readRMI(ts->client, SynaF34ReflashQuery_FirmwareBlockCount, &uData[0], 4);
-	SynaConfigBlockCount = uData[2] | (uData[3] << 8);
-
-	readRMI(ts->client, SynaF34ReflashQuery_BlockSize, &uData[0], 2);
+	readRMI(ts->client, SynaF34ReflashQuery_ConfigBlockSize, &uData[0], 2);
 	SynaConfigBlockSize = uData[0] | (uData[1] << 8);
+
+	readRMI(ts->client, SynaF34ReflashQuery_ConfigBlockCount, &uData[0], 2);
+	SynaConfigBlockCount = uData[0] | (uData[1] << 8);
 	SynaConfigImageSize = SynaConfigBlockCount * SynaConfigBlockSize;
-	}
+}
 
 
 /* SynaReadBootloadID reads the F34 query registers and retrieves the bootloader ID of the firmware
@@ -335,7 +371,7 @@ void SynaReadBootloadID(struct synaptics_ts_data *ts)
 
 	readRMI(ts->client, SynaF34ReflashQuery_BootID, &uData[0], 2);
 	SynaBootloadID = uData[0] + uData[1] * 0x100;
-		}
+}
 
 /* SynaWriteBootloadID writes the bootloader ID to the F34 data register to unlock the reflash process
  */
@@ -348,7 +384,7 @@ void SynaWriteBootloadID(struct synaptics_ts_data *ts)
 	uData[1] = SynaBootloadID / 0x100;
 
 	writeRMI(ts->client, SynaF34Reflash_BlockData, &uData[0], 2);
-	}
+}
 
 /* SynaWaitForATTN waits for ATTN to be asserted within a certain time threshold.
  */
@@ -370,7 +406,7 @@ int SynaWaitForATTN(int time, struct synaptics_ts_data *ts)
 		return -EBUSY;
 	else
 		return 0;
-	}
+}
 
 /* SynaWaitATTN waits for ATTN to be asserted within a certain time threshold.
  * The function also checks for the F34 "Program Enabled" bit and clear ATTN accordingly.
@@ -391,12 +427,12 @@ int SynaWaitATTN(struct synaptics_ts_data *ts)
 	}
 
 	do {
- 		readRMI(ts->client, (SynaF34_FlashControl+1), &uData, 1);
+ 		readRMI(ts->client, SynaF34_FlashControl, &uData, 1);
 		readRMI(ts->client, (SynaF01DataBase + 1), &uStatus, 1);
 	} while (uData!= 0x80);
 
 	return 0;
-	}
+}
 
 
 
@@ -410,14 +446,14 @@ int SynaEnableFlashing(struct synaptics_ts_data *ts)
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	TOUCH_INFO_MSG("\nEnable Reflash...");
-
+    
 	// Reflash is enabled by first reading the bootloader ID from the firmware and write it back
 	SynaReadBootloadID(ts);
 	SynaWriteBootloadID(ts);
 
 	// Make sure Reflash is not already enabled
 	do {
-		readRMI(ts->client, (SynaF34_FlashControl), &uData, 1);
+		readRMI(ts->client, SynaF34_FlashControl, &uData, 1);
 	} while (((uData & 0x0f) != 0x00));
 
 	// Clear ATTN
@@ -437,14 +473,14 @@ int SynaEnableFlashing(struct synaptics_ts_data *ts)
 		readRMI(ts->client, (SynaF01DataBase + 1), &uStatus, 1);
 		// Scan the PDT again to ensure all register offsets are correct
 		SynaSetup(ts);
-		// Read the "Program Enabled" bit of the F34 Control register, and proceed only if the
+		// Read the "Program Enabled" bit of the F34 Control register, and proceed only if the 
 		// bit is set.
 		do{
-			readRMI(ts->client, (SynaF34_FlashControl+1), &uData, 1);
-			// In practice, if uData!=0x80 happens for multiple counts, it indicates reflash
+			readRMI(ts->client, SynaF34_FlashControl, &uData, 1);
+			// In practice, if uData!=0x80 happens for multiple counts, it indicates reflash 
 			// is failed to be enabled, and program should quit
 		}while (uData != 0x80);
-}
+	}
 
 	return 0;
 }
@@ -458,7 +494,7 @@ int SynaProgramConfiguration(struct synaptics_ts_data *ts)
 	//unsigned char *puData = (unsigned char *)&SynaFirmware[0xb100];
 	//unsigned char *puData = (unsigned char *)&ts->fw_info->fw_start[0xb100];
 	unsigned char *puData = (unsigned char *)&my_image_bin[0xb100];
-
+	
 	unsigned short blockNum;
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
@@ -505,10 +541,10 @@ int SynaFinalizeReflash(struct synaptics_ts_data *ts)
 		return ret;
 	}
 	readRMI(ts->client, SynaF01DataBase, &uData, 1);
-
+	
 	// Sanity check that the reflash process is still enabled
-		do {
-	   readRMI(ts->client, (SynaF34_FlashControl), &uStatus, 1);
+	do {
+	   readRMI(ts->client, SynaF34_FlashControl, &uStatus, 1);
 	} while ((uStatus & 0x0f) != 0x00);
 	readRMI(ts->client, (SynaF01DataBase + 1), &uStatus, 1);
 
@@ -556,7 +592,7 @@ int SynaFlashFirmwareWrite(struct synaptics_ts_data *ts)
 		// Issue the "Write Firmware Block" command
 		uData[0] = 2;
 		writeRMI(ts->client, SynaF34_FlashControl, &uData[0], 1);
-
+		
 	    if(SynaWaitATTN(ts) < 0) return -1;
 	}
 	return 0;
@@ -568,7 +604,7 @@ int SynaFlashFirmwareWrite(struct synaptics_ts_data *ts)
 int SynaProgramFirmware(struct synaptics_ts_data *ts)
 {
 	int ret;
-	unsigned char uData;
+	unsigned char uData;    
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	TOUCH_INFO_MSG("\nProgram Firmware Section...");
@@ -577,18 +613,18 @@ int SynaProgramFirmware(struct synaptics_ts_data *ts)
 
 	SynaWriteBootloadID(ts);
 
-	uData = 3;
+	uData = 3; 
 	writeRMI(ts->client, SynaF34_FlashControl, &uData, 1);
 
 	msleep(1000);
-
+	
 	SynaWaitATTN(ts);
 
 	ret = SynaFlashFirmwareWrite(ts);
-		if (ret < 0) {
+	if(ret < 0){
 		TOUCH_ERR_MSG("SynaFlashFirmwareWrite fail\n");
-			return ret;
-		}
+		return ret;
+	}
 
 	return 0;
 }
@@ -598,7 +634,7 @@ int SynaProgramFirmware(struct synaptics_ts_data *ts)
 */
 int eraseConfigBlock(struct synaptics_ts_data *ts)
 {
-	unsigned char uData;
+	unsigned char uData;    
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
 	// Erase of config block is done by first entering into bootloader mode
@@ -606,7 +642,7 @@ int eraseConfigBlock(struct synaptics_ts_data *ts)
 	SynaWriteBootloadID(ts);
 
 	// Command 7 to erase config block
-	uData = 7;
+	uData = 7; 
 	writeRMI(ts->client, SynaF34_FlashControl, &uData, 1);
 
 	if(SynaWaitATTN(ts) < 0) return -1;
@@ -628,7 +664,7 @@ void convertConfigBlockData()
 #endif
 
 // CRC_Calculate illustates how to calculate a checksum from the config block data.
-// With DS4, the config block checksum is calculated and applies towards the end of
+// With DS4, the config block checksum is calculated and applies towards the end of 
 // the config block data automatically
 // Variable data to this function represents the data only portion of the config block
 // Varaible len represents the length of the variable data.
@@ -647,11 +683,11 @@ void CRC_Calculate(unsigned short * data, unsigned short len)
         sum2 += sum1;
         sum1 = (unsigned long)((sum1 & 0xffff) + (sum1 >> 16));
         sum2 = (unsigned long)((sum2 & 0xffff) + (sum2 >> 16));
-	}
+    }
 
     Data_CRC = (unsigned long)(sum2 << 16 | sum1);
     //return Bootloader_incrementalCrc;
-	}
+}
 
 
 int SynaBootloaderLock(struct synaptics_ts_data *ts)
@@ -663,11 +699,11 @@ int SynaBootloaderLock(struct synaptics_ts_data *ts)
     unsigned short uBlockNum;
 
 	// Check if device is in unlocked state
-	readRMI(ts->client, (SynaF34QueryBase+ 1), &uData[0], 1);
-
+	readRMI(ts->client, (SynaF34QueryBase+ 2), &uData[0], 1);
+ 
 	//Device is unlocked
     if (uData[0] & 0x02)
-	{
+	{ 
 		TOUCH_INFO_MSG("Device unlocked. Lock it first...\n");
 		// Different bootloader version has different block count for the lockdown data
 		// Need to check the bootloader version from the image file being reflashed
@@ -686,15 +722,15 @@ int SynaBootloaderLock(struct synaptics_ts_data *ts)
 			default:
 				lockBlockCount = 0;
 				break;
-}
+		}
 
 		// Write the lockdown info block by block
 		// This reference code of lockdown process does not check for bootloader version
-		// currently programmed on the ASIC against the bootloader version of the image to
-		// be reflashed. Such case should not happen in practice. Reflashing cross different
+		// currently programmed on the ASIC against the bootloader version of the image to 
+		// be reflashed. Such case should not happen in practice. Reflashing cross different 
 		// bootloader versions is not supported.
 		for (uBlockNum = 0; uBlockNum < lockBlockCount; ++uBlockNum)
-{
+		{
 			uData[0] = uBlockNum & 0xff;
 			uData[1] = (uBlockNum & 0xff00) >> 8;
 
@@ -715,20 +751,20 @@ int SynaBootloaderLock(struct synaptics_ts_data *ts)
 			if(SynaWaitATTN(ts) < 0) return -1;
 		}
 		TOUCH_INFO_MSG("Device locking done.\n");
-
+		
 		// Enable reflash again to finish the lockdown process.
-		// Since this lockdown process is part of the reflash process, we are enabling
+		// Since this lockdown process is part of the reflash process, we are enabling 
 		// reflash instead, rather than resetting the device to finish the unlock procedure.
 		ret = SynaEnableFlashing(ts);
-		if (ret < 0) {
+		if(ret < 0) {
 			TOUCH_ERR_MSG("SynaEnableFlashing fail\n");
 			return ret;
 		}
-		}
+	}
 	else TOUCH_INFO_MSG("Device already locked.\n");
 
 	return 0;
-	}
+}
 
 
 
@@ -740,45 +776,45 @@ int ConfigBlockReflash(struct synaptics_ts_data *ts)
 	unsigned char uData[2];
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 
-
+  
     SynaInitialize(ts);
-
+	
 	SynaReadConfigInfo(ts);
-
+	
 	SynaReadFirmwareInfo(ts);
 
-	SynaF34_FlashControl = SynaF34DataBase + 2;
+	SynaF34_FlashControl = SynaF34DataBase + SynaFirmwareBlockSize + 2;
 
 	ret = SynaEnableFlashing(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaEnableFlashing fail\n");
 		return ret;
 	}
-
+	
        // Check if device is in unlocked state
-	readRMI(ts->client, (SynaF34QueryBase + 1), &uData[0], 1);
-
+	readRMI(ts->client, (SynaF34QueryBase + 2), &uData[0], 1);
+ 
 	//Device is unlocked
 	if (uData[0] & 0x02)
-	{
+	{ 
 	   ret = SynaFinalizeReflash(ts);
-		if (ret < 0) {
+	   if(ret < 0) {
 			TOUCH_ERR_MSG("SynaFinalizeReflash fail\n");
 			return ret;
-		}
+	   }
 	   return 0;
 	   // Do not reflash config block if not locked.
 	}
 
 	ret = eraseConfigBlock(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("eraseConfigBlock fail\n");
 		return ret;
 	}
 	//SynaconfigImgData = (unsigned char *)ConfigBlockData;
 
 	ret = SynaProgramConfiguration(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaProgramConfiguration fail\n");
 		return ret;
 	}
@@ -786,8 +822,8 @@ int ConfigBlockReflash(struct synaptics_ts_data *ts)
 	ret = SynaFinalizeReflash(ts);
 	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaFinalizeReflash fail\n");
-	return ret;
-}
+		return ret;
+	}
 
 	return 0;
 }
@@ -795,37 +831,37 @@ int ConfigBlockReflash(struct synaptics_ts_data *ts)
 /* CompleteReflash reflashes the entire user image, including the configuration block and firmware
 */
 int CompleteReflash(struct synaptics_ts_data *ts)
-	{
+{   
 	int ret;
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
 	SynaInitialize(ts);
-
+	
 	SynaReadConfigInfo(ts);
-
+	
 	SynaReadFirmwareInfo(ts);
-
-	SynaF34_FlashControl = SynaF34DataBase + 2;
-
+	
+	SynaF34_FlashControl = SynaF34DataBase + SynaFirmwareBlockSize + 2;
+    
 	ret = SynaEnableFlashing(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaEnableFlashing fail\n");
 		return ret;
-}
+	}
 
 	ret = SynaProgramFirmware(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaProgramFirmware fail\n");
 		return ret;
-}
+	}
 
 	ret = SynaProgramConfiguration(ts);
 	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaProgramConfiguration fail\n");
-	return ret;
-}
+		return ret;
+	}
 
 	ret = SynaFinalizeReflash(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaFinalizeReflash fail\n");
 		return ret;
 	}
@@ -834,49 +870,49 @@ int CompleteReflash(struct synaptics_ts_data *ts)
 }
 
 int CompleteReflash_Lockdown(struct synaptics_ts_data *ts)
-{
+{   
 	int ret;
 	TOUCH_INFO_MSG("%s", __FUNCTION__);
-
+	
 	SynaInitialize(ts);
-
+	
 	SynaReadConfigInfo(ts);
-
+	
 	SynaReadFirmwareInfo(ts);
 
-	SynaF34_FlashControl = SynaF34DataBase + 2;
+	SynaF34_FlashControl = SynaF34DataBase + SynaFirmwareBlockSize + 2;
 
 	ret = SynaEnableFlashing(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaEnableFlashing fail\n");
 		return ret;
 	}
 
 	ret = SynaBootloaderLock(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaBootloaderLock fail\n");
 		return ret;
-}
+	}
 
 	ret = SynaProgramFirmware(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaProgramFirmware fail\n");
 		return ret;
 	}
 
 	ret = SynaProgramConfiguration(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaProgramConfiguration fail\n");
 		return ret;
 	}
 
 	ret = SynaFinalizeReflash(ts);
-	if (ret < 0) {
+	if(ret < 0) {
 		TOUCH_ERR_MSG("SynaFinalizeReflash fail\n");
 		return ret;
 	}
 
 	return 0;
-	}
+}
 
 

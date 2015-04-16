@@ -24,12 +24,9 @@ struct lge_android_usb_platform_data {
 	const char *manufacturer_name;
 	const char *factory_composition;
 	int (*get_factory_cable)(void);
-	bool (*is_factory_mode)(void);
 };
 
-bool lgeusb_is_factory_mode(void);
-int lgeusb_get_pif_cable(void);
-
+int lgeusb_get_factory_cable(void);
 int lgeusb_get_vendor_id(void);
 int lgeusb_get_factory_pid(void);
 int lgeusb_get_serial_number(void);
@@ -37,8 +34,8 @@ int lgeusb_get_product_name(char *);
 int lgeusb_get_manufacturer_name(char *);
 int lgeusb_get_factory_composition(char *);
 
-#define LGEUSB_FACTORY_56K 1
-#define LGEUSB_FACTORY_130K 2
+#define LGEUSB_FACTORY_130K 1
+#define LGEUSB_FACTORY_56K 2
 #define LGEUSB_FACTORY_910K 3
 
-#endif /*                       */
+#endif /* __LGE_ANDROID_USB_H__ */

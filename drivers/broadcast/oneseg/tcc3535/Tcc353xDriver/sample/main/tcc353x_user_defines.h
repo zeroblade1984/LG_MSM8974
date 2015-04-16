@@ -121,8 +121,6 @@ between Telechips and Company.
 #define STS_POLARITY	(STS_CLK_POS|STS_SYNC_ACT_HIGH|STS_FRM_ACT_HIGH)
 
 /* set stream speed (DLR) */
-#define TCC353X_DLR                             0   // 20M
-//#define TCC353X_DLR                             1   // 30M
-//#define TCC353X_DLR                             2   // 60M
+#define TCC353X_DLR                             1
 
 #endif

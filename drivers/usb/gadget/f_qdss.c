@@ -1,7 +1,7 @@
 /*
  * f_qdss.c -- QDSS function Driver
  *
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -397,6 +397,9 @@ static int qdss_bind(struct usb_configuration *c, struct usb_function *f)
 		}
 	}
 
+	if (gadget_is_dwc3(gadget))
+		dwc3_tx_fifo_resize_request(qdss->data, true);
+
 	return 0;
 fail:
 	clear_eps(f);
@@ -407,10 +410,15 @@ fail:
 
 static void qdss_unbind(struct usb_configuration *c, struct usb_function *f)
 {
+	struct f_qdss  *qdss = func_to_qdss(f);
 	struct usb_gadget *gadget = c->cdev->gadget;
 
 	pr_debug("qdss_unbind\n");
 
+	flush_workqueue(qdss->wq);
+
+	if (gadget_is_dwc3(gadget))
+		dwc3_tx_fifo_resize_request(qdss->data, false);
 
 	clear_eps(f);
 	clear_desc(gadget, f);

@@ -30,6 +30,7 @@ config LGE_SLATE
 	 This feature helps decide whether slate key logging start message would be routed to apps or not.
 endmenu
 
+
 menu "SDIO support for DIAG"
 
 config DIAG_SDIO_PIPE
@@ -74,19 +75,19 @@ config LGE_DM_APP
 	 LGE DM APP Support
 endmenu
 
-menu "LGE DM DEV Support"
+menu "LGE ACG Carrier Code"
 
-config LGE_DM_DEV
-    bool "LGE DM DEV Support"
+config LGE_ACG_CARRIER_CODE
+    bool "LGE ACG Carrier Code"
     default n
     depends on MACH_LGE
     help
-     LGE DM DEV Support
+     LGE ACG Carrier Code
 endmenu
 
 config LGE_TESTMODE_CRC_SKIP
-    bool "LGE factory testmode Support"
-    default y
-    depends on MACH_LGE
-    help
-     LGE Factory crc check skip during MITS
+	bool "LGE factory testmode Support"
+	default n
+	depends on MACH_LGE
+	help
+	 LGE factory crc check skip during MITS

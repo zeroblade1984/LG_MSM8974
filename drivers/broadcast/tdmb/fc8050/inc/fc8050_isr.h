@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8050_isr.c
- 
+
  Description : API of dmb baseband module
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/09/11 	jason		initial
+ 2009/09/11     jason        initial
 *******************************************************************************/
 
 #ifndef __FC8050_ISR__
@@ -32,4 +32,3 @@ extern void fc8050_isr(HANDLE hDevice);
 #endif
 
 #endif // __FC8050_ISR__
-

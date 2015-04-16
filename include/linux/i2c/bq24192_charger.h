@@ -19,7 +19,7 @@
 
 struct bq24192_platform_data {
 	int int_gpio;
-#if defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 	int ext_chg_en;
 	int otg_en;
 #endif

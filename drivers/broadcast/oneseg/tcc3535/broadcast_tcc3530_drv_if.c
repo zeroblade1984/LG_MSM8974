@@ -15,9 +15,13 @@
 #include "broadcast_dmb_typedef.h"
 #include "broadcast_dmb_drv_ifdef.h"
 
+#define GPIO_MMBI_ELNA_EN		8
+#define GPIO_LNA_PON			11
+
 /*#define _DISPLAY_MONITOR_DBG_LOG_*/
 /*#define _USE_ONSEG_SIGINFO_MODIFIED_MODE_*/
 #define _USE_MONITORING_TIME_GAP_
+#define _USE_SEND_GOOD_SIGNAL_INFO_CHANGING_
 
 typedef enum {
 	TMM_13SEG = 0,
@@ -85,6 +89,14 @@ I32S OnAir = 0;
 TcpalTime_t CurrentMonitoringTime = 0;
 #endif
 
+#if defined (_USE_SEND_GOOD_SIGNAL_INFO_CHANGING_)
+#define _GOOD_SIGNAL_INTERVAL_MAX_ 	2000
+#define _GOOD_SIGNAL_INTERVAL_MIN_ 	1000
+
+static TcpalTime_t Time_channel_tune = 0;
+static int Need_send_good_signal = 0;
+#endif
+
 /* Body of Internel function */
 int	broadcast_drv_start(void)
 {
@@ -130,6 +142,11 @@ static void Tcc353xWrapperSafeClose (void)
 	OnAir = 0;
 	currentSelectedChannel = -1;
 	currentBroadCast = TMM_13SEG;
+
+	/* lna control - off */
+	Tcc353xApiSetGpioControl(0, 0, GPIO_LNA_PON, 0);
+	Tcc353xApiSetGpioControl(0, 0, GPIO_MMBI_ELNA_EN, 0);
+	
 	Tcc353xApiClose(0);
 	Tcc353xI2cClose(0);
 	broadcast_drv_if_power_off();
@@ -143,6 +160,11 @@ int	broadcast_drv_if_open(void)
 	int ret = 0;
 
 	TcpalSemaphoreLock(&Tcc353xDrvSem);
+
+#if defined (_USE_SEND_GOOD_SIGNAL_INFO_CHANGING_)
+	Time_channel_tune = 0;
+	Need_send_good_signal = 0;
+#endif
 
 	Tcc353xI2cOpen(0);
 	ret = Tcc353xApiOpen(0, &Tcc353xOptionSingle, sizeof(Tcc353xOption_t));
@@ -202,6 +224,11 @@ int	broadcast_drv_if_close(void)
 	if(ret == TCC353X_RETURN_SUCCESS)
 		rc = OK;
 
+#if defined (_USE_SEND_GOOD_SIGNAL_INFO_CHANGING_)
+	Time_channel_tune = 0;
+	Need_send_good_signal = 0;
+#endif
+
 	TcpalSemaphoreUnLock(&Tcc353xDrvSem);
 	return rc;
 }
@@ -246,10 +273,20 @@ int	broadcast_drv_if_set_channel(struct broadcast_dmb_set_ch_info *udata)
 	}
 	frequency = frequencyTable[udata->channel-13];
 
+	/* lna control - high gain */
+	/* high gain : PON 1, EN 0   low gain : PON 0, EN 1 */
+	Tcc353xApiSetGpioControl(0, 0, GPIO_LNA_PON, 1);
+	Tcc353xApiSetGpioControl(0, 0, GPIO_MMBI_ELNA_EN, 0);
+
 	if(needLockCheck && udata->mode == 1)	/* Scan mode & need lock check */
 		ret = Tcc353xApiChannelSearch(0, frequency, &tuneOption);
 	else				/* normal mode */
 		ret = Tcc353xApiChannelSelect(0, frequency, &tuneOption);
+
+#if defined (_USE_SEND_GOOD_SIGNAL_INFO_CHANGING_)
+	Time_channel_tune = TcpalGetCurrentTimeCount_ms();
+	Need_send_good_signal = 1;
+#endif
 
 	Tcc353xMonitoringApiInit(0, 0);
 	CurrentMonitoringTime = 0;
@@ -309,23 +346,31 @@ static int Tcc353xWrapperGetLayerInfo(int layer, Tcc353xStatus_t *st)
 	unsigned int intLen,outIntLen;
 	unsigned char segNo;
 	unsigned int temp;
-	
+
+	if(((st->opstat.syncStatus>>8)&0x0F)<0x0C)
+		return 0xFFFF;
+
 	if(layer==0) {
 		modulation = (st->opstat.AMod & 0x03);
 		cr = (st->opstat.ACr & 0x07);
 		mode = st->opstat.mode;
 		intLen = st->opstat.AIntLen;
 		segNo = st->opstat.ASegNo;
-	} else {
+	} else if(layer==1) {
 		modulation = (st->opstat.BMod & 0x03);
 		cr = (st->opstat.BCr & 0x07);
 		mode = st->opstat.mode;
 		intLen = st->opstat.BIntLen;
 		segNo = st->opstat.BSegNo;
-	}
-
-	if(((st->opstat.syncStatus>>8)&0x0F)<0x0C)
+	} else if(layer==2) {
+		modulation = (st->opstat.CMod & 0x03);
+		cr = (st->opstat.CCr & 0x07);
+		mode = st->opstat.mode;
+		intLen = st->opstat.CIntLen;
+		segNo = st->opstat.CSegNo;
+	} else {
 		return 0xFFFF;
+	}
 
 	ret = (modulation << 13);
 	ret |= (cr << 10);
@@ -436,9 +481,9 @@ static void broadcast_drv_if_get_oneseg_sig_info(Tcc353xStatus_t *pst, struct br
 	pInfo->sig_info.info.oneseg_info.lock = pst->status.isdbLock.TMCC;
 	pInfo->sig_info.info.oneseg_info.cn = pst->status.snr.currentValue;
 	pInfo->sig_info.info.oneseg_info.ber = pst->status.viterbiber[0].currentValue;
-	pInfo->sig_info.info.oneseg_info.per = pst->status.tsper[0].avgValue;
+	pInfo->sig_info.info.oneseg_info.per = pst->status.tsper[0].currentValue;
 	pInfo->sig_info.info.oneseg_info.agc = pst->bbLoopGain;
-	pInfo->sig_info.info.oneseg_info.rssi = pst->status.rssi.avgValue/100;
+	pInfo->sig_info.info.oneseg_info.rssi = pst->status.rssi.currentValue/100;
 	pInfo->sig_info.info.oneseg_info.ErrTSP = pst->opstat.ARsErrorCnt;
 	pInfo->sig_info.info.oneseg_info.TotalTSP = pst->opstat.ARsCnt;
 
@@ -545,89 +590,191 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	}
 	Tcc353xMonitoringApiAntennaPercentage (0, &st, sizeof(Tcc353xStatus_t));
 #endif
+
+#if defined (_USE_SEND_GOOD_SIGNAL_INFO_CHANGING_)
+	if(Need_send_good_signal) {
+		unsigned int timeGap = 0;
+		timeGap = (unsigned int)(TcpalGetTimeIntervalCount_ms(Time_channel_tune));
+
+		if(timeGap >= _GOOD_SIGNAL_INTERVAL_MAX_) {
+			Need_send_good_signal = 0;
+			TcpalPrintStatus((I08S *)"[1seg][monitor] send current signal info [timeout]\n");
+		} else {
+			if (!st.status.isdbLock.TMCC){
+				/* unlock status */
+				Need_send_good_signal = 0;
+				TcpalPrintStatus((I08S *)"[1seg][monitor] send current signal info [tmcc unlock]\n");
+			} else if(st.opstat.ARsCnt>0 && timeGap >_GOOD_SIGNAL_INTERVAL_MIN_) {
+				Need_send_good_signal = 0;
+				TcpalPrintStatus((I08S *)"[1seg][monitor] send current signal info [pkt cnt exist]\n");
+			} else {
+				TcpalPrintStatus((I08S *)"[1seg][monitor] Force good ber,per value [pktcnt(%d)]\n",st.opstat.ARsCnt);
+
+				/* set good ber, per for full-segment */
+			    	st.opstat.ARsCnt = 1;	/* indication of modified value & avoid max ber, per */
+			    	st.opstat.BRsCnt = 1;	/* indication of modified value & avoid max ber, per */
+			    	st.opstat.CRsCnt = 1;	/* indication of modified value & avoid max ber, per */
+			    	st.opstat.ARsErrorCnt = 0;
+			    	st.opstat.BRsErrorCnt = 0;
+			    	st.opstat.CRsErrorCnt = 0;
+			    	st.opstat.ARsOverCnt = 0;
+			    	st.opstat.BRsOverCnt = 0;
+			    	st.opstat.CRsOverCnt = 0;
+
+				/* set good ber, per for one-segment */
+				st.status.viterbiber[0].currentValue = 0;
+				st.status.viterbiber[1].currentValue = 0;
+				st.status.viterbiber[2].currentValue = 0;
+				st.status.tsper[0].currentValue = 0;
+				st.status.tsper[1].currentValue = 0;
+				st.status.tsper[2].currentValue = 0;
+			}
+		}
+	}
+#endif
+
 	layer = pInfo->cmd_info.layer;
 
 	switch(pInfo->cmd_info.cmd)
 	{
 	case ENUM_GET_ALL:
 		pInfo->sig_info.info.mmb_info.cn = 
-				st.status.snr.currentValue;
+		    st.status.snr.currentValue;
 
-		/*
-		pInfo->sig_info.info.mmb_info.ber = 
-				st.status.viterbiber[layer].avgValue;
-				st.opstat.BRsCnt1;
-		pInfo->sig_info.info.mmb_info.per = 
-				st.status.tsper[layer].avgValue;
-		*/
+		if(layer==0) {
+			pInfo->sig_info.info.mmb_info.ber_a =
+			    st.opstat.ARsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_a =
+			    st.opstat.ARsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			    st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_a =
+				Tcc353xWrapperGetLayerInfo(0, &st);
+		} else if(layer==1) {
+			pInfo->sig_info.info.mmb_info.ber_b =
+			    st.opstat.BRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_b =
+			    st.opstat.BRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			    st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_b =
+				Tcc353xWrapperGetLayerInfo(1, &st);
+		} else if(layer==2) {
+			pInfo->sig_info.info.mmb_info.ber_c =
+			    st.opstat.CRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_c =
+			    st.opstat.CRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			    st.opstat.CRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_c =
+				Tcc353xWrapperGetLayerInfo(2, &st);
+		} else {
+			pInfo->sig_info.info.mmb_info.ber_a =
+			    st.opstat.ARsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_a =
+			    st.opstat.ARsOverCnt;
+			pInfo->sig_info.info.mmb_info.ber_b =
+			    st.opstat.BRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_b =
+			    st.opstat.BRsOverCnt;
+			pInfo->sig_info.info.mmb_info.ber_c =
+			    st.opstat.CRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.per_c =
+			    st.opstat.CRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			    st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			    st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			    st.opstat.CRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_a =
+				Tcc353xWrapperGetLayerInfo(0, &st);
+			pInfo->sig_info.info.mmb_info.layerinfo_b =
+				Tcc353xWrapperGetLayerInfo(1, &st);
+			pInfo->sig_info.info.mmb_info.layerinfo_c =
+				Tcc353xWrapperGetLayerInfo(2, &st);
+		}
 
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.ber = 
-					st.opstat.ARsErrorCnt;
-		else
-			pInfo->sig_info.info.mmb_info.ber = 
-					st.opstat.BRsErrorCnt;
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.per = 
-					st.opstat.ARsOverCnt;
-		else
-			pInfo->sig_info.info.mmb_info.per = 
-					st.opstat.BRsOverCnt;
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
-					st.opstat.ARsCnt;
-		else
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
-					st.opstat.BRsCnt;
-		
-		pInfo->sig_info.info.mmb_info.layerinfo =  
-			Tcc353xWrapperGetLayerInfo(layer, &st);
-
-		pInfo->sig_info.info.mmb_info.tmccinfo = 
+		pInfo->sig_info.info.mmb_info.tmccinfo =
 			Tcc353xWrapperGetTmccInfo(&st);
 		
-		pInfo->sig_info.info.mmb_info.receive_status = 
+		pInfo->sig_info.info.mmb_info.receive_status =
 				Tcc353xWrapperGetReceiveStat(&st);
 				
-		pInfo->sig_info.info.mmb_info.rssi = 
-			(st.status.rssi.avgValue);
+		pInfo->sig_info.info.mmb_info.rssi =
+			(st.status.rssi.currentValue);
 			
 		pInfo->sig_info.info.mmb_info.scan_status =
 			Tcc353xWrapperGetScanStat(&st);
-			
+
 		pInfo->sig_info.info.mmb_info.sysinfo =
 			Tcc353xWrapperGetSysInfo(&st);
 
 #ifdef _DISPLAY_MONITOR_DBG_LOG_
-		TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer[%d] cn[%d] ber[%d] per[%d] totalTSP[%d] layerinfo[%d]\n",
-			layer, 
-			pInfo->sig_info.info.mmb_info.cn, 
-			pInfo->sig_info.info.mmb_info.ber,
-			pInfo->sig_info.info.mmb_info.per, 
-			pInfo->sig_info.info.mmb_info.TotalTSP, 
-			pInfo->sig_info.info.mmb_info.layerinfo);
-		TcpalPrintStatus((I08S *)"[mmbi][monitor] tmccinfo[%d] status[%d] rssi[%d] scanstat[%d] sysinfo[%d]\n",
-			pInfo->sig_info.info.mmb_info.tmccinfo,
-			pInfo->sig_info.info.mmb_info.receive_status,
-			pInfo->sig_info.info.mmb_info.rssi,
-			pInfo->sig_info.info.mmb_info.scan_status,
-			pInfo->sig_info.info.mmb_info.sysinfo);
-#endif
-
-		/* for debugging log */
-#ifdef _DISPLAY_MONITOR_DBG_LOG_
 		{
-			if(pInfo->sig_info.info.mmb_info.layerinfo==0xFFFF) {
-				TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer info fail\n");
-			} else {
-				TcpalPrintStatus((I08S *)"[mmbi][monitor] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
-				cModulation[(pInfo->sig_info.info.mmb_info.layerinfo>>13)&0x07],
-				cCR[(pInfo->sig_info.info.mmb_info.layerinfo>>10)&0x07],
-				(pInfo->sig_info.info.mmb_info.layerinfo>>4)&0x1F,
-				(pInfo->sig_info.info.mmb_info.layerinfo)&0x0F );
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] [ENUM_GET_ALL] Layer[%d]\n",layer);
+			if(layer==0 || layer>=3) {
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer A-----------------\n");
+
+				if(pInfo->sig_info.info.mmb_info.layerinfo_a ==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer info fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_a>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_a>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_a>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_a)&0x0F );
+				}
+
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] ber[%d] per[%d] totalTSP[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_a,
+					pInfo->sig_info.info.mmb_info.per_a,
+					pInfo->sig_info.info.mmb_info.total_tsp_a);
 			}
+
+			if(layer==1 || layer>=3) {
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer B-----------------\n");
+
+				if(pInfo->sig_info.info.mmb_info.layerinfo_b ==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer info fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_b>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_b>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_b>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_b)&0x0F );
+				}
+
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] ber[%d] per[%d] totalTSP[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_b,
+					pInfo->sig_info.info.mmb_info.per_b,
+					pInfo->sig_info.info.mmb_info.total_tsp_b);
+			}
+
+			if(layer==2 || layer>=3) {
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer C-----------------\n");
+
+				if(pInfo->sig_info.info.mmb_info.layerinfo_c ==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer info fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_c>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_c>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_c>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_c)&0x0F );
+				}
+
+				TcpalPrintStatus((I08S *)"[mmbi][monitor] ber[%d] per[%d] totalTSP[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_c,
+					pInfo->sig_info.info.mmb_info.per_c,
+					pInfo->sig_info.info.mmb_info.total_tsp_c);
+			}
+
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] -----------------------\n");
+
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] rssi[%d] cn[%d]\n",
+				pInfo->sig_info.info.mmb_info.rssi,
+				pInfo->sig_info.info.mmb_info.cn);
 
 			if(pInfo->sig_info.info.mmb_info.tmccinfo==0xFF) {
 				TcpalPrintStatus((I08S *)"[mmbi][monitor] tmcc info fail\n");
@@ -662,53 +809,104 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	break;
 
 	case ENUM_GET_BER:
-		/*
-		pInfo->sig_info.info.mmb_info.ber = 
-			st.status.viterbiber[layer].avgValue;
-		*/
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.ber = 
+		if(layer==0) {
+			pInfo->sig_info.info.mmb_info.ber_a =
 					st.opstat.ARsErrorCnt;
-		else
-			pInfo->sig_info.info.mmb_info.ber = 
-					st.opstat.BRsErrorCnt;
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
 					st.opstat.ARsCnt;
-		else
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
+		} else if(layer==1) {
+			pInfo->sig_info.info.mmb_info.ber_b =
+					st.opstat.BRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
 					st.opstat.BRsCnt;
+		} else if(layer==2) {
+			pInfo->sig_info.info.mmb_info.ber_c =
+					st.opstat.CRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+					st.opstat.CRsCnt;
+		} else {
+			pInfo->sig_info.info.mmb_info.ber_a =
+					st.opstat.ARsErrorCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
+					st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.ber_b =
+					st.opstat.BRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
+					st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.ber_c =
+					st.opstat.CRsErrorCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+					st.opstat.CRsCnt;
+		}
 
-		TcpalPrintStatus((I08S *)"[mmbi][monitor] ber[%d] TotalTSP[%d]\n",
-				pInfo->sig_info.info.mmb_info.ber,
-				pInfo->sig_info.info.mmb_info.TotalTSP);
+#ifdef _DISPLAY_MONITOR_DBG_LOG_
+		TcpalPrintStatus((I08S *)"[mmbi][monitor] [ENUM_GET_BER] Layer[%d]\n",layer);
+		if(layer==0 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] ber_a[%d] total_tsp_a[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_a,
+					pInfo->sig_info.info.mmb_info.total_tsp_a);
+		}
+		if(layer==1 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] ber_b[%d] total_tsp_b[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_b,
+					pInfo->sig_info.info.mmb_info.total_tsp_b);
+		}
+		if(layer==2 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] ber_c[%d] total_tsp_c[%d]\n",
+					pInfo->sig_info.info.mmb_info.ber_c,
+					pInfo->sig_info.info.mmb_info.total_tsp_c);
+		}
+#endif
 	break;
 
 	case ENUM_GET_PER:
-		/*
-		pInfo->sig_info.info.mmb_info.per = 
-			st.status.tsper[layer].avgValue;
-		*/
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.per = 
+		if(layer==0) {
+			pInfo->sig_info.info.mmb_info.per_a =
 					st.opstat.ARsOverCnt;
-		else
-			pInfo->sig_info.info.mmb_info.per = 
-					st.opstat.BRsOverCnt;
-
-		if(layer==0)
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
 					st.opstat.ARsCnt;
-		else
-			pInfo->sig_info.info.mmb_info.TotalTSP = 
+		} else if(layer==1) {
+			pInfo->sig_info.info.mmb_info.per_b =
+					st.opstat.BRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
 					st.opstat.BRsCnt;
-		
-		TcpalPrintStatus((I08S *)"[mmbi][monitor] per[%d] TotalTSP[%d]\n",
-				pInfo->sig_info.info.mmb_info.per,
-				pInfo->sig_info.info.mmb_info.TotalTSP);
+		} else if(layer==2) {
+			pInfo->sig_info.info.mmb_info.per_c =
+					st.opstat.CRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+					st.opstat.CRsCnt;
+		} else {
+			pInfo->sig_info.info.mmb_info.per_a =
+					st.opstat.ARsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_a =
+					st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.per_b =
+					st.opstat.BRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b =
+					st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.per_c =
+					st.opstat.CRsOverCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c =
+					st.opstat.CRsCnt;
+		}
+#ifdef _DISPLAY_MONITOR_DBG_LOG_
+		TcpalPrintStatus((I08S *)"[mmbi][monitor] [ENUM_GET_PER] Layer[%d]\n",layer);
+		if(layer==0 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] per_a[%d] total_tsp_a[%d]\n",
+					pInfo->sig_info.info.mmb_info.per_a,
+					pInfo->sig_info.info.mmb_info.total_tsp_a);
+		}
+		if(layer==1 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] per_b[%d] total_tsp_b[%d]\n",
+					pInfo->sig_info.info.mmb_info.per_b,
+					pInfo->sig_info.info.mmb_info.total_tsp_b);
+		}
+		if(layer==2 || layer>=3) {
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] per_c[%d] total_tsp_c[%d]\n",
+					pInfo->sig_info.info.mmb_info.per_c,
+					pInfo->sig_info.info.mmb_info.total_tsp_c);
+		}
+#endif
 	break;
 
 	case ENUM_GET_CN:
@@ -726,22 +924,59 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	break;
 
 	case ENUM_GET_LAYER_INFO:
-		pInfo->sig_info.info.mmb_info.layerinfo =  
-			Tcc353xWrapperGetLayerInfo(layer, &st);
-		TcpalPrintStatus((I08S *)"[mmbi][monitor]  layer info[%d]\n",
-				pInfo->sig_info.info.mmb_info.layerinfo);
-
-		/* for debugging log */
+		if(layer==0) {
+			pInfo->sig_info.info.mmb_info.layerinfo_a =
+				Tcc353xWrapperGetLayerInfo(layer, &st);
+		} else if(layer==1) {
+			pInfo->sig_info.info.mmb_info.layerinfo_b =
+				Tcc353xWrapperGetLayerInfo(layer, &st);
+		} else if(layer==2) {
+			pInfo->sig_info.info.mmb_info.layerinfo_c =
+				Tcc353xWrapperGetLayerInfo(layer, &st);
+		} else {
+			pInfo->sig_info.info.mmb_info.layerinfo_a =
+				Tcc353xWrapperGetLayerInfo(0, &st);
+			pInfo->sig_info.info.mmb_info.layerinfo_b =
+				Tcc353xWrapperGetLayerInfo(1, &st);
+			pInfo->sig_info.info.mmb_info.layerinfo_c =
+				Tcc353xWrapperGetLayerInfo(2, &st);
+		}
 #ifdef _DISPLAY_MONITOR_DBG_LOG_
 		{
-			if(pInfo->sig_info.info.mmb_info.layerinfo==0xFFFF) {
-				TcpalPrintStatus((I08S *)"[mmbi][monitor] Layer info fail\n");
-			} else {
-				TcpalPrintStatus((I08S *)"[mmbi][monitor] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
-				cModulation[(pInfo->sig_info.info.mmb_info.layerinfo>>13)&0x07],
-				cCR[(pInfo->sig_info.info.mmb_info.layerinfo>>10)&0x07],
-				(pInfo->sig_info.info.mmb_info.layerinfo>>4)&0x1F,
-				(pInfo->sig_info.info.mmb_info.layerinfo)&0x0F );
+			TcpalPrintStatus((I08S *)"[mmbi][monitor] [ENUM_GET_LAYER_INFO] Layer[%d]\n",layer);
+
+			if(layer==0 || layer>=3) {
+				if(pInfo->sig_info.info.mmb_info.layerinfo_a==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] layerinfo_a fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] [A] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_a>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_a>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_a>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_a)&0x0F );
+				}
+			}
+			if(layer==1 || layer>=3) {
+				if(pInfo->sig_info.info.mmb_info.layerinfo_b==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] layerinfo_b fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] [B] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_b>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_b>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_b>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_b)&0x0F );
+				}
+			}
+			if(layer==2 || layer>=3) {
+				if(pInfo->sig_info.info.mmb_info.layerinfo_c==0xFFFF) {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] layerinfo_c fail\n");
+				} else {
+					TcpalPrintStatus((I08S *)"[mmbi][monitor] [C] Modulation [%s] CR[%s] TimeInterleave[%d] Segment[%d]\n",
+					cModulation[(pInfo->sig_info.info.mmb_info.layerinfo_c>>13)&0x07],
+					cCR[(pInfo->sig_info.info.mmb_info.layerinfo_c>>10)&0x07],
+					(pInfo->sig_info.info.mmb_info.layerinfo_c>>4)&0x1F,
+					(pInfo->sig_info.info.mmb_info.layerinfo_c)&0x0F );
+				}
 			}
 		}
 #endif
@@ -768,7 +1003,7 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 
 	case ENUM_GET_RSSI:
 		pInfo->sig_info.info.mmb_info.rssi = 
-			(st.status.rssi.avgValue);
+			(st.status.rssi.currentValue);
 		TcpalPrintStatus((I08S *)"[mmbi][monitor]  rssi[%d]\n",
 				pInfo->sig_info.info.mmb_info.rssi);
 	break;
@@ -865,12 +1100,12 @@ int	broadcast_drv_if_get_dmb_data(struct broadcast_dmb_data_info *pdmb_data)
 	if(OnAir == 0 || pdmb_data==NULL) {
 		return ERROR;
 	}
-
+#if 0
 	if(pdmb_data->data_buf == NULL) {
 		TcpalPrintErr((I08S *)"[1seg] broadcast_drv_if_get_dmb_data[ERR] data_buf is null\n");
 		return ERROR;
 	}
-
+#endif
 	if(pdmb_data->data_buf_size < 188) {
 		TcpalPrintErr((I08S *)"[1seg] broadcast_drv_if_get_dmb_data[ERR] buffsize < 188\n");
 		return ERROR;

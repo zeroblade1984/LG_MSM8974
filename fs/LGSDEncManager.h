@@ -17,4 +17,5 @@
 extern int getMediaProperty(void);
 extern int ecryptfs_mediaFileSearch(const unsigned char *filename);
 extern char *ecryptfs_Extfilename(const unsigned char *filename);
+extern int ecryptfs_asecFileSearch(const unsigned char *filename);
 

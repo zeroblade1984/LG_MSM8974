@@ -1,7 +1,7 @@
 /*
  * NVRAM variable manipulation
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmnvram.h 371859 2012-11-29 18:19:30Z $
+ * $Id: bcmnvram.h 428512 2013-10-09 02:12:11Z $
  */
 
 #ifndef _bcmnvram_h_
@@ -50,6 +50,15 @@ struct nvram_tuple {
  * Get default value for an NVRAM variable
  */
 extern char *nvram_default_get(const char *name);
+/*
+ * validate/restore all per-interface related variables
+ */
+extern void nvram_validate_all(char *prefix, bool restore);
+
+/*
+ * restore specific per-interface variable
+ */
+extern void nvram_restore_var(char *prefix, char *name);
 
 /*
  * Initialize NVRAM access. May be unnecessary or undefined on certain
@@ -57,6 +66,7 @@ extern char *nvram_default_get(const char *name);
  */
 extern int nvram_init(void *sih);
 extern int nvram_deinit(void *sih);
+
 
 /*
  * Append a chunk of nvram variables to the global list
@@ -183,7 +193,6 @@ extern int nvram_getall(char *nvram_buf, int count);
 uint8 nvram_calc_crc(struct nvram_header * nvh);
 
 extern int nvram_space;
-
 #endif /* _LANGUAGE_ASSEMBLY */
 
 /* The NVRAM version number stored as an NVRAM variable */
@@ -194,12 +203,13 @@ extern int nvram_space;
 #define NVRAM_INVALID_MAGIC	0xFFFFFFFF
 #define NVRAM_VERSION		1
 #define NVRAM_HEADER_SIZE	20
+/* This definition is for precommit staging, and will be removed */
 #define NVRAM_SPACE		0x8000
-#define DEF_NVRAM_SPACE		0x8000
-#ifdef MAX_NVRAM_SPACE
-#undef MAX_NVRAM_SPACE
+/* For CFE builds this gets passed in thru the makefile */
+#ifndef MAX_NVRAM_SPACE
+#define MAX_NVRAM_SPACE		0x10000
 #endif
-#define MAX_NVRAM_SPACE		NVRAM_SPACE
+#define DEF_NVRAM_SPACE		0x8000
 #define ROM_ENVRAM_SPACE	0x1000
 #define NVRAM_LZMA_MAGIC	0x4c5a4d41	/* 'LZMA' */
 
@@ -215,6 +225,7 @@ extern int nvram_space;
 
 #define BCM_JUMBO_NVRAM_DELIMIT '\n'
 #define BCM_JUMBO_START "Broadcom Jumbo Nvram file"
+
 
 #if (defined(FAILSAFE_UPGRADE) || defined(CONFIG_FAILSAFE_UPGRADE) || \
 	defined(__CONFIG_FAILSAFE_UPGRADE_SUPPORT__))

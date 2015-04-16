@@ -34,7 +34,7 @@
 #define HW_CONTROL_MASK		BIT(1)
 #define SW_COLLAPSE_MASK	BIT(0)
 
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 #include <mach/board_lge.h>
 
 #define RESTORE_MASK		BIT(10)
@@ -54,7 +54,7 @@
 #define EN_FEW_WAIT_VAL		(0x8 << 16)
 #define CLK_DIS_WAIT_VAL	(0x2 << 12)
 
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 #define TIMEOUT_US_LGE	20000
 #define TIMEOUT_US		100
 #else
@@ -71,7 +71,9 @@ struct gdsc {
 	bool			toggle_periph;
 	bool			toggle_logic;
 	bool			resets_asserted;
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 	bool			use_lge_workaround;
+#endif
 };
 
 static int gdsc_is_enabled(struct regulator_dev *rdev)
@@ -84,7 +86,7 @@ static int gdsc_is_enabled(struct regulator_dev *rdev)
 	return !!(readl_relaxed(sc->gdscr) & PWR_ON_MASK);
 }
 
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 static int lge_gdsc_disable(struct gdsc *sc)
 {
 	uint32_t regval;
@@ -197,7 +199,7 @@ static int gdsc_enable(struct regulator_dev *rdev)
 	int i, ret;
 
 	if (sc->toggle_logic) {
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 		if (sc->use_lge_workaround) {
 			ret = lge_gdsc_enable(sc);
 			if (ret)
@@ -255,7 +257,7 @@ static int gdsc_disable(struct regulator_dev *rdev)
 	}
 
 	if (sc->toggle_logic) {
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 		if (sc->use_lge_workaround)
 			ret = lge_gdsc_disable(sc);
 		else
@@ -296,7 +298,7 @@ static int __devinit gdsc_probe(struct platform_device *pdev)
 	uint32_t regval;
 	bool retain_mem, retain_periph;
 	int i, ret;
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 	int use_lge_workaround = 0; /* default: all not applied */
 #endif
 
@@ -350,7 +352,7 @@ static int __devinit gdsc_probe(struct platform_device *pdev)
 			return rc;
 		}
 	}
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
 	of_property_read_u32(pdev->dev.of_node, "lge,use_workaround",
 			&use_lge_workaround);
 	sc->use_lge_workaround =
@@ -383,8 +385,8 @@ static int __devinit gdsc_probe(struct platform_device *pdev)
 	sc->toggle_logic = !of_property_read_bool(pdev->dev.of_node,
 						"qcom,skip-logic-collapse");
 	if (!sc->toggle_logic) {
-#ifdef CONFIG_MACH_LGE
-		/*                                                             */
+#ifdef CONFIG_LGE_GDSC_SWCONTROL
+		/* LGE workaround is not used if a device is good pdn revision */
 		if (lge_get_board_revno() >= use_lge_workaround) {
 			regval &= ~SW_COLLAPSE_MASK;
 			writel_relaxed(regval, sc->gdscr);

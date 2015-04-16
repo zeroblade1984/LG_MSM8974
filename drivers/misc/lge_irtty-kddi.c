@@ -1,10 +1,10 @@
 /*********************************************************************
- *                
+ *
  * Filename:      lge_irtty-kddi.c
  * Version:       1.0
  * Description:   please refer to n_tty.c
- *     
- ********************************************************************/    
+ *
+ ********************************************************************/
 
 #include <linux/types.h>
 #include <linux/major.h>
@@ -28,6 +28,8 @@
 #include <asm/system.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#include <mach/board_lge.h>
+#include <linux/delay.h>
 
 #define IRTTY_WAKEUP_CHARS 256
 
@@ -45,6 +47,11 @@
 #define GPIO_IRDA_PWDN_DISABLE	1
 #define GPIO_IRDA_PWDN_ENABLE		0
 
+#define GPIO_IRDA_PWEN		69
+#define GPIO_IRDA_PWEN_ENABLE	1
+#define GPIO_IRDA_PWEN_DISABLE	0
+
+struct regulator *LDO19 = NULL;
 static inline int irtty_put_user(struct tty_struct *tty, unsigned char x,
 			       unsigned char __user *ptr)
 {
@@ -124,7 +131,7 @@ static ssize_t irtty_chars_in_buffer(struct tty_struct *tty)
 			tty->canon_head + (N_IRDA_BUF_SIZE - tty->read_tail);
 	}
 	spin_unlock_irqrestore(&tty->read_lock, flags);
-	
+
 	return n;
 }
 
@@ -150,7 +157,7 @@ static void irtty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	}
 	else {
 	i = min(N_IRDA_BUF_SIZE - tty->read_cnt, N_IRDA_BUF_SIZE - tty->read_head);
-	}			
+	}
 	i = min(count, i);
 	memcpy(tty->read_buf + tty->read_head, cp, i);
 	tty->read_head = (tty->read_head + i) & (N_IRDA_BUF_SIZE-1);
@@ -158,8 +165,8 @@ static void irtty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 
 	cp += i;
 	count -= i;
-	
-	i = min(N_IRDA_BUF_SIZE - tty->read_cnt, N_IRDA_BUF_SIZE - tty->read_head);			
+
+	i = min(N_IRDA_BUF_SIZE - tty->read_cnt, N_IRDA_BUF_SIZE - tty->read_head);
 	i = min(count, i);
 	memcpy(tty->read_buf + tty->read_head, cp, i);
 	tty->read_head = (tty->read_head + i) & (N_IRDA_BUF_SIZE-1);
@@ -285,6 +292,23 @@ static void irtty_close(struct tty_struct *tty)
 	/* we must switch on IrDA HW module & Level shifter
 	 * prior to transfering any data */
 	gpio_set_value_cansleep(GPIO_IRDA_PWDN, GPIO_IRDA_PWDN_DISABLE);
+
+	if(lge_get_board_revno() >= HW_REV_B) {
+		gpio_set_value_cansleep(GPIO_IRDA_PWEN, GPIO_IRDA_PWEN_DISABLE);
+		udelay(150);
+	}
+	else {
+		//IrDA LDO Disable -> PMIC L19
+		if(!LDO19) {
+			LDO19 = regulator_get(tty->dev, "8941_l19");
+			if(IS_ERR(LDO19)) {
+				pr_err("%s: regulator get of PM8941_l19 failed (%ld)\n",__func__, PTR_ERR(LDO19));
+				(LDO19) = NULL;
+				return;
+			}
+		}
+		regulator_disable(LDO19);
+	}
 }
 
 static int irtty_open(struct tty_struct *tty)
@@ -310,9 +334,25 @@ static int irtty_open(struct tty_struct *tty)
 	tty->minimum_to_wake = 1;
 	tty->closing = 0;
 
+	if(lge_get_board_revno() >= HW_REV_B) {
+		gpio_set_value_cansleep(GPIO_IRDA_PWEN, GPIO_IRDA_PWEN_ENABLE);
+		udelay(30);
+	}
+	else {
+		//IrDA LDO enable -> PMIC L19
+		if(!LDO19) {
+			LDO19 = regulator_get(tty->dev, "8941_l19");
+			if(IS_ERR(LDO19)) {
+				pr_err("%s: regulator get of PM8941_l19 failed (%ld)\n",__func__, PTR_ERR(LDO19));
+				(LDO19) = NULL;
+				return -ENXIO;
+			}
+		}
+		regulator_enable(LDO19);
+	}
 	printk(KERN_INFO "%s - %s: Irda GPIO PIN Enabled\n", __func__, tty->name);
 	/* we must switch on IrDA HW module & Level shifter
-	 * prior to transfering any data */	
+	 * prior to transfering any data */
 	gpio_set_value_cansleep(GPIO_IRDA_PWDN, GPIO_IRDA_PWDN_ENABLE);
 
 	return 0;
@@ -551,7 +591,7 @@ static ssize_t irtty_write(struct tty_struct *tty, struct file *file,
 	int c;
 	ssize_t retval = 0;
 	unsigned long cpuflags;
-	
+
 	/* Job control check -- must be done at start (POSIX.1 7.1.1.4). */
 	if (L_TOSTOP(tty) && file->f_op->write != redirected_tty_write) {
 		retval = tty_check_change(tty);
@@ -563,13 +603,13 @@ static ssize_t irtty_write(struct tty_struct *tty, struct file *file,
 
 	spin_lock_irqsave(&tty->read_lock, cpuflags);
 	tty->read_cnt -= nr;
-	tty->read_tail += nr;	
+	tty->read_tail += nr;
 	if(tty->read_tail >= N_IRDA_BUF_SIZE) {
 		tty->read_tail = nr;
 		tty->read_head = 0;
 	}
 	spin_unlock_irqrestore(&tty->read_lock, cpuflags);
-	
+
 
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -595,7 +635,7 @@ static ssize_t irtty_write(struct tty_struct *tty, struct file *file,
 
 		if (!nr)
 			break;
-		
+
 		if (file->f_flags & O_NONBLOCK) {
 			retval = -EAGAIN;
 			break;
@@ -604,7 +644,7 @@ static ssize_t irtty_write(struct tty_struct *tty, struct file *file,
 	}
 break_out:
 	__set_current_state(TASK_RUNNING);
-	
+
 	remove_wait_queue(&tty->write_wait, &wait);
 	if (b - buf != nr && tty->fasync)
 		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
@@ -620,11 +660,11 @@ static int irtty_ioctl(struct tty_struct *tty, struct file *file,
 	switch (cmd) {
 	case TIOCOUTQ:
 		return put_user(tty_chars_in_buffer(tty), (int __user *) arg);
-		
+
 	case TIOCINQ:
 		retval = tty->read_cnt;
 		return put_user(retval, (unsigned int __user *) arg);
-		
+
 	default:
 		return n_tty_ioctl_helper(tty, file, cmd, arg);
 	}
@@ -662,12 +702,28 @@ static int __init irtty_sir_init(void)
 		printk(KERN_ERR "%s : irda HW module open error\n", __func__);
 		return err;
 	}
-	
+	if(lge_get_board_revno() >= HW_REV_B) {
+		if((err = gpio_request_one(GPIO_IRDA_PWEN, GPIOF_OUT_INIT_LOW, "IrDA_PWEN")) != 0) {
+			printk(KERN_ERR "%s : irda HW module open error\n", __func__);
+			return err;
+		}
+	}
+	else {
+		if(!LDO19) {
+			LDO19 = regulator_get(NULL, "8941_l19");
+			if(IS_ERR(LDO19)) {
+				pr_err("%s: regulator get of PM8941_l19 failed (%ld)\n",__func__, PTR_ERR(LDO19));
+				(LDO19) = NULL;
+				return -ENXIO;
+	        }
+	    }
+	}
+
 	printk(KERN_INFO "%s : IrTTY Initialized.\n", __func__);
 	return err;
 }
 
-static void __exit irtty_sir_cleanup(void) 
+static void __exit irtty_sir_cleanup(void)
 {
 	int err;
 

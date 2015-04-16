@@ -26,13 +26,13 @@
 
         qcom,mdss_mdp@fd900000 {
                 qcom,mdss-pref-prim-intf = "edp";
-		qcom,panel-lpg-channel = <7>; /* LPG Channel 8 */
-		qcom,panel-pwm-period = <53>;
         };
 
 	qcom,mdss_edp@fd923400 {
 		status = "ok";
 		qcom,cont-splash-enabled;
+		qcom,panel-lpg-channel = <7>; /* LPG Channel 8 */
+		qcom,panel-pwm-period = <53>;
 	};
 
 	i2c@f9967000 {
@@ -396,12 +396,12 @@
 			compatible = "qcom,hsic-host";
 			reg = <0xf9a00000 0x400>;
 			#address-cells = <0>;
-	                interrupt-parent = <&hsic_host>;
+			interrupt-parent = <&hsic_host>;
 			interrupts = <0 1 2>;
 			#interrupt-cells = <1>;
 			interrupt-map-mask = <0xffffffff>;
 			interrupt-map = <0 &intc 0 136 0
-		                1 &intc 0 148 0
+			        1 &intc 0 148 0
 		                2 &msmgpio 144 0x8>;
 			interrupt-names = "core_irq", "async_irq", "wakeup";
 			hsic_vdd_dig-supply = <&pm8841_s2_corner>;
@@ -445,6 +445,7 @@
                 qcom,msm-bus,name = "wlan_sdio";
                 qca,wifi-chip-pwd-supply = <&ath_chip_pwd_l>;
         };
+
 };
 
 &mdss_fb0 {
@@ -461,10 +462,6 @@
 
 &usb3 {
 	qcom,otg-capability;
-};
-
-&pm8941_mvs1 {
-	parent-supply = <&ext_5v>;
 };
 
 &pm8941_mvs2 {
@@ -814,6 +811,7 @@
 
 &pm8941_chg {
 	status = "ok";
+	otg-parent-supply = <&ext_5v>;
 
 	qcom,charging-disabled;
 

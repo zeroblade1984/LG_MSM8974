@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8050_tun.c
- 
+
  Description : API of dmb baseband module
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/09/11 	jason		initial
+ 2009/09/11     jason        initial
 *******************************************************************************/
 
 #ifndef __FC8050_TUNER__
@@ -26,4 +26,3 @@ extern int fc8050_get_rssi(HANDLE hDevice, int *rssi);
 #endif
 
 #endif // __FC8050_TUNER__
-

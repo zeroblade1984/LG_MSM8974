@@ -23,14 +23,7 @@
 
 /* Fixed constants first: */
 #undef NR_OPEN
-/*
- * increase INR_OPEN_CUR to 2048
- */
-#ifdef CONFIG_MACH_LGE
-#define INR_OPEN_CUR 2048	/* Initial setting for nfile rlimits */
-#else
 #define INR_OPEN_CUR 1024	/* Initial setting for nfile rlimits */
-#endif
 #define INR_OPEN_MAX 4096	/* Hard limit for nfile rlimits */
 
 #define BLOCK_SIZE_BITS 10
@@ -2443,6 +2436,7 @@ enum {
 void dio_end_io(struct bio *bio, int error);
 void inode_dio_wait(struct inode *inode);
 void inode_dio_done(struct inode *inode);
+struct inode *dio_bio_get_inode(struct bio *bio);
 
 ssize_t __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct block_device *bdev, const struct iovec *iov, loff_t offset,

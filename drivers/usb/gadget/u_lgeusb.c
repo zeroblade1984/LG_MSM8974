@@ -61,13 +61,16 @@ struct lgeusb_dev {
 
 	int (*get_serial_number)(char *serial);
 	int (*get_factory_cable)(void);
-	bool (*is_factory_mode)(void);
 };
 
 static char model_string[32];
 static char swver_string[32];
 static char subver_string[32];
 static char phoneid_string[32];
+
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+static bool is_mac_os;
+#endif
 
 static struct lgeusb_dev *_lgeusb_dev;
 
@@ -275,23 +278,17 @@ static int lgeusb_create_device_file(struct lgeusb_dev *dev)
 
 	while ((attr = *attrs++)) {
 		ret = device_create_file(dev->dev, attr);
-		if (ret)
+		if (ret) {
 			pr_err("usb: lgeusb: error on creating device file %s\n",
 					attr->attr.name);
+			return ret;
+		}
 	}
 
 	return 0;
 }
 
-bool lgeusb_is_factory_mode(void)
-{
-	struct lgeusb_dev *usbdev = _lgeusb_dev;
-	if (usbdev->is_factory_mode)
-		return usbdev->is_factory_mode();
-	return false;
-}
-
-int lgeusb_get_pif_cable(void)
+int lgeusb_get_factory_cable(void)
 {
 	struct lgeusb_dev *usbdev = _lgeusb_dev;
 	if (usbdev->get_factory_cable)
@@ -396,121 +393,41 @@ int lgeusb_get_sub_ver(char *sub_ver)
 	return 0;
 }
 
-static int get_factory_cable(void)
-{
-	struct chg_cable_info info;
-	enum lge_boot_mode_type boot_mode;
-	int res;
+static struct platform_driver lge_android_usb_platform_driver = {
+	.driver = {
+		.name = "lge_android_usb",
+	},
+};
 
-	/* if boot mode is factory,
-	 * cable must be factory cable.
-	 */
-	boot_mode = lge_get_boot_mode();
-	switch (boot_mode) {
-	case LGE_BOOT_MODE_FACTORY:
-	case LGE_BOOT_MODE_PIFBOOT:
-		res = LGEUSB_FACTORY_130K;
-		goto done;
-	case LGE_BOOT_MODE_FACTORY2:
-	case LGE_BOOT_MODE_PIFBOOT2:
-		res = LGEUSB_FACTORY_56K;
-		goto done;
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+void lgeusb_set_host_os(u16 w_length)
+{
+	switch (w_length) {
+	case MAC_OS_TYPE:
+		is_mac_os = true;
+		break;
+	case WIN_LINUX_TYPE:
+		is_mac_os = false;
+		break;
 	default:
 		break;
 	}
-	/* get cable infomation */
-	res = lge_pm_get_cable_info(&info);
-	if (res < 0) {
-		pr_err("Error get cable information from PMIC %d\n", res);
-		return res;
-	}
-
-	switch (info.cable_type) {
-	/* It is factory cable */
-	case CABLE_56K:
-		res = LGEUSB_FACTORY_56K;
-		break;
-	case CABLE_130K:
-		res = LGEUSB_FACTORY_130K;
-		break;
-	case CABLE_910K:
-		res = LGEUSB_FACTORY_910K;
-		break;
-	/* It is normal cable */
-	default:
-		res = 0;
-		break;
-	}
-
-done:
-	return res;
 }
 
-static bool is_factory_mode(void)
+bool lgeusb_get_host_os(void)
 {
-	enum lge_boot_mode_type boot_mode;
-	bool res;
-
-	boot_mode = lge_get_boot_mode();
-	switch (boot_mode) {
-	case LGE_BOOT_MODE_FACTORY:
-	case LGE_BOOT_MODE_PIFBOOT:
-	case LGE_BOOT_MODE_FACTORY2:
-	case LGE_BOOT_MODE_PIFBOOT2:
-	case LGE_BOOT_MODE_MINIOS:
-		res = true;
-		break;
-	default:
-		res = false;
-		break;
-	}
-
-	return res;
+	return is_mac_os;
 }
-
-struct lge_android_usb_platform_data *lge_android_usb_dt_to_pdata(
-		struct platform_device *pdev)
-{
-	struct device_node *node;
-	struct lge_android_usb_platform_data *pdata;
-
-	if (!pdev) {
-		pr_err("Error: Null Platform device\n");
-		return NULL;
-	}
-
-	node = pdev->dev.of_node;
-	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		pr_err("unable to allocate platform data\n");
-		return NULL;
-	}
-	of_property_read_u32(node, "lge,lge_android_usb,vendor_id",
-			&pdata->vendor_id);
-	of_property_read_u32(node, "lge,lge_android_usb,factory_pid",
-			&pdata->factory_pid);
-	of_property_read_u32(node, "lge,lge_android_usb,iSerialNumber",
-			&pdata->iSerialNumber);
-	of_property_read_string(node, "lge,lge_android_usb,product_name",
-			&pdata->product_name);
-	of_property_read_string(node, "lge,lge_android_usb,manufacturer_name",
-			&pdata->manufacturer_name);
-	of_property_read_string(node, "lge,lge_android_usb,factory_composition",
-			&pdata->factory_composition);
-	return pdata;
-}
-
+#endif
 
 static int __devinit lgeusb_probe(struct platform_device *pdev)
 {
-	struct lge_android_usb_platform_data *pdata;
+	struct lge_android_usb_platform_data *pdata = pdev->dev.platform_data;
 	struct lgeusb_dev *usbdev = _lgeusb_dev;
-	int ret = 0;
-
-	pdata = lge_android_usb_dt_to_pdata(pdev);
-	usbdev->dev = &pdev->dev;
 
 	dev_dbg(&pdev->dev, "%s: pdata: %p\n", __func__, pdata);
+
+	usbdev->dev = &pdev->dev;
 
 	if (pdata) {
 		if (pdata->vendor_id)
@@ -533,68 +450,16 @@ static int __devinit lgeusb_probe(struct platform_device *pdev)
 
 		if (pdata->get_factory_cable)
 			usbdev->get_factory_cable = pdata->get_factory_cable;
-		else
-			usbdev->get_factory_cable = get_factory_cable;
-
-		if (pdata->is_factory_mode)
-			usbdev->is_factory_mode = pdata->is_factory_mode;
-		else
-			usbdev->is_factory_mode = is_factory_mode;
-
 	}
 
 	usbdev->current_mode = LGEUSB_DEFAULT_MODE;
 	lgeusb_create_device_file(usbdev);
 
-	return ret;
-}
-
-static void android_destroy_device(struct lgeusb_dev *dev)
-{
-	struct device_attribute **attrs = lge_android_usb_attributes;
-	struct device_attribute *attr;
-
-	while ((attr = *attrs++))
-		device_remove_file(dev->dev, attr);
-}
-
-static int lge_android_remove(struct platform_device *pdev)
-{
-	struct lgeusb_dev *dev = _lgeusb_dev;
-
-	if (dev) {
-		android_destroy_device(dev);
-		kfree(dev);
-	}
-
 	return 0;
 }
 
-static const struct platform_device_id lge_android_id_table[] __devinitconst = {
-	{
-		.name = "lge_android_usb",
-	},
-};
-
-static struct of_device_id lge_usb_android_dt_match[] = {
-	{   .compatible = "lge,lge-android-usb",
-	},
-	{}
-};
-
-static struct platform_driver lge_android_usb_platform_driver = {
-	.driver = {
-		.name = "lge_android_usb",
-		.of_match_table = lge_usb_android_dt_match,
-	},
-	.probe = lgeusb_probe,
-	.remove = lge_android_remove,
-	.id_table = lge_android_id_table,
-};
-
 static int __init lgeusb_init(void)
 {
-	int ret;
 	struct lgeusb_dev *dev;
 
 	pr_info("u_lgeusb init\n");
@@ -610,13 +475,8 @@ static int __init lgeusb_init(void)
 	dev->vendor_id = LGE_VENDOR_ID;
 	dev->factory_pid = LGE_FACTORY_PID;
 
-	ret = platform_driver_register(&lge_android_usb_platform_driver);
-	if (ret) {
-		pr_err("%s(): Failed to register android"
-				"platform driver\n", __func__);
-	}
-
-	return ret;
+	return platform_driver_probe(&lge_android_usb_platform_driver,
+			lgeusb_probe);
 }
 module_init(lgeusb_init);
 

@@ -33,10 +33,8 @@ struct pm8xxx_cradle {
 	int pouch;
 	spinlock_t lock;
 	int state;
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-	struct switch_dev pen_sdev;
+#if defined CONFIG_HALLIC_PEN
 	int pen;
-	int pen_state;
 	struct delayed_work pen_work;
 #else
 	int camera;
@@ -47,7 +45,14 @@ struct pm8xxx_cradle {
 static struct workqueue_struct *cradle_wq;
 static struct pm8xxx_cradle *cradle;
 
-#if defined(A1_only)
+#if defined(CONFIG_TOUCHSCREEN_ATMEL_S540)
+static int is_smart_cover_closed = 0; /* check status of smart cover to resize quick window area */
+int cradle_smart_cover_status(void)
+{
+	return is_smart_cover_closed;/* check status of smart cover to resize quick window area */
+}
+#endif
+#if defined HALLIC_TOUCH_IF
 static int smartcover_status;
 
 int get_smartcover_status(void){
@@ -62,47 +67,24 @@ static void set_smartcover_status(int status){
 static void boot_cradle_det_func(void)
 {
 	int state;
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-	int pen_state;
-#endif
+
 	if (cradle->pdata->hallic_pouch_detect_pin)
 		cradle->pouch = !gpio_get_value(cradle->pdata->hallic_pouch_detect_pin);
 
 	printk("%s : boot pouch === > %d \n", __func__ , cradle->pouch);
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (cradle->pdata->hallic_pen_detect_pin)
 		cradle->pen = !gpio_get_value(cradle->pdata->hallic_pen_detect_pin);
 
 	printk("%s : boot pen === > %d \n", __func__ , cradle->pen);
 
-	if (cradle->pouch == 1){
-		if(cradle->pen==1){
-			state=SMARTCOVER_POUCH_CLOSED;
-			pen_state=SMARTCOVER_PEN_IN;
-		}
-		else{
-			state=SMARTCOVER_POUCH_CLOSED;
-			pen_state=SMARTCOVER_PEN_OUT;
-		}
-	}
-	else{
-		if(cradle->pen==1){
-			state=SMARTCOVER_POUCH_OPENED;
-			pen_state=SMARTCOVER_PEN_IN;
-		}
-		else{
-			state=SMARTCOVER_POUCH_OPENED;
-			pen_state=SMARTCOVER_PEN_OUT;
-		}
-	}
-	printk("%s : [Cradle] boot cradle value : pouch_state is %d, pen_state is %d\n", __func__ , state, pen_state);
-	cradle->state = state;
-	wake_lock_timeout(&cradle->wake_lock, msecs_to_jiffies(3000));
-	switch_set_state(&cradle->sdev, cradle->state);
-	cradle->pen_state = pen_state;
-	wake_lock_timeout(&cradle->wake_lock, msecs_to_jiffies(3000));
-	switch_set_state(&cradle->pen_sdev, cradle->pen_state);
+	if (cradle->pouch == 1)
+		state = SMARTCOVER_POUCH_CLOSED;
+	else if (cradle->pen == 1)
+		state = SMARTCOVER_PEN_IN;
+	else
+		state = SMARTCOVER_POUCH_OPENED;
 #else
 	if (cradle->pdata->hallic_camera_detect_pin)
 		cradle->camera = !gpio_get_value(cradle->pdata->hallic_camera_detect_pin);
@@ -117,18 +99,21 @@ static void boot_cradle_det_func(void)
 		state = SMARTCOVER_CAMERA_OPENED;
 	else
 		state = SMARTCOVER_POUCH_OPENED;
+#endif
 
 	printk("%s : [Cradle] boot cradle value is %d\n", __func__ , state);
 	cradle->state = state;
 	wake_lock_timeout(&cradle->wake_lock, msecs_to_jiffies(3000));
 	switch_set_state(&cradle->sdev, cradle->state);
+#if defined(CONFIG_TOUCHSCREEN_ATMEL_S540)
+	is_smart_cover_closed = cradle->pouch;
 #endif
 }
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 static void pm8xxx_pen_work_func(struct work_struct *work)
 {
-	int pen_state = 0;
+	int state = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&cradle->lock, flags);
@@ -145,20 +130,20 @@ static void pm8xxx_pen_work_func(struct work_struct *work)
 
 
 	if (cradle->pen == 1)
-		pen_state = SMARTCOVER_PEN_IN;
+		state = SMARTCOVER_PEN_IN;
 	else if (cradle->pen == 0)
-		pen_state = SMARTCOVER_PEN_OUT;
+		state = SMARTCOVER_PEN_OUT;
 
-	if (cradle->pen_state != pen_state) {
-		cradle->pen_state = pen_state;
+	if (cradle->state != state) {
+		cradle->state = state;
 		spin_unlock_irqrestore(&cradle->lock, flags);
 		wake_lock_timeout(&cradle->wake_lock, msecs_to_jiffies(3000));
-		switch_set_state(&cradle->pen_sdev, cradle->pen_state);
-		printk("%s : [Cradle] pen value is %d\n", __func__ , pen_state);
+		switch_set_state(&cradle->sdev, cradle->state);
+		printk("%s : [Cradle] pen value is %d\n", __func__ , state);
 	}
 	else {
 		spin_unlock_irqrestore(&cradle->lock, flags);
-		printk("%s : [Cradle] pen value is %d (no change)\n", __func__ , pen_state);
+		printk("%s : [Cradle] pen value is %d (no change)\n", __func__ , state);
 	}
 }
 
@@ -203,7 +188,7 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 {
 	int state = 0;
 	unsigned long flags;
-#if !defined(CONFIG_MACH_MSM8974_VU3_KR)
+#if !defined CONFIG_HALLIC_PEN
 	int tmp_camera = 0;
 #endif
 	spin_lock_irqsave(&cradle->lock, flags);
@@ -211,7 +196,7 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 	if (cradle->pdata->hallic_pouch_detect_pin)
 		cradle->pouch = !gpio_get_value(cradle->pdata->hallic_pouch_detect_pin);
 	printk("%s : pouch === > %d \n", __func__ , cradle->pouch);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (cradle->pdata->hallic_pen_detect_pin)
 			cradle->pen = !gpio_get_value(cradle->pdata->hallic_pen_detect_pin);
 	printk("%s : pen === > %d \n", __func__ , cradle->pen);
@@ -221,7 +206,7 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 	printk("%s : camera === > %d \n", __func__ , tmp_camera);
 #endif
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (cradle->pouch == 1)
 		state = SMARTCOVER_POUCH_CLOSED;
 	else if (cradle->pouch == 0)
@@ -235,7 +220,7 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 		state = SMARTCOVER_POUCH_OPENED;
 #endif
 
-#if defined(A1_only)
+#if defined HALLIC_TOUCH_IF
 	set_smartcover_status(state);
 #endif
 	if (cradle->state != state) {
@@ -283,14 +268,23 @@ static irqreturn_t pm8xxx_pouch_irq_handler(int irq, void *handle)
 {
 	struct pm8xxx_cradle *cradle_handle = handle;
 	int v;
+#if defined(CONFIG_TOUCHSCREEN_ATMEL_S540)
+	int status;
+
+	status = !gpio_get_value(cradle->pdata->hallic_pouch_detect_pin);
+	printk("pouch irq!!!! %d\n", status);
+	v = 1 + 1*status;
+	is_smart_cover_closed = status;
+#else
 	printk("pouch irq!!!!\n");
 	v = 1 + 1*(!gpio_get_value(cradle->pdata->hallic_pouch_detect_pin));
+#endif
 	wake_lock_timeout(&cradle->wake_lock, msecs_to_jiffies(POUCH_DETECT_DELAY*v+5));
 	queue_delayed_work(cradle_wq, &cradle_handle->pouch_work, msecs_to_jiffies(POUCH_DETECT_DELAY*v));
 	return IRQ_HANDLED;
 }
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 static irqreturn_t pm8xxx_pen_irq_handler(int irq, void *handle)
 {
 	struct pm8xxx_cradle *cradle_handle = handle;
@@ -330,7 +324,7 @@ cradle_sensing_show(struct device *dev, struct device_attribute *attr, char *buf
 
 	return len;
 }
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 static ssize_t
 cradle_pen_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -351,7 +345,7 @@ cradle_camera_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return len;
 }
 #endif
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 static struct device_attribute cradle_pen_attr   = __ATTR(pen, S_IRUGO | S_IWUSR, cradle_pen_show, NULL);
 #else
 static struct device_attribute cradle_camera_attr  = __ATTR(camera, S_IRUGO | S_IWUSR, cradle_camera_show, NULL);
@@ -376,12 +370,12 @@ static void bu52014hfv_parse_dt(struct device *dev,
 	struct device_node *np = dev->of_node;
 
 	/* hallic info
-	   1 : only pouch (KR, ATT ~Rev.A)
-   	   2 : pouch and camera (KR, ATT Rev.B~, SPR, TUMS, DCM Rev.A~)
+		1 : only pouch (KR, ATT ~Rev.A)
+		2 : pouch and camera (KR, ATT Rev.B~, SPR, TUMS, DCM Rev.A~)
 	*/
 	if ((pdata->hallic_pouch_detect_pin = of_get_named_gpio_flags(np, "hallic-pouch-irq-gpio", 0, NULL)) > 0)
 		pdata->hallic_pouch_irq = gpio_to_irq(pdata->hallic_pouch_detect_pin);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if ((pdata->hallic_pen_detect_pin = of_get_named_gpio_flags(np, "hallic-pen-irq-gpio", 0, NULL)) > 0)
 		pdata->hallic_pen_irq = gpio_to_irq(pdata->hallic_pen_detect_pin);
 	printk("[Hall IC] hallic_pouch_gpio: %d, hallic_pen_gpio: %d\n",
@@ -399,7 +393,7 @@ static void bu52014hfv_parse_dt(struct device *dev,
 static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 {
 	int ret;
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	unsigned int hall_pen_gpio_irq = 0, hall_pouch_gpio_irq = 0;
 #else
 	unsigned int hall_camera_gpio_irq = 0, hall_pouch_gpio_irq = 0;
@@ -434,10 +428,8 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 	cradle->sdev.name = "smartcover";
 	cradle->sdev.print_name = cradle_print_name;
 	cradle->pouch = 0;
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	cradle->pen = 0;
-	cradle->pen_sdev.name = "pen_state";
-	cradle->pen_sdev.print_name = cradle_print_name;
 #else
 	cradle->camera = 0;
 #endif
@@ -447,11 +439,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 	ret = switch_dev_register(&cradle->sdev);
 	if (ret < 0)
 		goto err_switch_dev_register;
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-	ret = switch_dev_register(&cradle->pen_sdev);
-    if (ret < 0)
-        goto err_switch_dev_register;
-#endif
+
 	if (pre_set_flag) {
 		cradle_set_deskdock(pre_set_flag);
 		cradle->state = pre_set_flag;
@@ -459,7 +447,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 	wake_lock_init(&cradle->wake_lock, WAKE_LOCK_SUSPEND, "hall_ic_wakeups");
 
 	INIT_DELAYED_WORK(&cradle->pouch_work, pm8xxx_pouch_work_func);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	INIT_DELAYED_WORK(&cradle->pen_work, pm8xxx_pen_work_func);
 #else
 	INIT_DELAYED_WORK(&cradle->camera_work, pm8xxx_camera_work_func);
@@ -489,7 +477,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			printk("%s :enable_irq_wake failed(1)\n",__func__);
 	}
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (cradle->pdata->hallic_pen_detect_pin > 0) {
 		hall_pen_gpio_irq = gpio_to_irq(cradle->pdata->hallic_pen_detect_pin);
 		printk("%s : hall_pen_gpio_irq = [%d]\n", __func__, hall_pen_gpio_irq);
@@ -546,7 +534,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			goto err_request_irq;
 	}
 
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (cradle->pdata->hallic_pen_detect_pin > 0) {
 		ret = device_create_file(&pdev->dev, &cradle_pen_attr);
 		if (ret)
@@ -565,7 +553,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 err_request_irq:
 	if (hall_pouch_gpio_irq)
 		free_irq(hall_pouch_gpio_irq, 0);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	if (hall_pen_gpio_irq)
 		free_irq(hall_pen_gpio_irq, 0);
 #else
@@ -575,9 +563,6 @@ err_request_irq:
 
 err_switch_dev_register:
 	switch_dev_unregister(&cradle->sdev);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
-	switch_dev_unregister(&cradle->pen_sdev);
-#endif
 	kfree(cradle);
 	return ret;
 }
@@ -586,7 +571,7 @@ static int __devexit pm8xxx_cradle_remove(struct platform_device *pdev)
 {
 	struct pm8xxx_cradle *cradle = platform_get_drvdata(pdev);
 	cancel_delayed_work_sync(&cradle->pouch_work);
-#if defined CONFIG_MACH_MSM8974_VU3_KR
+#if defined CONFIG_HALLIC_PEN
 	cancel_delayed_work_sync(&cradle->pen_work);
 #else
 	cancel_delayed_work_sync(&cradle->camera_work);

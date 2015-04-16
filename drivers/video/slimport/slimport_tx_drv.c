@@ -1080,40 +1080,8 @@ static void sp_tx_aux_rd(unchar len_cmd)
 
 unchar sp_tx_chip_located(void)
 {
-	unchar c1, c2;
-
-#ifdef CONFIG_MACH_LGE
-	int i = 0;
-#endif
 	sp_tx_hardware_poweron();
-#ifdef CONFIG_MACH_LGE
-	do {
-		sp_read_reg(TX_P2, SP_TX_DEV_IDL_REG, &c1);
-		sp_read_reg(TX_P2, SP_TX_DEV_IDH_REG, &c2);
-		if ((c1 == 0x08) && (c2 == 0x78)) {
-			pr_info("ANX7808 BA is found.\n");
-			return 1;
-		} else {
-			pr_info("Failed ANX7808 initialize : Retry(%d)\n", i+1);
-		}
-		i++;
-	} while (i < 4);
-	sp_tx_hardware_powerdown();
-	pr_info("ANX7808 is not found.\n");
-	return 0;
-#else
-	sp_read_reg(TX_P2, SP_TX_DEV_IDL_REG, &c1);
-	sp_read_reg(TX_P2, SP_TX_DEV_IDH_REG, &c2);
-	if ((c1 == 0x08) && (c2 == 0x78)) {
-		pr_info("ANX7808 BA is found.\n");
-		return 1;
-	} else {
-		sp_tx_hardware_powerdown();
-		pr_info("ANX7808 is not found.\n");
-		return 0;
-	}
-#endif
-
+	return 1;
 }
 
 void sp_tx_vbus_poweron(void)

@@ -37,34 +37,34 @@
 	_IO(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 3)
 
 #define LGE_BROADCAST_TDMB_IOCTL_TUNE \
-	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 4, int*)
+	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 4, int)
 
 #define LGE_BROADCAST_TDMB_IOCTL_SET_CH \
-	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 5, struct broadcast_tdmb_set_ch_info*)
+	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 5, struct broadcast_tdmb_set_ch_info)
 
 #define LGE_BROADCAST_TDMB_IOCTL_RESYNC \
 	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 6, int)
 
 #define LGE_BROADCAST_TDMB_IOCTL_DETECT_SYNC \
-	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 7, int*)
+	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 7, int)
 
 #define LGE_BROADCAST_TDMB_IOCTL_GET_SIG_INFO \
-	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 8, struct broadcast_tdmb_sig_info*)
+	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 8, struct broadcast_tdmb_sig_info)
 
 #define LGE_BROADCAST_TDMB_IOCTL_GET_CH_INFO \
-	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 9, struct broadcast_tdmb_ch_info*)
+	_IOR(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 9, struct broadcast_tdmb_ch_info)
 
 #define LGE_BROADCAST_TDMB_IOCTL_RESET_CH \
 	_IO(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 10)
 
 #define LGE_BROADCAST_TDMB_IOCTL_USER_STOP \
-	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 11, int*)
+	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 11, int)
 
 #define LGE_BROADCAST_TDMB_IOCTL_GET_DMB_DATA \
-	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 12, struct broadcast_tdmb_data_info*)
+	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 12, struct broadcast_tdmb_data_info)
 
 #define LGE_BROADCAST_TDMB_IOCTL_SELECT_ANTENNA \
-	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 13, int*)
+	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 13, int)
 
 struct broadcast_tdmb_set_ch_info
 {
@@ -91,13 +91,13 @@ struct broadcast_tdmb_sig_info
 
 struct broadcast_tdmb_ch_info
 {
-	unsigned char*  ch_buf;
+	unsigned int	ch_buf_addr;
 	unsigned int	buf_len;
 };
 
 struct broadcast_tdmb_data_info
 {
-	unsigned char*	data_buf;
+	unsigned int	data_buf_addr;
 	unsigned int 	data_buf_size;
 	unsigned int	copied_size;
 	unsigned int	packet_cnt;

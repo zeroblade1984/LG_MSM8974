@@ -20,25 +20,6 @@ config FB_MSM_MDSS_HDMI_MHL_SII8334
 	  Support the HDMI to MHL conversion.
 	  MHL (Mobile High-Definition Link) technology
 	  uses USB connector to output HDMI content
-config LGE_ESD_CHECK
-	bool "Enable sysfs for ESD check"
-	default n
-config LGE_SUPPORT_LCD_MAKER_ID
-	depends on MACH_LGE
-	default n
-	bool "LGE LCD MAKER ID support configuration"
-	help
-	Say Y here to enable support for LCD MAKER ID lge feature.
-config MACH_MSM8974_A1
-	depends on MACH_LGE
-	bool "LGE LCD support configuration for A1"
-	default n
-config LGE_SUPORT_OLED_TUNING
-	depends on (MACH_MSM8974_Z_KR || MACH_MSM8974_Z_US || MACH_MSM8974_Z_KDDI) && OLED_SUPPORT
-	bool "Enable sysfs for OLED image tuning"
-	default y
-	---help---
-	Support the image tuning for the LGD OLED Panel.
 
 config FB_MSM_MDSS_DSI_CTRL_STATUS
 	tristate "DSI controller status check feature"
@@ -54,6 +35,25 @@ config FB_MSM_MDSS_MDP3
 	---help---
 	The MDP3 provides support for an older version display controller
 	included in latest display sub-system, known as MDSS.
+config LGE_VSYNC_SKIP
+	bool "MDSS VSYNC Skip scheme"
+	---help---
+	This feature provides VSYNC skip scheme.
+
+config LGE_SUPPORT_LCD_MAKER_ID
+	depends on MACH_LGE
+	default y
+	bool "LGE LCD MAKER ID support configuration"
+	help
+	   Say Y here to enable support for LCD MAKER ID lge feature.
+	   
+config LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
+	bool "MIPI Disney JDI FHD LCD Video Panel"
+	default n
+
+config LGE_LION_DSV
+	bool "LION_DSV Power Management chip"
+	default n
 
 config FB_MSM_MDSS_KCAL_CTRL
 	depends on FB_MSM_MDSS

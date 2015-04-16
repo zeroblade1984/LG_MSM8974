@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -101,7 +101,6 @@ struct pwm_period_config {
  * duty_ms - duty cycle time in ms
  * start_idx - index in the LUT
  */
-
 struct pwm_duty_cycles {
 #ifdef CONFIG_LEDS_PM8941_EMOTIONAL
 	int *duty_pcts0;
@@ -124,6 +123,16 @@ struct pwm_duty_cycles {
 	int *duty_pcts30;
 	int *duty_pcts31;
 	int *duty_pcts32;
+	int *duty_pcts37;
+	int *duty_pcts39;
+	int *duty_pcts40;
+	int *duty_pcts41;
+	int *duty_pcts42;
+	int *duty_pcts43;
+	int *duty_pcts44;
+	int *duty_pcts45;
+	int *duty_pcts46;
+	int *duty_pcts47;
 	int *duty_pcts101;
 	int *duty_pcts102;
 #endif
@@ -171,6 +180,12 @@ struct lut_params {
 int pwm_lut_config(struct pwm_device *pwm, int period_us,
 		int duty_pct[], struct lut_params lut_params);
 
+/*
+ * support microsecond level configuration
+ */
+int pwm_config_us(struct pwm_device *pwm,
+		int duty_us, int period_us);
+
 /* Standard APIs supported */
 /*
  * pwm_request - request a PWM device
@@ -186,8 +201,8 @@ int pwm_lut_config(struct pwm_device *pwm, int period_us,
 /*
  * pwm_config - change a PWM device configuration
  * @pwm: the PWM device
- * @period_us: period in microsecond
- * @duty_us: duty cycle in microsecond
+ * @period_ns: period in nanosecond
+ * @duty_ns: duty cycle in nanosecond
  */
 
 /*

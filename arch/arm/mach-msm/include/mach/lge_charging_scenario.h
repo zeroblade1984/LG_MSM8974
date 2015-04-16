@@ -21,6 +21,9 @@
 #include <linux/kernel.h>
 
 #define CONFIG_LGE_THERMALE_CHG_CONTROL
+#if defined(CONFIG_CHARGER_UNIFIED_WLC)
+#define CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+#endif
 
 #define DC_IUSB_VOLTUV   4000000
 #if defined(CONFIG_BQ24192_CHARGER)
@@ -36,12 +39,13 @@ enum lge_battemp_states {
 	CHG_BATTEMP_M10_M5,
 	CHG_BATTEMP_M4_41,
 	CHG_BATTEMP_42_45,
-	CHG_BATTEMP_46_OT,
+	CHG_BATTEMP_46_51,
+	CHG_BATTEMP_52_OT,
 	CHG_BATTEMP_AB_OT,
 
 };
 
-/*                     */
+/* LGE charging states */
 enum lge_charging_states {
 	CHG_BATT_NORMAL_STATE,
 	CHG_BATT_DECCUR_STATE,
@@ -49,7 +53,7 @@ enum lge_charging_states {
 	CHG_BATT_STPCHG_STATE,
 };
 
-/*                            */
+/* LGE charging states change */
 enum lge_states_changes {
 	STS_CHE_NONE,
 	STS_CHE_NORMAL_TO_DECCUR,
@@ -57,9 +61,7 @@ enum lge_states_changes {
 	STS_CHE_DECCUR_TO_NORAML,
 	STS_CHE_DECCUR_TO_STPCHG,
 	STS_CHE_STPCHG_TO_NORMAL,
-#if defined(CONFIG_MACH_MSM8974_Z_US) || defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
 	STS_CHE_STPCHG_TO_DECCUR,
-#endif
 };
 
 /* BTM status */
@@ -75,11 +77,12 @@ struct charging_info {
 	int     is_charger;
 	int     current_now;
 #ifdef CONFIG_LGE_THERMALE_CHG_CONTROL
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+	int		input_current_ma;
+	int		input_current_te;
+#endif
 	int     chg_current_ma;
 	int     chg_current_te;
-#ifdef CONFIG_MACH_MSM8974_B1_KR
-	int     input_current_ma;
-#endif
 #endif
 };
 
@@ -102,5 +105,5 @@ struct batt_temp_table {
 extern void
 lge_monitor_batt_temp(struct charging_info req, struct charging_rsp *res);
 #endif
-/*                            */
+/* __LGE_CHARGING_SCENARIO_H_ */
 

@@ -34,7 +34,7 @@
 #include <linux/leds-lp5521.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_KDDI )|| defined(CONFIG_MACH_MSM8974_Z_TMO_US)|| defined(CONFIG_MACH_MSM8974_Z_SPR)|| defined(CONFIG_MACH_MSM8974_Z_ATT_US) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 #include <mach/board_lge.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
@@ -53,32 +53,21 @@
 #define LP5521_REG_ENABLE		0x00
 #define LP5521_REG_OP_MODE		0x01
 #define LP5521_REG_R_PWM		0x02
+#define LP5521_REG_G_PWM		0x03
+#define LP5521_REG_B_PWM		0x04
 #define LP5521_REG_R_CURRENT		0x05
+#define LP5521_REG_G_CURRENT		0x06
+#define LP5521_REG_B_CURRENT		0x07
 #define LP5521_REG_CONFIG		0x08
 #define LP5521_REG_R_CHANNEL_PC		0x09
+#define LP5521_REG_G_CHANNEL_PC		0x0A
+#define LP5521_REG_B_CHANNEL_PC		0x0B
 #define LP5521_REG_STATUS		0x0C
 #define LP5521_REG_RESET		0x0D
 #define LP5521_REG_GPO			0x0E
 #define LP5521_REG_R_PROG_MEM		0x10
-#if defined(CONFIG_MACH_MSM8974_VU3_KR)
-#define LP5521_REG_G_PWM		0x04
-#define LP5521_REG_B_PWM		0x03
-#define LP5521_REG_G_CURRENT		0x07
-#define LP5521_REG_B_CURRENT		0x06
-#define LP5521_REG_G_CHANNEL_PC		0x0B
-#define LP5521_REG_B_CHANNEL_PC		0x0A
-#define LP5521_REG_G_PROG_MEM		0x50
-#define LP5521_REG_B_PROG_MEM		0x30
-#else
-#define LP5521_REG_G_PWM		0x03
-#define LP5521_REG_B_PWM		0x04
-#define LP5521_REG_G_CURRENT		0x06
-#define LP5521_REG_B_CURRENT		0x07
-#define LP5521_REG_G_CHANNEL_PC		0x0A
-#define LP5521_REG_B_CHANNEL_PC		0x0B
 #define LP5521_REG_G_PROG_MEM		0x30
 #define LP5521_REG_B_PROG_MEM		0x50
-#endif
 #define LP5521_PROG_MEM_BASE		LP5521_REG_R_PROG_MEM
 #define LP5521_PROG_MEM_SIZE		0x20
 
@@ -192,450 +181,57 @@ static const struct lp5521_wait_param lp5521_wait_params[LP5521_CYCLE_MAX] = {
 	},
 };
 
-#if defined(CONFIG_MACH_MSM8974_VU3_KR)
-static struct lp5521_led_config lp5521_led_config_rev_a[] = {
-	{
-		.name = "R",
-		.chan_nr	= 0,
-		.led_current	= 180,
-		.max_current	= 180,
-	},
-	{
-		.name = "B",
-		.chan_nr	= 1,
-		.led_current	= 180,
-		.max_current	= 180,
-	},
-	{
-		.name = "G",
-		.chan_nr	= 2,
-		.led_current	= 180,
-		.max_current	= 180,
-	},
-};
-
-static struct lp5521_led_pattern board_led_patterns_rev_a[] = {
-	{
-		/* ID_POWER_ON = 1 */
-		.r = mode1_red,
-		.g = mode1_green,
-		.b = mode1_blue,
-		.size_r = ARRAY_SIZE(mode1_red),
-		.size_g = ARRAY_SIZE(mode1_green),
-		.size_b = ARRAY_SIZE(mode1_blue),
-	},
-	{
-		/* ID_LCD_ON = 2 */
-		.r = mode2_red,
-		.g = mode2_green,
-		.b = mode2_blue,
-		.size_r = ARRAY_SIZE(mode2_red),
-		.size_g = ARRAY_SIZE(mode2_green),
-		.size_b = ARRAY_SIZE(mode2_blue),
-		},
-	{
-		/* ID_CHARGING = 3 */
-		.r = mode3_red,
-		.size_r = ARRAY_SIZE(mode3_red),
-	},
-	{
-		/* ID_CHARGING_FULL = 4 */
-		.g = mode4_green,
-		.size_g = ARRAY_SIZE(mode4_green),
-	},
-	{
-		/* ID_CALENDAR_REMIND = 5 */
-		.r = mode5_red_rev_a,
-		.g = mode5_green_rev_a,
-		.size_r = ARRAY_SIZE(mode5_red_rev_a),
-		.size_g = ARRAY_SIZE(mode5_green_rev_a),
-	},
-	{
-		/* ID_POWER_OFF = 6 */
-		.r = mode6_red,
-		.g = mode6_green,
-		.b = mode6_blue,
-		.size_r = ARRAY_SIZE(mode6_red),
-		.size_g = ARRAY_SIZE(mode6_green),
-		.size_b = ARRAY_SIZE(mode6_blue),
-	},
-	{
-		/* ID_MISSED_NOTI = 7 */
-		.r = mode7_red,
-		.g = mode7_green,
-		.b = mode7_blue,
-		.size_r = ARRAY_SIZE(mode7_red),
-		.size_g = ARRAY_SIZE(mode7_green),
-		.size_b = ARRAY_SIZE(mode7_blue),
-	},
-
-	/* for dummy pattern IDs (defined LGLedRecord.java) */
-	{
-		/* ID_ALARM = 8 */
-	},
-	{
-		/* ID_CALL_01 = 9 */
-	},
-	{
-		/* ID_CALL_02 = 10 */
-	},
-	{
-		/* ID_CALL_03 = 11 */
-	},
-	{
-		/* ID_VOLUME_UP = 12 */
-	},
-	{
-		/* ID_VOLUME_DOWN = 13 */
-	},
-
-	{
-		/* ID_FAVORITE_MISSED_NOTI = 14 */
-		.r = mode8_red,
-		.g = mode8_green,
-		.b = mode8_blue,
-		.size_r = ARRAY_SIZE(mode8_red),
-		.size_g = ARRAY_SIZE(mode8_green),
-		.size_b = ARRAY_SIZE(mode8_blue),
-	},
-	{
-		/* CHARGING_100_FOR_ATT = 15 (use chargerlogo, only AT&T) */
-		.g = mode4_green_50,
-		.size_g = ARRAY_SIZE(mode4_green_50),
-	},
-	{
-		/* CHARGING_FOR_ATT = 16 (use chargerlogo, only AT&T) */
-		.r = mode3_red_50,
-		.size_r = ARRAY_SIZE(mode3_red_50),
-	},
-	{
-		/* ID_MISSED_NOTI_PINK = 17 */
-		.r = mode9_red_rev_a,
-		.g = mode9_green_rev_a,
-		.b = mode9_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode9_red_rev_a),
-		.size_g = ARRAY_SIZE(mode9_green_rev_a),
-		.size_b = ARRAY_SIZE(mode9_blue_rev_a),
-	},
-	{
-		/* ID_MISSED_NOTI_BLUE = 18 */
-		.r = mode10_red,
-		.g = mode10_green,
-		.b = mode10_blue,
-		.size_r = ARRAY_SIZE(mode10_red),
-		.size_g = ARRAY_SIZE(mode10_green),
-		.size_b = ARRAY_SIZE(mode10_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_ORANGE = 19 */
-		.r = mode11_red_rev_a,
-		.g = mode11_green_rev_a,
-		.b = mode11_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode11_red_rev_a),
-		.size_g = ARRAY_SIZE(mode11_green_rev_a),
-		.size_b = ARRAY_SIZE(mode11_blue_rev_a),
-	},
-	{
-		/* ID_MISSED_NOTI_YELLOW = 20 */
-		.r = mode12_red_rev_a,
-		.g = mode12_green_rev_a,
-		.b = mode12_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode12_red_rev_a),
-		.size_g = ARRAY_SIZE(mode12_green_rev_a),
-		.size_b = ARRAY_SIZE(mode12_blue_rev_a),
-	},
-	/* for dummy pattern IDs (defined LGLedRecord.java) */
-	{
-		/* ID_INCALL_PINK = 21 */
-	},
-	{
-		/* ID_INCALL_BLUE = 22 */
-	},
-	{
-		/* ID_INCALL_ORANGE = 23 */
-	},
-	{
-		/* ID_INCALL_YELLOW = 24 */
-	},
-	{
-		/* ID_INCALL_TURQUOISE = 25 */
-	},
-	{
-		/* ID_INCALL_PURPLE = 26 */
-	},
-	{
-		/* ID_INCALL_RED = 27 */
-	},
-	{
-		/* ID_INCALL_LIME = 28 */
-	},
-	{
-		/* ID_MISSED_NOTI_TURQUOISE = 29 */
-		.r = mode13_red_rev_a,
-		.g = mode13_green_rev_a,
-		.b = mode13_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode13_red_rev_a),
-		.size_g = ARRAY_SIZE(mode13_green_rev_a),
-		.size_b = ARRAY_SIZE(mode13_blue_rev_a),
-	},
-	{
-		/* ID_MISSED_NOTI_PURPLE = 30 */
-		.r = mode14_red_rev_a,
-		.g = mode14_green_rev_a,
-		.b = mode14_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode14_red_rev_a),
-		.size_g = ARRAY_SIZE(mode14_green_rev_a),
-		.size_b = ARRAY_SIZE(mode14_blue_rev_a),
-	},
-	{
-		/* ID_MISSED_NOTI_RED = 31 */
-		.r = mode15_red,
-		.g = mode15_green,
-		.b = mode15_blue,
-		.size_r = ARRAY_SIZE(mode15_red),
-		.size_g = ARRAY_SIZE(mode15_green),
-		.size_b = ARRAY_SIZE(mode15_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_LIME = 32 */
-		.r = mode16_red_rev_a,
-		.g = mode16_green_rev_a,
-		.b = mode16_blue_rev_a,
-		.size_r = ARRAY_SIZE(mode16_red_rev_a),
-		.size_g = ARRAY_SIZE(mode16_green_rev_a),
-		.size_b = ARRAY_SIZE(mode16_blue_rev_a),
-	},
-};
-
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA)
 static struct lp5521_led_config lp5521_led_config[] = {
 	{
 		.name = "R",
 		.chan_nr	= 0,
-		.led_current	= 180,
-		.max_current	= 180,
+		.led_current	= 25,
+		.max_current	= 25,
 	},
 	{
 		.name = "G",
 		.chan_nr	= 1,
-		.led_current	= 180,
-		.max_current	= 180,
+		.led_current	= 120,
+		.max_current	= 120,
 	},
 	{
 		.name = "B",
 		.chan_nr	= 2,
-		.led_current	= 180,
-		.max_current	= 180,
+		.led_current	= 90,
+		.max_current	= 90,
 	},
 };
-
-static struct lp5521_led_pattern board_led_patterns[] = {
-	{
-		/* ID_POWER_ON = 1 */
-		.r = mode1_red,
-		.g = mode1_green,
-		.b = mode1_blue,
-		.size_r = ARRAY_SIZE(mode1_red),
-		.size_g = ARRAY_SIZE(mode1_green),
-		.size_b = ARRAY_SIZE(mode1_blue),
-	},
-	{
-		/* ID_LCD_ON = 2 */
-		.r = mode2_red,
-		.g = mode2_green,
-		.b = mode2_blue,
-		.size_r = ARRAY_SIZE(mode2_red),
-		.size_g = ARRAY_SIZE(mode2_green),
-		.size_b = ARRAY_SIZE(mode2_blue),
-		},
-	{
-		/* ID_CHARGING = 3 */
-		.r = mode3_red,
-		.size_r = ARRAY_SIZE(mode3_red),
-	},
-	{
-		/* ID_CHARGING_FULL = 4 */
-		.g = mode4_green,
-		.size_g = ARRAY_SIZE(mode4_green),
-	},
-	{
-		/* ID_CALENDAR_REMIND = 5 */
-		.r = mode5_red,
-		.g = mode5_green,
-		.size_r = ARRAY_SIZE(mode5_red),
-		.size_g = ARRAY_SIZE(mode5_green),
-	},
-	{
-		/* ID_POWER_OFF = 6 */
-		.r = mode6_red,
-		.g = mode6_green,
-		.b = mode6_blue,
-		.size_r = ARRAY_SIZE(mode6_red),
-		.size_g = ARRAY_SIZE(mode6_green),
-		.size_b = ARRAY_SIZE(mode6_blue),
-	},
-	{
-		/* ID_MISSED_NOTI = 7 */
-		.r = mode7_red,
-		.g = mode7_green,
-		.b = mode7_blue,
-		.size_r = ARRAY_SIZE(mode7_red),
-		.size_g = ARRAY_SIZE(mode7_green),
-		.size_b = ARRAY_SIZE(mode7_blue),
-	},
-
-	/* for dummy pattern IDs (defined LGLedRecord.java) */
-	{
-		/* ID_ALARM = 8 */
-	},
-	{
-		/* ID_CALL_01 = 9 */
-	},
-	{
-		/* ID_CALL_02 = 10 */
-	},
-	{
-		/* ID_CALL_03 = 11 */
-	},
-	{
-		/* ID_VOLUME_UP = 12 */
-	},
-	{
-		/* ID_VOLUME_DOWN = 13 */
-	},
-
-	{
-		/* ID_FAVORITE_MISSED_NOTI = 14 */
-		.r = mode8_red,
-		.g = mode8_green,
-		.b = mode8_blue,
-		.size_r = ARRAY_SIZE(mode8_red),
-		.size_g = ARRAY_SIZE(mode8_green),
-		.size_b = ARRAY_SIZE(mode8_blue),
-	},
-	{
-		/* CHARGING_100_FOR_ATT = 15 (use chargerlogo, only AT&T) */
-		.g = mode4_green_50,
-		.size_g = ARRAY_SIZE(mode4_green_50),
-	},
-	{
-		/* CHARGING_FOR_ATT = 16 (use chargerlogo, only AT&T) */
-		.r = mode3_red_50,
-		.size_r = ARRAY_SIZE(mode3_red_50),
-	},
-	{
-		/* ID_MISSED_NOTI_PINK = 17 */
-		.r = mode9_red,
-		.g = mode9_green,
-		.b = mode9_blue,
-		.size_r = ARRAY_SIZE(mode9_red),
-		.size_g = ARRAY_SIZE(mode9_green),
-		.size_b = ARRAY_SIZE(mode9_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_BLUE = 18 */
-		.r = mode10_red,
-		.g = mode10_green,
-		.b = mode10_blue,
-		.size_r = ARRAY_SIZE(mode10_red),
-		.size_g = ARRAY_SIZE(mode10_green),
-		.size_b = ARRAY_SIZE(mode10_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_ORANGE = 19 */
-		.r = mode11_red,
-		.g = mode11_green,
-		.b = mode11_blue,
-		.size_r = ARRAY_SIZE(mode11_red),
-		.size_g = ARRAY_SIZE(mode11_green),
-		.size_b = ARRAY_SIZE(mode11_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_YELLOW = 20 */
-		.r = mode12_red,
-		.g = mode12_green,
-		.b = mode12_blue,
-		.size_r = ARRAY_SIZE(mode12_red),
-		.size_g = ARRAY_SIZE(mode12_green),
-		.size_b = ARRAY_SIZE(mode12_blue),
-	},
-	/* for dummy pattern IDs (defined LGLedRecord.java) */
-	{
-		/* ID_INCALL_PINK = 21 */
-	},
-	{
-		/* ID_INCALL_BLUE = 22 */
-	},
-	{
-		/* ID_INCALL_ORANGE = 23 */
-	},
-	{
-		/* ID_INCALL_YELLOW = 24 */
-	},
-	{
-		/* ID_INCALL_TURQUOISE = 25 */
-	},
-	{
-		/* ID_INCALL_PURPLE = 26 */
-	},
-	{
-		/* ID_INCALL_RED = 27 */
-	},
-	{
-		/* ID_INCALL_LIME = 28 */
-	},
-	{
-		/* ID_MISSED_NOTI_TURQUOISE = 29 */
-		.r = mode13_red,
-		.g = mode13_green,
-		.b = mode13_blue,
-		.size_r = ARRAY_SIZE(mode13_red),
-		.size_g = ARRAY_SIZE(mode13_green),
-		.size_b = ARRAY_SIZE(mode13_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_PURPLE = 30 */
-		.r = mode14_red,
-		.g = mode14_green,
-		.b = mode14_blue,
-		.size_r = ARRAY_SIZE(mode14_red),
-		.size_g = ARRAY_SIZE(mode14_green),
-		.size_b = ARRAY_SIZE(mode14_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_RED = 31 */
-		.r = mode15_red,
-		.g = mode15_green,
-		.b = mode15_blue,
-		.size_r = ARRAY_SIZE(mode15_red),
-		.size_g = ARRAY_SIZE(mode15_green),
-		.size_b = ARRAY_SIZE(mode15_blue),
-	},
-	{
-		/* ID_MISSED_NOTI_LIME = 32 */
-		.r = mode16_red,
-		.g = mode16_green,
-		.b = mode16_blue,
-		.size_r = ARRAY_SIZE(mode16_red),
-		.size_g = ARRAY_SIZE(mode16_green),
-		.size_b = ARRAY_SIZE(mode16_blue),
-	},
-};
-
-#else
-
+#elif defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
+/* for HW rev.1.0 or higher */
 static struct lp5521_led_config lp5521_led_config[] = {
 	{
-#if defined(CONFIG_MACH_MSM8974_B1_KR)
 		.name = "R",
 		.chan_nr	= 0,
 		.led_current	= 37,
-		.max_current	= 180,
-#else
-		.name = "R",
-		.chan_nr	= 0,
+		.max_current	= 37,
+	},
+	{
+		.name = "G",
+		.chan_nr	= 1,
 		.led_current	= 180,
 		.max_current	= 180,
-#endif	
+	},
+	{
+		.name = "B",
+		.chan_nr	= 2,
+		.led_current	= 90,
+		.max_current	= 90,
+	},
+};
+
+/* for HW rev.C */
+static struct lp5521_led_config lp5521_led_config_rev_c[] = {
+	{
+		.name = "R",
+		.chan_nr	= 0,
+		.led_current	= 25,
+		.max_current	= 25,
 	},
 	{
 		.name = "G",
@@ -650,6 +246,50 @@ static struct lp5521_led_config lp5521_led_config[] = {
 		.max_current	= 180,
 	},
 };
+
+/* for HW rev.B or lower */
+static struct lp5521_led_config lp5521_led_config_rev_b[] = {
+	{
+		.name = "R",
+		.chan_nr	= 0,
+		.led_current	= 37,
+		.max_current	= 37,
+	},
+	{
+		.name = "G",
+		.chan_nr	= 1,
+		.led_current	= 180,
+		.max_current	= 180,
+	},
+	{
+		.name = "B",
+		.chan_nr	= 2,
+		.led_current	= 180,
+		.max_current	= 180,
+	},
+};
+#else
+static struct lp5521_led_config lp5521_led_config[] = {
+	{
+		.name = "R",
+		.chan_nr	= 0,
+		.led_current	= 180,
+		.max_current	= 180,
+	},
+	{
+		.name = "G",
+		.chan_nr	= 1,
+		.led_current	= 180,
+		.max_current	= 180,
+	},
+	{
+		.name = "B",
+		.chan_nr	= 2,
+		.led_current	= 180,
+		.max_current	= 180,
+	},
+};
+#endif
 
 static struct lp5521_led_pattern board_led_patterns[] = {
 	{
@@ -705,7 +345,7 @@ static struct lp5521_led_pattern board_led_patterns[] = {
 		.size_g = ARRAY_SIZE(mode7_green),
 		.size_b = ARRAY_SIZE(mode7_blue),
 	},
-#if defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined(CONFIG_MACH_APQ8064_GKOPENHK)  || defined(CONFIG_MACH_APQ8064_GV_KR) || defined(CONFIG_MACH_APQ8064_GKOPENTW) || defined(CONFIG_MACH_APQ8064_GKSHBSG) || defined(CONFIG_MACH_APQ8064_GKOPENEU) || defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_KDDI)|| defined(CONFIG_MACH_MSM8974_Z_TMO_US)|| defined(CONFIG_MACH_MSM8974_Z_SPR)|| defined(CONFIG_MACH_MSM8974_Z_ATT_US) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 	/* for dummy pattern IDs (defined LGLedRecord.java) */
 	{
 		/* ID_ALARM = 8 */
@@ -841,7 +481,7 @@ static struct lp5521_led_pattern board_led_patterns[] = {
 		.size_r = ARRAY_SIZE(mode16_red),
 		.size_g = ARRAY_SIZE(mode16_green),
 		.size_b = ARRAY_SIZE(mode16_blue),
-	},	
+	},
 	{
 		/* ID_NONE = 33 */
 	},
@@ -855,10 +495,21 @@ static struct lp5521_led_pattern board_led_patterns[] = {
 		.b = mode17_blue,
 		.size_r = ARRAY_SIZE(mode17_red),
 		.size_g = ARRAY_SIZE(mode17_green),
-		.size_b = ARRAY_SIZE(mode17_blue),		
-	},	
+		.size_b = ARRAY_SIZE(mode17_blue),
+	},
+	{
+		/* ID_NONE = 36 */
+	},
+	{
+		/* ID_URGENT_CALL_MISSED_NOTI = 37 */
+		.r = mode18_red,
+		.g = mode18_green,
+		.b = mode18_blue,
+		.size_r = ARRAY_SIZE(mode18_red),
+		.size_g = ARRAY_SIZE(mode18_green),
+		.size_b = ARRAY_SIZE(mode18_blue),
+	},
 };
-#endif
 
 #define LP5521_CONFIGS	(LP5521_PWM_HF | LP5521_PWRSAVE_EN | \
 			LP5521_CP_MODE_AUTO | \
@@ -876,17 +527,15 @@ static void lp5521_enable(bool state)
 		return;
 	}
 
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-        if(state){
-	        gpio_set_value(chip->rgb_led_en, 1);
-	        LP5521_INFO_MSG("LP5521: [%s] RGB_EN(gpio #%d) set to HIGH\n", __func__, chip->rgb_led_en);
-        }
-        else{
-	        gpio_set_value(chip->rgb_led_en, 0);
-	        LP5521_INFO_MSG("LP5521: [%s] RGB_EN(gpio #%d) set to LOW\n", __func__, chip->rgb_led_en);
-        }
-    }
+    if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (state) {
+			gpio_set_value(chip->rgb_led_en, 1);
+			LP5521_INFO_MSG("LP5521: [%s] RGB_EN(gpio #%d) set to HIGH\n", __func__, chip->rgb_led_en);
+		} else {
+			gpio_set_value(chip->rgb_led_en, 0);
+			LP5521_INFO_MSG("LP5521: [%s] RGB_EN(gpio #%d) set to LOW\n", __func__, chip->rgb_led_en);
+		}
+	}
 	return;
 }
 
@@ -1364,27 +1013,10 @@ static void _run_led_pattern(struct lp5521_chip *chip,
 
 	lp5521_write_program_memory(cl, LP5521_REG_R_PROG_MEM,
 				ptn->r, ptn->size_r);
-#if defined(CONFIG_MACH_MSM8974_VU3_KR)
-    if(lge_get_board_revno() == HW_REV_B)
-    {
-	    lp5521_write_program_memory(cl, LP5521_REG_B_PROG_MEM,
-				ptn->g, ptn->size_g);
-	    lp5521_write_program_memory(cl, LP5521_REG_G_PROG_MEM,
-				ptn->b, ptn->size_b);
-    }
-    else
-    {
-	    lp5521_write_program_memory(cl, LP5521_REG_G_PROG_MEM,
-				ptn->g, ptn->size_g);
-	    lp5521_write_program_memory(cl, LP5521_REG_B_PROG_MEM,
-				ptn->b, ptn->size_b);
-    }
-#else
 	lp5521_write_program_memory(cl, LP5521_REG_G_PROG_MEM,
 				ptn->g, ptn->size_g);
 	lp5521_write_program_memory(cl, LP5521_REG_B_PROG_MEM,
 				ptn->b, ptn->size_b);
-#endif
 
 	lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_RUN);
 	usleep_range(1000, 2000);
@@ -1397,7 +1029,7 @@ static void lp5521_run_led_pattern(int mode, struct lp5521_chip *chip)
 	struct i2c_client *cl = chip->client;
 	int num_patterns = chip->pdata->num_patterns;
 
-#if defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_KDDI) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 	if (mode >= 1000) {
 		mode = mode - 1000;
 	}
@@ -1405,14 +1037,7 @@ static void lp5521_run_led_pattern(int mode, struct lp5521_chip *chip)
 
 	chip->id_pattern_play = mode;
 
-    #ifdef CONFIG_MACH_APQ8064_GVDCM
-	if(mode == PATTERN_FELICA_ON  || mode == PATTERN_GPS_ON)
-	{
-		mode = num_patterns - (PATTERN_GPS_ON - mode);
-	}
-	#endif
-
-#if defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_Z_KR) || defined(CONFIG_MACH_MSM8974_Z_KDDI)|| defined(CONFIG_MACH_MSM8974_Z_TMO_US)|| defined(CONFIG_MACH_MSM8974_Z_SPR)|| defined(CONFIG_MACH_MSM8974_Z_ATT_US) || defined(CONFIG_MACH_MSM8974_B1_KR)
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
 #if 0
 	/* this process is not need, because dummy pattern defined in board file */
 	if (mode == PATTERN_FAVORITE_MISSED_NOTI || mode == PATTERN_CHARGING_COMPLETE_50 || mode == PATTERN_CHARGING_50) {
@@ -1462,6 +1087,7 @@ static ssize_t store_led_pattern(struct device *dev,
 	struct lp5521_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
 	unsigned long val;
 	int ret;
+
 	LP5521_INFO_MSG("[%s] pattern id : %s", __func__, buf);
 
 	ret = strict_strtoul(buf, 10, &val);
@@ -1504,6 +1130,11 @@ static ssize_t store_led_current_index(struct device *dev,
 
 	if (!chip)
 		return 0;
+
+#if defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
+	LP5521_INFO_MSG("[%s] prevent change current_index", __func__);
+	return 0;
+#endif
 
 	chip->current_index = val;
 
@@ -1566,58 +1197,52 @@ static void _set_wait_cmd(struct lp5521_pattern_cmd *cmd,
 	WARN_ON(!cmd_msb);
 	WARN_ON(loop > 64);
 
-        if(off)
-        {
-            if(loop > 1)
-            {
-                if(loop > 128)
-                    loop = 128;
+	if (off) {
+		if (loop > 1) {
+			if (loop > 128)
+				loop = 128;
 
-                lsb = ((loop-1) & 0xff) | 0x80;
-                /* wait command */
-                cmd->r[cmd->pc_r++] = cmd_msb;
-                cmd->r[cmd->pc_r++] = lsb;
-                cmd->g[cmd->pc_g++] = cmd_msb;
-                cmd->g[cmd->pc_g++] = lsb;
-                cmd->b[cmd->pc_b++] = cmd_msb;
-                cmd->b[cmd->pc_b++] = lsb;
-            }
-            else
-            {
-                /* wait command */
-                cmd->r[cmd->pc_r++] = cmd_msb;
-                cmd->r[cmd->pc_r++] = CMD_WAIT_LSB;
-                cmd->g[cmd->pc_g++] = cmd_msb;
-                cmd->g[cmd->pc_g++] = CMD_WAIT_LSB;
-                cmd->b[cmd->pc_b++] = cmd_msb;
-                cmd->b[cmd->pc_b++] = CMD_WAIT_LSB;
-            }
-        }
-        else
-        {
-            /* wait command */
-            cmd->r[cmd->pc_r++] = cmd_msb;
-            cmd->r[cmd->pc_r++] = CMD_WAIT_LSB;
-            cmd->g[cmd->pc_g++] = cmd_msb;
-            cmd->g[cmd->pc_g++] = CMD_WAIT_LSB;
-            cmd->b[cmd->pc_b++] = cmd_msb;
-            cmd->b[cmd->pc_b++] = CMD_WAIT_LSB;
+			lsb = ((loop-1) & 0xff) | 0x80;
+			/* wait command */
+			cmd->r[cmd->pc_r++] = cmd_msb;
+			cmd->r[cmd->pc_r++] = lsb;
+			cmd->g[cmd->pc_g++] = cmd_msb;
+			cmd->g[cmd->pc_g++] = lsb;
+			cmd->b[cmd->pc_b++] = cmd_msb;
+			cmd->b[cmd->pc_b++] = lsb;
+		} else {
+			/* wait command */
+			cmd->r[cmd->pc_r++] = cmd_msb;
+			cmd->r[cmd->pc_r++] = CMD_WAIT_LSB;
+			cmd->g[cmd->pc_g++] = cmd_msb;
+			cmd->g[cmd->pc_g++] = CMD_WAIT_LSB;
+			cmd->b[cmd->pc_b++] = cmd_msb;
+			cmd->b[cmd->pc_b++] = CMD_WAIT_LSB;
+		}
+	} else {
+		/* wait command */
+		cmd->r[cmd->pc_r++] = cmd_msb;
+		cmd->r[cmd->pc_r++] = CMD_WAIT_LSB;
+		cmd->g[cmd->pc_g++] = cmd_msb;
+		cmd->g[cmd->pc_g++] = CMD_WAIT_LSB;
+		cmd->b[cmd->pc_b++] = cmd_msb;
+		cmd->b[cmd->pc_b++] = CMD_WAIT_LSB;
 
-            /* branch command : if wait time is bigger than cycle msec,
-                       branch is used for command looping */
-            if (loop > 1) {
-                branch = (5 << 13) | ((loop - 1) << 7) | jump;
-                msb = (branch >> 8) & 0xFF;
-                lsb = branch & 0xFF;
+		/* branch command : if wait time is bigger than cycle msec,
+							branch is used for command looping */
+		if (loop > 1) {
+			branch = (5 << 13) | ((loop - 1) << 7) | jump;
+			msb = (branch >> 8) & 0xFF;
+			lsb = branch & 0xFF;
 
-                cmd->r[cmd->pc_r++] = msb;
-                cmd->r[cmd->pc_r++] = lsb;
-                cmd->g[cmd->pc_g++] = msb;
-                cmd->g[cmd->pc_g++] = lsb;
-                cmd->b[cmd->pc_b++] = msb;
-                cmd->b[cmd->pc_b++] = lsb;
-            }
-        }
+			cmd->r[cmd->pc_r++] = msb;
+			cmd->r[cmd->pc_r++] = lsb;
+			cmd->g[cmd->pc_g++] = msb;
+			cmd->g[cmd->pc_g++] = lsb;
+			cmd->b[cmd->pc_b++] = msb;
+			cmd->b[cmd->pc_b++] = lsb;
+		}
+	}
 
 }
 
@@ -1640,8 +1265,8 @@ static ssize_t store_led_blink(struct device *dev,
 	struct lp5521_pattern_cmd cmd = { };
 	u8 jump_pc = 0;
 
-	sscanf(buf, "0x%06x %d %d", &rgb, &on, &off);
-	LP5521_INFO_MSG("[%s] rgb=0x%06x, on=%d, off=%d\n",__func__, rgb, on, off);
+	sscanf(buf, "0x%06x,%d,%d", &rgb, &on, &off);
+	LP5521_INFO_MSG("[%s] rgb=0x%06x, on=%d, off=%d\n", __func__, rgb, on, off);
 	lp5521_run_led_pattern(PATTERN_OFF, chip);
 
 	on = min_t(unsigned int, on, MAX_BLINK_TIME);
@@ -1796,45 +1421,37 @@ static int lp5521_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 
-	int ret =0, i, led;
+	int ret = 0, i, led;
 	u8 buf = 0;
 
 	LP5521_INFO_MSG("[%s] start\n", __func__);
 
 #ifdef CONFIG_OF
-    if (&client->dev.of_node)
-    {
-        chip = devm_kzalloc(&client->dev, sizeof(struct lp5521_chip), GFP_KERNEL);
-        if (!chip)
-        {
-            pr_err("%s: Failed to allocate memory\n", __func__);
-            return -ENOMEM;
-        }
-        if(lge_get_board_revno()> HW_REV_EVB2)
-        {
-            chip->rgb_led_en = of_get_named_gpio(client->dev.of_node, "ti,led_en", 0);
+	if (&client->dev.of_node) {
+		chip = devm_kzalloc(&client->dev, sizeof(struct lp5521_chip), GFP_KERNEL);
+		if (!chip) {
+			pr_err("%s: Failed to allocate memory\n", __func__);
+			return -ENOMEM;
+		}
+		if (lge_get_board_revno() > HW_REV_EVB2) {
+			chip->rgb_led_en = of_get_named_gpio(client->dev.of_node, "ti,led_en", 0);
 			LP5521_INFO_MSG("chip->rgb_led_en ==%d \n", chip->rgb_led_en);
-            if (!gpio_is_valid(chip->rgb_led_en))
-			{
+			if (!gpio_is_valid(chip->rgb_led_en)) {
 				pr_err("Fail to get named gpio for rgb_led_en.\n");
-                goto fail0;
+				goto fail0;
+			} else {
+				ret = gpio_request(chip->rgb_led_en, "rgb_led_en");
+				if (ret) {
+					pr_err("request reset gpio failed, rc=%d\n", ret);
+					gpio_free(chip->rgb_led_en);
+					goto fail0;
+				}
 			}
-            else
-            {
-                ret = gpio_request(chip->rgb_led_en, "rgb_led_en");
-                if(ret) {
-                    pr_err("request reset gpio failed, rc=%d\n", ret);
-                    gpio_free(chip->rgb_led_en);
-                    goto fail0;
-                }
-            }
-        }
-    }
-    else
-    {
-        dev_err(&client->dev, "lp5521 probe of_node fail\n");
-        return -ENODEV;
-    }
+		}
+	} else {
+		dev_err(&client->dev, "lp5521 probe of_node fail\n");
+		return -ENODEV;
+	}
 #else
 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip) {
@@ -1848,43 +1465,25 @@ static int lp5521_probe(struct i2c_client *client,
 
 	mutex_init(&chip->lock);
 
-#if defined(CONFIG_MACH_MSM8974_VU3_KR)
-    if(lge_get_board_revno() != HW_REV_B)
-    {
-        lp5521_pdata.led_config = lp5521_led_config_rev_a;
-        lp5521_pdata.patterns = board_led_patterns_rev_a;
-    }
+
+#if defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W)
+	if (lge_get_board_revno() < HW_REV_1_0) {
+		lp5521_pdata.led_config = lp5521_led_config_rev_c;
+		LP5521_INFO_MSG("[%s] lp5521_led_config_rev_c!\n", __func__);
+	} else	if (lge_get_board_revno() <= HW_REV_B) {
+		lp5521_pdata.led_config = lp5521_led_config_rev_b;
+		LP5521_INFO_MSG("[%s] lp5521_led_config_rev_b!\n", __func__);
+	} else{
+	}
 #endif
 
 	chip->pdata = &lp5521_pdata;
 
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-        gpio_set_value((chip->rgb_led_en), 0);
-        usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-#ifdef CONFIG_MACH_MSM8974_Z_KR		
-        if(lge_get_board_revno() >= HW_REV_E)
-        {
-            gpio_set_value((chip->rgb_led_en), 1);
-            usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-        }
-#elif defined(CONFIG_MACH_MSM8974_Z_KDDI)|| defined(CONFIG_MACH_MSM8974_Z_ATT_US)
-        if(lge_get_board_revno() >= HW_REV_B)
-        {
-            gpio_set_value((chip->rgb_led_en), 1);
-            usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-        }
-#elif defined(CONFIG_MACH_MSM8974_Z_TMO_US)|| defined(CONFIG_MACH_MSM8974_Z_SPR)
-        if(lge_get_board_revno() >= HW_REV_D)
-        {
-            gpio_set_value((chip->rgb_led_en), 1);
-            usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-        }
-#else	  	
-        gpio_set_value((chip->rgb_led_en), 1);
-        usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-#endif		
-    }
+    gpio_set_value((chip->rgb_led_en), 0);
+    usleep_range(1000, 2000); /* Keep enable down at least 1ms */
+
+    gpio_set_value((chip->rgb_led_en), 1);
+    usleep_range(1000, 2000); /* Keep enable down at least 1ms */
 
 	lp5521_write(client, LP5521_REG_RESET, 0xff);
 	usleep_range(10000, 20000); /*
@@ -1956,8 +1555,8 @@ static int lp5521_probe(struct i2c_client *client,
 		goto fail2;
 	}
 
-#if !defined(CONFIG_MACH_MSM8974_Z_KR) && !defined(CONFIG_MACH_MSM8974_Z_KDDI)&& !defined(CONFIG_MACH_MSM8974_Z_TMO_US)&& !defined(CONFIG_MACH_MSM8974_Z_SPR)&& !defined(CONFIG_MACH_MSM8974_Z_ATT_US) && !defined(CONFIG_MACH_MSM8974_B1_KR)
-	lp5521_run_led_pattern(1, chip); //1: Power On pattern number
+#if !(defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W))
+	lp5521_run_led_pattern(1, chip); /* 1: Power On pattern number */
 	LP5521_INFO_MSG("[%s] pattern id : 1(Power on)", __func__);
 	LP5521_INFO_MSG("[%s] complete\n", __func__);
 #endif
@@ -1969,13 +1568,12 @@ fail2:
 		cancel_work_sync(&chip->leds[i].brightness_work);
 	}
 fail1:
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-        if (lp5521_pdata.enable)
-	        lp5521_pdata.enable(0);
-    }
+	if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (lp5521_pdata.enable)
+			lp5521_pdata.enable(0);
+	}
 fail0:
-    gpio_free(chip->rgb_led_en);
+	gpio_free(chip->rgb_led_en);
 
 	return ret;
 }
@@ -1994,11 +1592,10 @@ static int lp5521_remove(struct i2c_client *client)
 		cancel_work_sync(&chip->leds[i].brightness_work);
 	}
 
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-        if (chip->pdata->enable)
-	        chip->pdata->enable(0);
-    }
+	if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (chip->pdata->enable)
+			chip->pdata->enable(0);
+	}
 	if (chip->pdata->release_resources)
 		chip->pdata->release_resources();
 
@@ -2029,11 +1626,10 @@ static void lp5521_shutdown(struct i2c_client *client)
 		cancel_work_sync(&chip->leds[i].brightness_work);
 	}
 
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-	    if (chip->pdata->enable)
-		    chip->pdata->enable(0);
-    }
+	if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (chip->pdata->enable)
+			chip->pdata->enable(0);
+	}
 	if (chip->pdata->release_resources)
 		chip->pdata->release_resources();
 
@@ -2051,13 +1647,12 @@ static int lp5521_suspend(struct i2c_client *client, pm_message_t mesg)
 }
 
 	LP5521_INFO_MSG("[%s] id_pattern_play = %d\n", __func__, chip->id_pattern_play);
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-	    if (chip->pdata->enable && chip->id_pattern_play == PATTERN_OFF) {
-		    LP5521_INFO_MSG("[%s] RGB_EN set to LOW\n", __func__);
-		    chip->pdata->enable(0);
-	    }
-    }
+	if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (chip->pdata->enable && chip->id_pattern_play == PATTERN_OFF) {
+			LP5521_INFO_MSG("[%s] RGB_EN set to LOW\n", __func__);
+			chip->pdata->enable(0);
+		}
+	}
 	return 0;
 }
 
@@ -2073,34 +1668,33 @@ static int lp5521_resume(struct i2c_client *client)
 
 	LP5521_INFO_MSG("[%s] id_pattern_play = %d\n", __func__, chip->id_pattern_play);
 
-    if(lge_get_board_revno()> HW_REV_EVB2)
-    {
-	    if (chip->pdata->enable && chip->id_pattern_play == PATTERN_OFF) {
-		    LP5521_INFO_MSG("[%s] RGB_EN set to HIGH\n", __func__);
-		    chip->pdata->enable(0);
-		    usleep_range(1000, 2000); /* Keep enable down at least 1ms */
-		    chip->pdata->enable(1);
-		    usleep_range(1000, 2000); /* 500us abs min. */
-		    lp5521_write(client, LP5521_REG_RESET, 0xff);
-		    usleep_range(10000, 20000);
-		    ret = lp5521_configure(client);
-		    if (ret < 0) {
-			    dev_err(&client->dev, "error configuring chip\n");
-		    }
-        }
-    }
-    else
-    {
-	    if (chip->id_pattern_play == PATTERN_OFF) {
-		    LP5521_INFO_MSG("[%s] RGB_EN set to HIGH\n", __func__);
-		    lp5521_write(client, LP5521_REG_RESET, 0xff);
-		    usleep_range(10000, 20000);
-		    ret = lp5521_configure(client);
-		    if (ret < 0) {
-			    dev_err(&client->dev, "error configuring chip\n");
-            }
-        }
-    }
+	if (lge_get_board_revno() > HW_REV_EVB2) {
+		if (chip->pdata->enable && chip->id_pattern_play == PATTERN_OFF) {
+			LP5521_INFO_MSG("[%s] RGB_EN set to HIGH\n", __func__);
+			chip->pdata->enable(0);
+			usleep_range(1000, 2000); /* Keep enable down at least 1ms */
+			chip->pdata->enable(1);
+			usleep_range(1000, 2000); /* 500us abs min. */
+#if !(defined(CONFIG_MACH_MSM8974_G3_LGU) || defined(CONFIG_MACH_MSM8974_G3_SKT) || defined(CONFIG_MACH_MSM8974_G3_KT) || defined(CONFIG_MACH_MSM8974_G3_ATT) || defined(CONFIG_MACH_MSM8974_G3_VZW) || defined(CONFIG_MACH_MSM8974_G3_SPR_US) || defined(CONFIG_MACH_MSM8974_G3_USC_US) || defined(CONFIG_MACH_MSM8974_G3_ACG_US) || defined(CONFIG_MACH_MSM8974_G3_TMO_US) || defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_CN) || defined(CONFIG_MACH_MSM8974_G3_CA) || defined(CONFIG_MACH_MSM8974_G3_LRA) || defined(CONFIG_MACH_MSM8974_B1_KR) || defined(CONFIG_MACH_MSM8974_B1W))
+			lp5521_write(client, LP5521_REG_RESET, 0xff);
+			usleep_range(10000, 20000);
+			ret = lp5521_configure(client);
+			if (ret < 0) {
+				dev_err(&client->dev, "error configuring chip\n");
+			}
+#endif
+		}
+	} else {
+		if (chip->id_pattern_play == PATTERN_OFF) {
+			LP5521_INFO_MSG("[%s] RGB_EN set to HIGH\n", __func__);
+			lp5521_write(client, LP5521_REG_RESET, 0xff);
+			usleep_range(10000, 20000);
+			ret = lp5521_configure(client);
+			if (ret < 0) {
+				dev_err(&client->dev, "error configuring chip\n");
+			}
+		}
+	}
 
 	return ret;
 }
@@ -2119,7 +1713,7 @@ static struct of_device_id lp5521_match_table[] = {
 
 static struct i2c_driver lp5521_driver = {
 	.driver = {
-        .owner  = THIS_MODULE,
+		.owner  = THIS_MODULE,
 		.name	= "lp5521",
 #ifdef CONFIG_OF
 		.of_match_table = lp5521_match_table,

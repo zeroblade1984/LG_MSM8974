@@ -6,8 +6,8 @@
  * This section contains comments describing changes made to the module.
  * Notice that changes are listed in reverse chronological order.
  *
- * when			model		who			what
- * 10.27.2009		android		inb612		Create for Android platform
+ * when            model        who            what
+ * 10.27.2009        android        inb612        Create for Android platform
 ====================================================================**/
 #ifndef _BROADCAST_FC8050_H_
 #define _BROADCAST_FC8050_H_
@@ -15,14 +15,14 @@
 
 typedef struct
 {
-	void		(*tdmb_pwr_on)(void);
-	void		(*tdmb_pwr_off)(void);
+    void        (*tdmb_pwr_on)(void);
+    void        (*tdmb_pwr_off)(void);
 }broadcast_pwr_func;
 
 struct broadcast_tdmb_data
 {
-	void (*pwr_on)(void);
-	void (*pwr_off)(void);
+    void (*pwr_on)(void);
+    void (*pwr_off)(void);
 };
 
 
@@ -39,4 +39,3 @@ int tdmb_fc8050_spi_write_read(uint8* tx_data, int tx_length, uint8 *rx_data, in
 void tdmb_fc8050_set_userstop(int mode);
 int tdmb_fc8050_tdmb_is_on(void);
 #endif
-

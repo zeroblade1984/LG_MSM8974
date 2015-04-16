@@ -1,12 +1,16 @@
+/* LGE_CHANGE_S seunghyun.kwak@lge.com 2013-10-16 B2 brinup */
+//#include "pn544_lge_hwadapter.h"
+#include <linux/nfc/pn544_lge_hwadapter.h>
+/* LGE_CHANGE_E seunghyun.kwak@lge.com 2013-10-16 B2 brinup */
 
-#include "pn544_lge_hwadapter.h"
 
 bool pn544_validate_boot_mode(void) {
     enum lge_boot_mode_type boot_mode;
     boot_mode = lge_get_boot_mode();
 	printk("pn544_probe() boot_mode : %d\n",boot_mode);
-    if (boot_mode == LGE_BOOT_MODE_FACTORY || boot_mode == LGE_BOOT_MODE_FACTORY2 || boot_mode == LGE_BOOT_MODE_MINIOS) {
-        printk("boot_mode :LGE_BOOT_MODE_FACTORY or LGE_BOOT_MODE_FACTORY2 or LGE_BOOT_MODE_MINIOS\n");
+    if (boot_mode == LGE_BOOT_MODE_FACTORY || boot_mode == LGE_BOOT_MODE_FACTORY2)
+    {
+        printk("boot_mode == LGE_BOOT_MODE_FACTORY || boot_mode == LGE_BOOT_MODE_FACTORY2\n");
         return true;
     }
     return false;

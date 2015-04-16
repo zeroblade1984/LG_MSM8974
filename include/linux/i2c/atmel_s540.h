@@ -22,10 +22,31 @@
 #define MXT_GESTURE_RECOGNIZE
 #define TSP_PATCH
 #define I2C_SUSPEND_WORKAROUND 1
+#define MXT_LPWG
+#define ALPHA_FW
+#define WAITED_UDF
+#define T100_AREA_REPLACE_AMPLITUDE
+#ifdef T100_AREA_REPLACE_AMPLITUDE
+#define T100_AREA_W_H_IN_2BYTES
+#endif
+#define MXT_TA_TIME
+#define MXT_FACTORY
+#define MXT_WIRELESS
+#define MXT_RECOVERY_RESOLUTION
 
 #ifdef MXT_GESTURE_RECOGNIZE
+#ifdef MXT_LPWG
+#ifdef ALPHA_FW
+#define MXT_LATEST_FW_VERSION       0x50
+#define MXT_LATEST_FW_BUILD         0xF6
+#else
+#define MXT_LATEST_FW_VERSION       0x10
+#define MXT_LATEST_FW_BUILD         0xEE
+#endif
+#else
 #define MXT_LATEST_FW_VERSION       0x10
 #define MXT_LATEST_FW_BUILD         0xE2
+#endif
 #else
 #define MXT_LATEST_FW_VERSION       0x30
 #define MXT_LATEST_FW_BUILD         0xAA
@@ -38,7 +59,6 @@
 #define MXT_MAX_BLOCK_WRITE	256
 
 /* Object types */
-#define MXT_DEBUG_DIAGNOSTIC_T37	37
 #define MXT_GEN_MESSAGE_T5		5
 #define MXT_GEN_MESSAGEPROCESSOR_T5	5
 #define MXT_GEN_COMMAND_T6		6
@@ -46,41 +66,44 @@
 #define MXT_GEN_POWER_T7		7
 #define MXT_GEN_ACQUIRE_T8		8
 #define MXT_TOUCH_KEYARRAY_T15		15
+#define MXT_SPT_COMMSCONFIG_T18		18
+#define MXT_SPT_GPIOPWM_T19		19
 #define MXT_TOUCH_PROXIMITY_T23		23
-#define MXT_TOUCH_MULTITOUCHSCREEN_T100 100
+#define MXT_PROCI_ONETOUCH_T24		24
+#define MXT_SPT_SELFTEST_T25		25
+#define MXT_SPT_PROTOTYPE_T35		35
+#define MXT_DEBUG_DIAGNOSTIC_T37	37
+#define MXT_T37		37
+#define MXT_SPT_USERDATA_T38		38
 #define MXT_PROCI_GRIPSUPPRESSION_T40		40
 #define MXT_PROCI_TOUCHSUPPRESSION_T42	42
+#define MXT_SPT_MESSAGECOUNT_T44	44
+#define MXT_SPT_CTECONFIG_T46		46
 #define MXT_PROCI_STYLUS_T47		47
 #define MXT_PROCI_ADAPTIVETHRESHOLD_T55			55
 #define MXT_PROCI_SHIELDLESS_T56				56
 #define MXT_PROCI_EXTRATOUCHSCREENDATA_T57		57
+#define MXT_SPT_TIMER_T61			61
 #define MXT_PROCI_LENSBENDING_T65				65
+#define MXT_SPT_GOLDENREFERENCES_T66	66
 #define MXT_PROCI_PALMGESTUREPROCESSOR_T69		69
+#define MXT_SPT_DYNAMICCONFIGURATIONCONTROLLER_T70	70
+#define MXT_SPT_DYNAMICCONFIGURATIONCONTAINER_T71	71
 #define MXT_PROCG_NOISESUPPRESSION_T72	72
 #define MXT_GLOVEDETECTION_T78				78
 #define MXT_RETRANSMISSIONCOMPENSATION_T80		80
 #define MXT_PROCI_GESTUREPROCESSOR_T84			84
-#define MXT_PROCI_SCHNOISESUPPRESSION_T103	103
-#define MXT_SPT_COMMSCONFIG_T18		18
-#define MXT_SPT_GPIOPWM_T19		19
-#define MXT_SPT_SELFTEST_T25		25
-#define MXT_SPT_USERDATA_T38		38
-#define MXT_SPT_MESSAGECOUNT_T44	44
-#define MXT_SPT_CTECONFIG_T46		46
-#define MXT_SPT_TIMER_T61			61
-#define MXT_SPT_GOLDENREFERENCES_T66	66
-#define MXT_SPT_DYNAMICCONFIGURATIONCONTROLLER_T70	70
-#define MXT_SPT_DYNAMICCONFIGURATIONCONTAINER_T71	71
-#define MXT_SPT_SELFCAPCBCRCONFIG_T102		102
-#define MXT_SPT_AUXTOUCHCONFIG_T104			104
+#define MXT_T92_NEW	92
+#define MXT_T93_NEW	93
+#define MXT_TOUCH_MULTITOUCHSCREEN_T100 100
 #define MXT_SPT_TOUCHSCREENHOVER_T101		101
+#define MXT_SPT_SELFCAPCBCRCONFIG_T102		102
+#define MXT_PROCI_SCHNOISESUPPRESSION_T103	103
+#define MXT_SPT_AUXTOUCHCONFIG_T104			104
 #define MXT_SPT_DRIVENPLATEHOVERCONFIG_T105	105
-#ifdef MXT_GESTURE_RECOGNIZE
-#define MXT_PROCI_ONETOUCH_T24		24
-#define MXT_SPT_PROTOTYPE_T35		35
-#endif
+#define MXT_RESERVED_T255 255
 
-/* Not for ATMEL S540 */
+/* for 1188s */
 #define MXT_GEN_DATASOURCE_T53		53
 #define MXT_TOUCH_MULTI_T9		9
 #define MXT_TOUCH_MULTITOUCHSCREEN_T9	9
@@ -94,7 +117,6 @@
 #define MXT_SPT_DIGITIZER_T43		43
 #define MXT_SPT_NOISESUPPRESSION_T48	48
 #define MXT_PROCI_ACTIVE_STYLUS_T63	63
-#define MXT_RESERVED_T255 255
 
 /* MXT_GEN_MESSAGE_T5 object */
 #define MXT_RPTID_NOMSG		0xff
@@ -114,6 +136,7 @@
 #define MXT_T6_STATUS_CFGERR	(1 << 3)
 #define MXT_T6_STATUS_COMSERR	(1 << 2)
 
+/* MXT POWER */
 #define MXT_POWER_CFG_RUN		0
 #define MXT_POWER_CFG_DEEPSLEEP		1
 #define MXT_POWER_CFG_KNOCKON	2
@@ -179,8 +202,10 @@
 #define MXT_T100_TCHAUX_VECT	(1 << 0)
 #define MXT_T100_TCHAUX_AMPL	(1 << 1)
 #define MXT_T100_TCHAUX_AREA	(1 << 2)
+#define MXT_T100_TCHAUX_RESV	(1 << 3)
 
 #define MXT_T100_DETECT		(1 << 7)
+#define MXT_T100_FRIST_ID_SUPPRESSION	(1 << 6)
 #define MXT_T100_TYPE_MASK	0x70
 #define MXT_T100_TYPE_FINGER	0x10
 #define MXT_T100_TYPE_STYLUS	0x20
@@ -190,6 +215,14 @@
 #define MXT_T100_PRESS		0x04
 #define MXT_T100_RELEASE	0x05
 #define MXT_T100_MOVE		0x01
+#define MXT_T100_SUPPRESSION		0x03
+
+#ifdef T100_AREA_W_H_IN_2BYTES
+#define MXT_T100_AREA_MASK			0x3F
+#define MXT_T100_WIDTH_MSB_MASK		0xC0
+#define MXT_T100_WIDTH_LSB_MASK		0xE0
+#define MXT_T100_HEIGHT_MASK		0x1F
+#endif
 
 /* Delay times */
 #define MXT_BACKUP_TIME		50	/* msec */
@@ -224,12 +257,57 @@
 #define MXT_PIXELS_PER_MM	20
 
 #ifdef CUST_B_TOUCH
-//                                                           
+// LGE_CHANGE_S [naomi.kim@lge.com] 13.06.17, set data format
 #define TOUCHEVENTFILTER	1
-//                                                           
+// LGE_CHANGE_E [naomi.kim@lge.com] 13.06.17, set data format
 #endif
 
 #define MXT_MAX_FW_PATH				64
+#ifdef MXT_LPWG
+#define MAX_POINT_SIZE_FOR_LPWG	12
+
+struct point
+{
+	int x;
+	int y;
+};
+
+struct quickcover_size
+{
+	int x_max;
+	int y_max;
+	int x_min;
+	int y_min;
+};
+
+enum{
+	LPWG_READ = 1,
+	LPWG_ENABLE,
+	LPWG_LCD_X,
+	LPWG_LCD_Y,
+	LPWG_ACTIVE_AREA_X1,
+	LPWG_ACTIVE_AREA_X2,
+	LPWG_ACTIVE_AREA_Y1,
+	LPWG_ACTIVE_AREA_Y2,
+	LPWG_TAP_COUNT,
+	LPWG_REPLY,
+	LPWG_LENGTH_BETWEEN_TAP,
+	LPWG_EARLY_MODE,
+};
+
+enum{
+	LPWG_NONE = 0,
+	LPWG_DOUBLE_TAP,
+	LPWG_PASSWORD,
+};
+#endif
+
+typedef enum error_type {
+	NO_ERROR = 0,
+	ERROR,
+	IGNORE_EVENT,
+	IGNORE_EVENT_BUT_SAVE_IT,
+} err_t;
 
 enum{
 	KEYGUARD_RESERVED,
@@ -240,6 +318,9 @@ enum{
 enum{
 	TIME_START_TIME,
 	TIME_CURR_TIME,
+	TIME_RESUME_END,
+	TIME_TA_DETECT,
+	TIME_CAL_START,
 	TIME_EX_PROFILE_MAX
 };
 
@@ -264,9 +345,6 @@ enum { MXT_T6 = 0,
 	MXT_T24,
 #endif
 	MXT_T25,
-#ifdef MXT_GESTURE_RECOGNIZE
-	MXT_T35,
-#endif
 	MXT_T40,
 	MXT_T42,
 	MXT_T46,
@@ -281,7 +359,13 @@ enum { MXT_T6 = 0,
 	MXT_T72,
 	MXT_T78,
 	MXT_T80,
+#ifndef ALPHA_FW
 	MXT_T84,
+#endif
+#ifdef MXT_LPWG
+	MXT_T92,
+	MXT_T93,
+#endif
 	MXT_T100,
 	MXT_T101,
 	MXT_T102,
@@ -416,15 +500,12 @@ struct mxt_message {
     u8 reportid;
     u8 message[8];
 };
-
+#endif
 
 struct mxt_reportid {
 	u8 type;
 	u8 index;
 };
-
-
-#endif
 
 struct mxt_anti_info{
 	bool insensitive_th;
@@ -453,7 +534,13 @@ struct mxt_data {
 	struct mxt_anti_info *anti;
 #ifdef TSP_PATCH
 	struct mxt_patch patch;
+#endif
 	struct mxt_reportid *reportids;
+#ifdef MXT_LPWG
+	u8 is_lpwg_report_enable;
+	u8 mxt_password_enable;
+	u8 lpwg_mode;
+	struct quickcover_size *qwindow_size;
 #endif
 	void *raw_info_block;
 	unsigned int irq;
@@ -464,6 +551,7 @@ struct mxt_data {
 	u8 t100_aux_ampl;
 	u8 t100_aux_area;
 	u8 t100_aux_vect;
+	u8 t100_aux_resv;
 	struct bin_attribute mem_access_attr;
 	bool debug_enabled;
 	u8 max_reportid;
@@ -486,6 +574,7 @@ struct mxt_data {
 	int power_status;
 	int ta_status;
 	bool charging_mode;
+	bool charging_wireless;
 	char *fw_name;
 	char *cfg_name;
 #if defined(CONFIG_FB)
@@ -495,7 +584,6 @@ struct mxt_data {
 	/* Cached parameters from object table */
 	u16 T5_address;
 	u8 T5_msg_size;
-	u8 T6_reportid;
 	u16 T6_address;
 	u16 T7_address;
 	u16 T8_address;
@@ -504,28 +592,18 @@ struct mxt_data {
 	u8 T15_reportid_min;
 	u8 T15_reportid_max;
 	u16 T18_address;
-	u8 T19_reportid;
-#ifdef MXT_GESTURE_RECOGNIZE
-	u8 T24_reportid;
-	u8 T35_reportid;
-#endif
-	u8 T25_reportid;
 	u16 T25_address;
-	u8 T42_reportid_min;
-	u8 T42_reportid_max;
+	u16 T42_address;
 	u16 T44_address;
-	u16 T46_address;
 	u16 T47_address;
-	u8 T48_reportid;
-	u16 T56_address;
-	u8 T57_reportid;
-	u8 T61_reportid;
 	u8 T63_reportid_min;
 	u8 T63_reportid_max;
-	u16 T65_address;
-	u16 T72_address;
+#ifdef MXT_LPWG
+	u16 T92_address;
+	u16 T93_address;
+	u8 T93_reportid_min;
+#endif
 	u8 T100_reportid_min;
-	u8 T100_reportid_max;
 	u16 T100_address;
 
 	/* for fw update in bootloader */
@@ -545,6 +623,7 @@ struct mxt_data {
 
 	/* Indicates whether device is in suspend */
 	bool suspended;
+	bool mxt_suspended;
 #ifdef I2C_SUSPEND_WORKAROUND
 	struct delayed_work check_suspended_work;
 #endif
@@ -561,6 +640,13 @@ struct mxt_data {
 #endif
 	bool self_test_result;
 	u8 self_test_status[4];
+#ifdef T100_AREA_REPLACE_AMPLITUDE
+	u8 T100_palm_threshold;
+#endif
+#ifdef WAITED_UDF
+	struct hrtimer multi_tap_timer;
+	struct work_struct  multi_tap_work;
+#endif
 };
 #ifdef TSP_PATCH
 int mxt_write_object(struct mxt_data *data, u8 type, u8 offset, int value);
@@ -572,6 +658,35 @@ extern void mxt_patch_message(struct mxt_data *data, struct mxt_message *message
 extern int mxt_patch_init(struct mxt_data *data, u8* ppatch);
 #endif
 #ifdef I2C_SUSPEND_WORKAROUND
-extern bool i2c_suspended;
+extern bool atmel_touch_i2c_suspended;
 #endif
+
+#define	REPORT_ID_TO_OBJECT(rid, data)			\
+	(((rid) == 0xff) ? 0 : data->reportids[rid].type)
+
+#define DO_IF(do_work, goto_error) 								\
+do {												\
+	if(do_work){ 										\
+		printk(KERN_INFO "[lge_touch E] Action Failed [%s %d] \n", __FUNCTION__, __LINE__); \
+		goto goto_error; 								\
+	}											\
+} while(0)
+
+#define DO_SAFE(do_work, goto_error) 								\
+	DO_IF(unlikely((do_work) < 0), goto_error)
+
+#define TOUCH_INFO_MSG(fmt, args...) \
+		printk(KERN_INFO "[lge_touch] " fmt, ##args);
+
+#define TOUCH_ERR_MSG(fmt, args...) \
+	printk(KERN_ERR "[lge_touch E] [%s %d] " fmt, __FUNCTION__, __LINE__, ##args);
+
+#define TOUCH_DEBUG_MSG(fmt, args...) \
+	printk(KERN_INFO "[lge_touch D] [%s %d] " fmt, __FUNCTION__, __LINE__, ##args);
+
+#define TOUCH_PATCH_MSG(fmt, args...) \
+		;//printk(KERN_INFO "[mxts_patch] " fmt, ##args);		//print too many patch logs
+#define TOUCH_PATCH_ERRMSG(fmt, args...) \
+		;//printk(KERN_ERR "[mxts_patch] " fmt, ##args);
+
 #endif /* __LINUX_ATMEL_MXT_TS_H */

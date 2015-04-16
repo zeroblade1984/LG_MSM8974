@@ -567,7 +567,8 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			   RT_SCOPE_UNIVERSE,
 			   inet->hdrincl ? IPPROTO_RAW : sk->sk_protocol,
 			   inet_sk_flowi_flags(sk) | FLOWI_FLAG_CAN_SLEEP,
-			   daddr, saddr, 0, 0);
+			   daddr, saddr, 0, 0,
+			   sock_i_uid(sk));
 
 	if (!inet->hdrincl) {
 		err = raw_probe_proto_opt(&fl4, msg);
@@ -697,10 +698,6 @@ static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
-	if (ccs_socket_post_recvmsg_permission(sk, skb, flags)) {
-		err = -EAGAIN; /* Hope less harmful than -EPERM. */
-		goto out;
-	}
 
 	copied = skb->len;
 	if (len < copied) {

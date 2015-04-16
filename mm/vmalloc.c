@@ -184,36 +184,6 @@ static int vmap_page_range(unsigned long start, unsigned long end,
 	return ret;
 }
 
-#ifdef ENABLE_VMALLOC_SAVING
-int is_vmalloc_addr(const void *x)
-{
-	struct rb_node *n;
-	struct vmap_area *va;
-	int ret = 0;
-
-	spin_lock(&vmap_area_lock);
-
-	for (n = rb_first(vmap_area_root); n; rb_next(n)) {
-		va = rb_entry(n, struct vmap_area, rb_node);
-		if (x >= va->va_start && x < va->va_end) {
-			ret = 1;
-			break;
-		}
-	}
-
-	spin_unlock(&vmap_area_lock);
-	return ret;
-}
-#else
-int is_vmalloc_addr(const void *x)
-{
-	unsigned long addr = (unsigned long)x;
-
-	return addr >= VMALLOC_START && addr < VMALLOC_END;
-}
-#endif
-EXPORT_SYMBOL(is_vmalloc_addr);
-
 int is_vmalloc_or_module_addr(const void *x)
 {
 	/*
@@ -301,6 +271,47 @@ static unsigned long cached_vstart;
 static unsigned long cached_align;
 
 static unsigned long vmap_area_pcpu_hole;
+
+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+#define POSSIBLE_VMALLOC_START	PAGE_OFFSET
+
+#define VMALLOC_BITMAP_SIZE	((VMALLOC_END - PAGE_OFFSET) >> \
+					PAGE_SHIFT)
+#define VMALLOC_TO_BIT(addr)	((addr - PAGE_OFFSET) >> PAGE_SHIFT)
+#define BIT_TO_VMALLOC(i)	(PAGE_OFFSET + i * PAGE_SIZE)
+
+DECLARE_BITMAP(possible_areas, VMALLOC_BITMAP_SIZE);
+
+void mark_vmalloc_reserved_area(void *x, unsigned long size)
+{
+	unsigned long addr = (unsigned long)x;
+
+	bitmap_set(possible_areas, VMALLOC_TO_BIT(addr), size >> PAGE_SHIFT);
+}
+
+int is_vmalloc_addr(const void *x)
+{
+	unsigned long addr = (unsigned long)x;
+
+	if (addr < POSSIBLE_VMALLOC_START || addr >= VMALLOC_END)
+		return 0;
+
+	if (test_bit(VMALLOC_TO_BIT(addr), possible_areas))
+		return 0;
+
+	return 1;
+}
+#else
+int is_vmalloc_addr(const void *x)
+{
+	unsigned long addr = (unsigned long)x;
+
+	return addr >= VMALLOC_START && addr < VMALLOC_END;
+}
+#endif
+EXPORT_SYMBOL(is_vmalloc_addr);
+
+
 
 static struct vmap_area *__find_vmap_area(unsigned long addr)
 {
@@ -408,12 +419,12 @@ nocache:
 		addr = ALIGN(first->va_end, align);
 		if (addr < vstart)
 			goto nocache;
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 	} else {
 		addr = ALIGN(vstart, align);
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 		n = vmap_area_root.rb_node;
@@ -440,7 +451,7 @@ nocache:
 		if (addr + cached_hole_size < first->va_start)
 			cached_hole_size = first->va_start - addr;
 		addr = ALIGN(first->va_end, align);
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 		n = rb_next(&first->rb_node);
@@ -1555,9 +1566,6 @@ static void __vunmap(const void *addr, int deallocate_pages)
 			struct page *page = area->pages[i];
 
 			BUG_ON(!page);
-#ifdef CONFIG_LGE_MEMORY_INFO
-			__dec_zone_page_state(page, NR_VMALLOC_PAGES);
-#endif
 			__free_page(page);
 		}
 
@@ -1688,9 +1696,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
-#ifdef CONFIG_LGE_MEMORY_INFO
-		__inc_zone_page_state(page, NR_VMALLOC_PAGES);
-#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))

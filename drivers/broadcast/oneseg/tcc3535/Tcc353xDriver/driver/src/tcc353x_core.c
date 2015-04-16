@@ -2748,6 +2748,7 @@ static void Tcc353xGetOpconfigValues(I32S _moduleIndex,
 	I32U tripleBandRfFlag = 0;
 	I32U DIV_NUM_CFG = 0;
 	I32U AGC_TR_SPEED = 3;
+	I32U AID= 1;
 
 	if(Tcc353xHandle[_moduleIndex][0].options.rfType == 
 	   TCC353X_TRIPLE_BAND_RF)
@@ -2759,7 +2760,6 @@ static void Tcc353xGetOpconfigValues(I32S _moduleIndex,
 		DIV_NUM_CFG = 1;
 	else
 		DIV_NUM_CFG = 0;
-
 
 	frequencyForm = ((_frequencyInfo >> 4) & 0xFFFF);
 	S = 1;
@@ -2965,7 +2965,8 @@ static void Tcc353xGetOpconfigValues(I32S _moduleIndex,
 								  1) | (S);
 	_opConfig[1] = 0x368285E5;	/* layer - A only ts resync enable */
 	_opConfig[2] =
-	   (DIV_NUM_CFG<<31) | (AGC_TR_SPEED<<21) | (tripleBandRfFlag<<20) | 
+	   (DIV_NUM_CFG<<31) | (AID<<25) | 
+	   (AGC_TR_SPEED<<21) | (tripleBandRfFlag<<20) | 
 	   (CFO_ER<<18) | (ADC_CLK_CFG << 12) | 
 	   (FP_CLK_CFG << 6) | DIV_CLK_CFG;
 	_opConfig[3] = (FP_GLB_CFG << 16) | (ADC_GLB_CFG);

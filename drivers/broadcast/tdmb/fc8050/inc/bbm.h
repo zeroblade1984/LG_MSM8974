@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : bbm.h
- 
+
  Description : API of dmb baseband module
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/08/29 	jason		initial
+ 2009/08/29     jason        initial
 *******************************************************************************/
 
 #ifndef __BBM_H__
@@ -19,13 +19,13 @@ extern "C" {
 
 #include "fci_types.h"
 
-#define DRIVER_VER 	"VER 3.4.2"
+#define DRIVER_VER     "VER 3.4.2"
 
-#define BBM_HPI		0		// EBI2
-#define BBM_SPI		1		// SPI
-#define BBM_USB		2		// USB
-#define BBM_I2C		3		// I2C
-#define BBM_PPI		4		// PPI
+#define BBM_HPI        0        // EBI2
+#define BBM_SPI        1        // SPI
+#define BBM_USB        2        // USB
+#define BBM_I2C        3        // I2C
+#define BBM_PPI        4        // PPI
 
 extern int BBM_RESET(HANDLE hDevice);
 extern int BBM_PROBE(HANDLE hDevice);
@@ -69,4 +69,3 @@ extern void BBM_ISR(HANDLE hDevice);
 #endif
 
 #endif /* __BBM_H__ */
-

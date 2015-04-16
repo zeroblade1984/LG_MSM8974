@@ -6,7 +6,7 @@
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
  *  Added initrd & change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Moan early if gcc is old, avoiding bogus kernels - Paul Gortmaker, May '96
- *  Simplified starting of init:  Michael A. Griffith <grif@acm.org> 
+ *  Simplified starting of init:  Michael A. Griffith <grif@acm.org>
  */
 
 #include <linux/types.h>
@@ -79,7 +79,9 @@
 #include <asm/smp.h>
 #endif
 
-#include <mach/board_lge.h>	/*                          */
+#ifdef CONFIG_LGE_PM
+#include <linux/qpnp/power-on.h>
+#endif
 
 static int kernel_init(void *);
 
@@ -115,13 +117,6 @@ EXPORT_SYMBOL(system_state);
 #define MAX_INIT_ARGS CONFIG_INIT_ENV_ARG_LIMIT
 #define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
 
-#ifndef CONFIG_MACH_MSM8974_G2_KDDI
-/*                                                                         */
-/*                                       */
-static void smpl_count(void);
-/*                             */
-/*                                                                         */
-#endif
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
 void (*__initdata late_time_init)(void);
@@ -136,7 +131,7 @@ static char *static_command_line;
 
 static char *execute_command;
 static char *ramdisk_execute_command;
-static char miniOS_command[] = "miniOS";	/*                          */
+
 /*
  * If set, this is an indication to the drivers that reset the underlying
  * device before going ahead with the initialization otherwise driver might
@@ -395,76 +390,8 @@ static noinline void __init_refok rest_init(void)
 	cpu_idle();
 }
 
-#ifndef CONFIG_MACH_MSM8974_G2_KDDI
-/*                                                                         */
-/*                                        */
-//                    
-#define PWR_ON_EVENT_KEYPAD			0x80
-#define PWR_ON_EVENT_CABLE			0x40
-#define PWR_ON_EVENT_PON1			0x20
-#define PWR_ON_EVENT_USB            0x10
-#define PWR_ON_EVENT_DC  			0x08
-#define PWR_ON_EVENT_RTC			0x04
-#define PWR_ON_EVENT_SMPL			0x02
-#define PWR_ON_EVENT_HARD_RESET		0x01
 
-
-extern struct file *fget(unsigned int fd);
-extern void fput(struct file *);
-extern uint16_t power_on_status_info_get(void);
-
-static void write_file(char *filename, char* data)
-{
-	int fd = -1;
-	loff_t pos = 0;
-	struct file* file;
-	mm_segment_t old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	fd = sys_open((const char __user *)filename, O_WRONLY | O_CREAT, 0644);
-	printk("[SMPL_CNT] ===> write() : fd is %d\n", fd);
-	if(fd >=0)
-	{
-		file = fget(fd);
-		if(file)
-		{
-			vfs_write(file, data, strlen(data), &pos);
-			fput(file);
-		}
-		sys_close(fd);
-	}
-	else
-	{
-		printk("[SMPL_CNT] === > write : sys_open error!!!!\n");
-	}
-	set_fs(old_fs);
-}
-
-
-static void smpl_count(void)
-{
-	char* file_name = "/smpl_boot";
-	uint16_t boot_cause = 0;
-
-	boot_cause = power_on_status_info_get();
-	printk("[BOOT_CAUSE] %d \n", boot_cause);
-
-	if(boot_cause==PWR_ON_EVENT_SMPL)
-	{
-		printk("[SMPL_CNT] ===> is smpl boot\n");
-		write_file(file_name, "1");
-	}
-	else
-	{
-		write_file(file_name, "0");
-        printk("[SMPL_CNT] ===> not smpl boot!!!!!\n");
-	}
-}
-/*                             */
-/*                                                                          */
 /* Check for early params. */
-#endif
-
 static int __init do_early_param(char *param, char *val)
 {
 	const struct obs_kernel_param *p;
@@ -858,6 +785,7 @@ static void __init do_basic_setup(void)
 	do_ctors();
 	usermodehelper_enable();
 	do_initcalls();
+	random_int_secret_init();
 }
 
 static void __init do_pre_smp_initcalls(void)
@@ -871,15 +799,6 @@ static void __init do_pre_smp_initcalls(void)
 static void run_init_process(const char *init_filename)
 {
 	argv_init[0] = init_filename;
-
-	/*                            */
-	if(lge_get_boot_mode() == LGE_BOOT_MODE_MINIOS)
-	{
-		printk(KERN_WARNING "BOOT MODE %s\n", miniOS_command);
-		argv_init[1] = miniOS_command;
-	}
-	/*                            */
-
 	kernel_execve(init_filename, argv_init, envp_init);
 }
 
@@ -975,15 +894,6 @@ static int __init kernel_init(void * unused)
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
-
-#ifndef CONFIG_MACH_MSM8974_G2_KDDI
-/*                                                                         */
-/*                                        */
-	smpl_count();
-/*                              */
-/*                                                                         */
-#endif
-
 	init_post();
 	return 0;
 }

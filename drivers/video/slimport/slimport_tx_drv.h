@@ -15,8 +15,13 @@
 #ifndef _SP_TX_DRV_H
 #define _SP_TX_DRV_H
 
+#include <linux/slimport.h>
+#include "slimport_tx_reg.h"
+#include "../msm/mdss/mdss_hdmi_slimport.h"
+
 #define FALSE 0
 #define TRUE 1
+
 
 #define MAX_BUF_CNT 16
 #define VID_DVI_MODE 0x00

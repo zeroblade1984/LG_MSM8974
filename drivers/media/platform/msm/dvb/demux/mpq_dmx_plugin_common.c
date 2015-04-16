@@ -87,14 +87,12 @@ module_param(mpq_sdmx_scramble_even, int, S_IRUGO | S_IWUSR);
 static int mpq_sdmx_scramble_odd = 0x3;
 module_param(mpq_sdmx_scramble_odd, int, S_IRUGO | S_IWUSR);
 
+/* LGE_BROADCAST_ISDBT_JAPAN { */
 /* Whether to use secure demux or bypass it. Use for debugging */
-/*                         */
-#ifdef  CONFIG_MACH_LGE
+//static int mpq_bypass_sdmx = 1;
 static int mpq_bypass_sdmx = 0;
-#else
-static int mpq_bypass_sdmx = 1;
-#endif
-/*                         */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
+
 module_param(mpq_bypass_sdmx, int, S_IRUGO | S_IWUSR);
 
 /* Max number of TS packets allowed as input for a single sdmx process */
@@ -102,11 +100,8 @@ static int mpq_sdmx_proc_limit = MAX_TS_PACKETS_FOR_SDMX_PROCESS;
 module_param(mpq_sdmx_proc_limit, int, S_IRUGO | S_IWUSR);
 
 /* Debug flag for secure demux process */
-#ifdef  CONFIG_MACH_LGE
-static int mpq_sdmx_debug = 1;
-#else
+// LGE_BROADCAST_ISDBT_JAPAN
 static int mpq_sdmx_debug;
-#endif
 module_param(mpq_sdmx_debug, int, S_IRUGO | S_IWUSR);
 
 /*
@@ -4367,7 +4362,6 @@ static void mpq_sdmx_section_filter_results(struct mpq_demux *mpq_demux,
 	struct dmx_section_feed *sec = &feed->feed.sec;
 	ssize_t bytes_avail;
 
-
 	/* Parse error indicators */
 	if (sts->error_indicators & SDMX_FILTER_ERR_SEC_VERIF_CRC32_FAIL) {
 		MPQ_DVB_DBG_PRINT("%s: Notify CRC err event\n", __func__);
@@ -4444,7 +4438,6 @@ static void mpq_sdmx_decoder_filter_results(struct mpq_demux *mpq_demux,
 	struct dmx_data_ready data;
 	struct dvb_demux_feed *feed = mpq_feed->dvb_demux_feed;
 	ssize_t bytes_avail;
-
 
 	if ((!sts->metadata_fill_count) && (!sts->data_fill_count))
 		goto decoder_filter_check_flags;

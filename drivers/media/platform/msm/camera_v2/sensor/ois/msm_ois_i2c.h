@@ -1,5 +1,5 @@
 #ifndef OIS_I2C_COMMON_H
-#define OIS_I2C_COMMON_H   
+#define OIS_I2C_COMMON_H
 
 #include <linux/i2c.h>
 
@@ -18,7 +18,9 @@ int32_t RamReadA( uint16_t RamAddr, uint16_t *ReadData );
 int32_t RamWrite32A( uint16_t RamAddr, uint32_t RamData );
 int32_t RamRead32A(uint16_t RamAddr, uint32_t *ReadData );
 int32_t RegWriteA(uint16_t RegAddr, uint8_t RegData);
+int32_t RegWriteB(uint16_t RegAddr, uint16_t RegData);
 int32_t RegReadA(uint16_t RegAddr, uint8_t *RegData);
+int32_t RegReadB(uint16_t RegAddr, uint16_t *RegData);
 int32_t E2PRegWriteA(uint16_t RegAddr, uint8_t RegData);
 int32_t E2PRegReadA(uint16_t RegAddr, uint8_t * RegData);
 int32_t	E2pRed( uint16_t UsAdr, uint8_t UcLen, uint8_t *UcPtr );

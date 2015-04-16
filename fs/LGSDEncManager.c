@@ -8,6 +8,7 @@
 
 int propertyMediaCheck;				// Media Ecryption 체크 여부
 char savedfileExtList[MAX_MEDIA_EXT_LENGTH];
+char asecExtension[MAX_MEDIA_EXT_LENGTH] = ".ASEC";
 
 /*
 *     System property의 Media Encryption 여부 저장.
@@ -63,7 +64,22 @@ char *ecryptfs_Extfilename(const unsigned char *filename){
 	}	    
 	return pos+1;
 }
+int ecryptfs_asecFileSearch(const unsigned char *filename){
+    char *extP = NULL;
 
+    // extract extension in filename
+    extP = ecryptfs_Extfilename(filename);
+    if(extP == NULL || strlen(extP) < 2){
+        printk(KERN_DEBUG "Extfilename is NULL\n");
+        return 0;
+    }
+
+    //check if the extension is asec
+    if(strstr(asecExtension,extP) == NULL){
+        return 0;
+    }
+    return 1;
+}
 int ecryptfs_mediaFileSearch(const unsigned char *filename){
 	char *extP = NULL;
 

@@ -40,6 +40,9 @@
 #include <linux/syscore_ops.h>
 #include <linux/version.h>
 #include <linux/ctype.h>
+#include <linux/mm.h>
+#include <linux/mempolicy.h>
+#include <linux/sched.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -180,10 +183,6 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 
 	if (which > PRIO_USER || which < PRIO_PROCESS)
 		goto out;
-	if (!ccs_capable(CCS_SYS_NICE)) {
-		error = -EPERM;
-		goto out;
-	}
 
 	/* normalize: avoid signed division (rounding problems) */
 	error = -ESRCH;
@@ -447,8 +446,6 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 			magic2 != LINUX_REBOOT_MAGIC2B &&
 	                magic2 != LINUX_REBOOT_MAGIC2C))
 		return -EINVAL;
-	if (!ccs_capable(CCS_SYS_REBOOT))
-		return -EPERM;
 
 	/*
 	 * If pid namespaces are enabled and the current task is in a child
@@ -1204,7 +1201,7 @@ static int override_release(char __user *release, size_t len)
 			rest++;
 		}
 		v = ((LINUX_VERSION_CODE >> 8) & 0xff) + 40;
-		copy = clamp_t(size_t, len, 1, sizeof(buf));
+		copy = min(sizeof(buf), max_t(size_t, 1, len));
 		copy = scnprintf(buf, copy, "2.6.%u%s", v, rest);
 		ret = copy_to_user(release, buf, copy + 1);
 	}
@@ -1295,8 +1292,6 @@ SYSCALL_DEFINE2(sethostname, char __user *, name, int, len)
 
 	if (len < 0 || len > __NEW_UTS_LEN)
 		return -EINVAL;
-	if (!ccs_capable(CCS_SYS_SETHOSTNAME))
-		return -EPERM;
 	down_write(&uts_sem);
 	errno = -EFAULT;
 	if (!copy_from_user(tmp, name, len)) {
@@ -1347,8 +1342,6 @@ SYSCALL_DEFINE2(setdomainname, char __user *, name, int, len)
 		return -EPERM;
 	if (len < 0 || len > __NEW_UTS_LEN)
 		return -EINVAL;
-	if (!ccs_capable(CCS_SYS_SETHOSTNAME))
-		return -EPERM;
 
 	down_write(&uts_sem);
 	errno = -EFAULT;
@@ -1831,10 +1824,151 @@ static int prctl_set_mm(int opt, unsigned long addr,
 }
 #endif
 
+
+static int prctl_update_vma_anon_name(struct vm_area_struct *vma,
+		struct vm_area_struct **prev,
+		unsigned long start, unsigned long end,
+		const char __user *name_addr)
+{
+	struct mm_struct * mm = vma->vm_mm;
+	int error = 0;
+	pgoff_t pgoff;
+
+	if (name_addr == vma_get_anon_name(vma)) {
+		*prev = vma;
+		goto out;
+	}
+
+	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
+	*prev = vma_merge(mm, *prev, start, end, vma->vm_flags, vma->anon_vma,
+				vma->vm_file, pgoff, vma_policy(vma),
+				name_addr);
+	if (*prev) {
+		vma = *prev;
+		goto success;
+	}
+
+	*prev = vma;
+
+	if (start != vma->vm_start) {
+		error = split_vma(mm, vma, start, 1);
+		if (error)
+			goto out;
+	}
+
+	if (end != vma->vm_end) {
+		error = split_vma(mm, vma, end, 0);
+		if (error)
+			goto out;
+	}
+
+success:
+	if (!vma->vm_file)
+		vma->shared.anon_name = name_addr;
+
+out:
+	if (error == -ENOMEM)
+		error = -EAGAIN;
+	return error;
+}
+
+static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
+			unsigned long arg)
+{
+	unsigned long tmp;
+	struct vm_area_struct * vma, *prev;
+	int unmapped_error = 0;
+	int error = -EINVAL;
+
+	/*
+	 * If the interval [start,end) covers some unmapped address
+	 * ranges, just ignore them, but return -ENOMEM at the end.
+	 * - this matches the handling in madvise.
+	 */
+	vma = find_vma_prev(current->mm, start, &prev);
+	if (vma && start > vma->vm_start)
+		prev = vma;
+
+	for (;;) {
+		/* Still start < end. */
+		error = -ENOMEM;
+		if (!vma)
+			return error;
+
+		/* Here start < (end|vma->vm_end). */
+		if (start < vma->vm_start) {
+			unmapped_error = -ENOMEM;
+			start = vma->vm_start;
+			if (start >= end)
+				return error;
+		}
+
+		/* Here vma->vm_start <= start < (end|vma->vm_end) */
+		tmp = vma->vm_end;
+		if (end < tmp)
+			tmp = end;
+
+		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
+		error = prctl_update_vma_anon_name(vma, &prev, start, end,
+				(const char __user *)arg);
+		if (error)
+			return error;
+		start = tmp;
+		if (prev && start < prev->vm_end)
+			start = prev->vm_end;
+		error = unmapped_error;
+		if (start >= end)
+			return error;
+		if (prev)
+			vma = prev->vm_next;
+		else	/* madvise_remove dropped mmap_sem */
+			vma = find_vma(current->mm, start);
+	}
+}
+
+static int prctl_set_vma(unsigned long opt, unsigned long start,
+		unsigned long len_in, unsigned long arg)
+{
+	struct mm_struct *mm = current->mm;
+	int error;
+	unsigned long len;
+	unsigned long end;
+
+	if (start & ~PAGE_MASK)
+		return -EINVAL;
+	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
+
+	/* Check to see whether len was rounded up from small -ve to zero */
+	if (len_in && !len)
+		return -EINVAL;
+
+	end = start + len;
+	if (end < start)
+		return -EINVAL;
+
+	if (end == start)
+		return 0;
+
+	down_write(&mm->mmap_sem);
+
+	switch (opt) {
+	case PR_SET_VMA_ANON_NAME:
+		error = prctl_set_vma_anon_name(start, end, arg);
+		break;
+	default:
+		error = -EINVAL;
+	}
+
+	up_write(&mm->mmap_sem);
+
+	return error;
+}
+
 SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
 	struct task_struct *me = current;
+	struct task_struct *tsk;
 	unsigned char comm[sizeof(me->comm)];
 	long error;
 
@@ -1990,6 +2124,29 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		case PR_GET_CHILD_SUBREAPER:
 			error = put_user(me->signal->is_child_subreaper,
 					 (int __user *) arg2);
+			break;
+		case PR_SET_VMA:
+			error = prctl_set_vma(arg2, arg3, arg4, arg5);
+			break;
+		case PR_SET_TIMERSLACK_PID:
+			if (current->pid != (pid_t)arg3 &&
+					!capable(CAP_SYS_NICE))
+				return -EPERM;
+			rcu_read_lock();
+			tsk = find_task_by_pid_ns((pid_t)arg3, &init_pid_ns);
+			if (tsk == NULL) {
+				rcu_read_unlock();
+				return -EINVAL;
+			}
+			get_task_struct(tsk);
+			rcu_read_unlock();
+			if (arg2 <= 0)
+				tsk->timer_slack_ns =
+					tsk->default_timer_slack_ns;
+			else
+				tsk->timer_slack_ns = arg2;
+			put_task_struct(tsk);
+			error = 0;
 			break;
 		default:
 			error = -EINVAL;

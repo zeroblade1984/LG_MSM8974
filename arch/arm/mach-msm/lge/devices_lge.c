@@ -20,6 +20,7 @@
 #ifdef CONFIG_LGE_PM
 #include <linux/qpnp/qpnp-adc.h>
 #include <mach/board_lge.h>
+#include <linux/power_supply.h>
 #endif
 
 #if defined(CONFIG_LGE_PM_BATTERY_ID_CHECKER)
@@ -31,37 +32,27 @@
 #include <mach/msm_memtypes.h>
 #endif
 
-#if defined(CONFIG_LGE_BOOST_GPIO)
-#include <linux/of_gpio.h>
-#include <linux/spmi.h>
+#ifdef CONFIG_LGE_QSDL_SUPPORT
+#include <mach/lge_qsdl.h>
 #endif
 
-
+#ifdef CONFIG_USB_G_LGE_ANDROID
+#include <linux/platform_data/lge_android_usb.h>
+#endif
 /* in drivers/staging/android */
 #include "ram_console.h"
 
+#if defined(CONFIG_LCD_KCAL)
+/* LGE_CHANGE_S
+   * change code for LCD KCAL
+   * 2013-05-08, seojin.lee@lge.com
+   */
+#include <linux/module.h>
+#include "../../../../drivers/video/msm/mdss/mdss_fb.h"
+extern int update_preset_lcdc_lut(void);
+#endif /* CONFIG_LCD_KCAL */
+
 static int cn_arr_len = 3;
-/*                                                              */
-#ifdef CONFIG_LGE_PM
-struct chg_cable_info_table {
-	int threshhold;
-	acc_cable_type type;
-	unsigned ta_ma;
-	unsigned usb_ma;
-};
-
-#define ADC_NO_INIT_CABLE   0
-#define C_NO_INIT_TA_MA     0
-#define C_NO_INIT_USB_MA    0
-#define ADC_CABLE_NONE      1900000
-#define C_NONE_TA_MA        700
-#define C_NONE_USB_MA       500
-
-#define MAX_CABLE_NUM		15
-static bool cable_type_defined;
-static struct chg_cable_info_table pm8941_acc_cable_type_data[MAX_CABLE_NUM];
-#endif
-/*                                        */
 
 struct cn_prop {
 	char *name;
@@ -107,15 +98,15 @@ int __init lge_init_dt_scan_chosen(unsigned long node, const char *uname,
 			continue;
 		if (type == CELL_U32) {
 			u32 = of_get_flat_dt_prop(node, cn_array[i].name, &len);
-			if(u32 != NULL)
+			if (u32 != NULL)
 				cn_array[i].cell_u32 = of_read_ulong(u32, 1);
 		} else if (type == CELL_U64) {
 			u32 = of_get_flat_dt_prop(node, cn_array[i].name, &len);
-			if(u32 != NULL)
+			if (u32 != NULL)
 				cn_array[i].cell_u64 = of_read_number(u32, 2);
 		} else {
 			p = of_get_flat_dt_prop(node, cn_array[i].name, &len);
-			if(p != NULL)
+			if (p != NULL)
 				strlcpy(cn_array[i].str, p, len);
 		}
 		cn_array[i].is_valid = 1;
@@ -247,21 +238,21 @@ void __init lge_add_persistent_device(void)
 
 }
 
-#ifdef CONFIG_LGE_ECO_MODE
-static struct platform_device lge_kernel_device = {
-	.name = "lge_kernel_driver",
-	.id = -1,
+
+
+/* BEGIN : janghyun.baek@lge.com 2012-12-26 For cable detection */
+#ifdef CONFIG_LGE_PM
+struct chg_cable_info_table {
+	int threshhold;
+	acc_cable_type type;
+	unsigned ta_ma;
+	unsigned usb_ma;
 };
 
-void __init lge_add_lge_kernel_devices(void)
-{
-	platform_device_register(&lge_kernel_device);
-}
-#endif
 
 #ifdef CONFIG_LGE_QFPROM_INTERFACE
 static struct platform_device qfprom_device = {
-	.name = "lge-msm8974-qfprom",
+	.name = "lge-qfprom",
 	.id = -1,
 };
 
@@ -270,7 +261,19 @@ void __init lge_add_qfprom_devices(void)
 	platform_device_register(&qfprom_device);
 }
 #endif
-#ifdef CONFIG_LGE_DIAG_ENABLE_SYSFS
+#define ADC_NO_INIT_CABLE   0
+#define C_NO_INIT_TA_MA     0
+#define C_NO_INIT_USB_MA    0
+#define ADC_CABLE_NONE      1900000
+#define C_NONE_TA_MA        700
+#define C_NONE_USB_MA       500
+
+#define MAX_CABLE_NUM		15
+static bool cable_type_defined;
+static struct chg_cable_info_table pm8941_acc_cable_type_data[MAX_CABLE_NUM];
+#endif
+/* END : janghyun.baek@lge.com 2012-12-26 */
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
 static struct platform_device lg_diag_cmd_device = {
 	.name = "lg_diag_cmd",
 	.id = -1,
@@ -284,7 +287,8 @@ void __init lge_add_diag_devices(void)
 	platform_device_register(&lg_diag_cmd_device);
 }
 #endif
-/*                                                              */
+
+/* BEGIN : janghyun.baek@lge.com 2012-12-26 For cable detection */
 #ifdef CONFIG_LGE_PM
 void get_cable_data_from_dt(void *of_node)
 {
@@ -313,7 +317,7 @@ void get_cable_data_from_dt(void *of_node)
 		return;
 	}
 
-	for (i = 0; i < MAX_CABLE_NUM; i++) {
+	for (i = 0 ; i < MAX_CABLE_NUM ; i++) {
 		of_property_read_u32_array(node_temp, propname[i],
 				cable_value, 3);
 		pm8941_acc_cable_type_data[i].threshhold = cable_value[0];
@@ -324,28 +328,39 @@ void get_cable_data_from_dt(void *of_node)
 	cable_type_defined = 1;
 }
 
-int lge_pm_get_cable_info(struct chg_cable_info *cable_info)
+int lge_pm_get_cable_info(struct qpnp_vadc_chip *vadc,
+		struct chg_cable_info *cable_info)
 {
 	char *type_str[] = {
-		"NOT INIT", "MHL 1K", "U_28P7K", "28P7K", "56K", "100K",
-		"130K", "180K", "200K", "220K", "270K", "330K", "620K",
-		"910K", "OPEN"
+		"NOT INIT", "MHL 1K", "U_28P7K", "28P7K", "56K",
+		"100K", "130K", "180K", "200K", "220K",
+		"270K", "330K", "620K", "910K", "OPEN"
 	};
 
 	struct qpnp_vadc_result result;
 	struct chg_cable_info *info = cable_info;
 	struct chg_cable_info_table *table;
+
 	int table_size = ARRAY_SIZE(pm8941_acc_cable_type_data);
 	int acc_read_value = 0;
-	int i, rc = 0;
+	int i, rc;
 	int count = 1;
 
 	if (!info) {
-		pr_err("lge_pm_get_cable_info: invalid info parameters\n");
+		printk(KERN_ERR "%s : invalid info parameters\n",
+				__func__);
 		return -1;
 	}
+
+	if (!vadc) {
+		printk(KERN_ERR "%s : invalid vadc parameters\n",
+				__func__);
+		return -1;
+	}
+
 	if (!cable_type_defined) {
-		pr_info("Cable type is not defined yet.\n");
+		printk(KERN_ERR "%s : cable type is not defined yet.\n",
+				__func__);
 		return -1;
 	}
 
@@ -359,15 +374,7 @@ int lge_pm_get_cable_info(struct chg_cable_info *cable_info)
 		}
 		rc = qpnp_vadc_read_lge(LR_MUX10_USB_ID_LV, &result);
 #else
-		/* MUST BE IMPLEMENT :
-		 * After MSM8974 AC and later version(PMIC combination change),
-		 * ADC AMUX of PMICs are separated in each dual PMIC.
-		 *
-		 * Ref.
-		 * qpnp-adc-voltage.c : *qpnp_get_vadc(), qpnp_vadc_read().
-		 * qpnp-charger.c     : new implementation by QCT.
-		 */
-		return -ENODEV;
+		rc = qpnp_vadc_read(vadc, LR_MUX10_USB_ID_LV, &result);
 #endif
 		if (rc < 0) {
 			if (rc == -ETIMEDOUT) {
@@ -378,14 +385,15 @@ int lge_pm_get_cable_info(struct chg_cable_info *cable_info)
 				info->ta_ma = C_NONE_TA_MA;
 				info->usb_ma = C_NONE_USB_MA;
 			}
-			pr_err("lge_pm_get_cable_info: adc read "
-					"error - %d\n", rc);
+
+			printk(KERN_ERR "%s : adc read error - %d\n",
+					__func__, rc);
 			return rc;
 		}
 
 		acc_read_value = (int)result.physical;
-		pr_info("%s: acc_read_value - %d\n", __func__,
-				(int)result.physical);
+		printk(KERN_ERR "%s : acc_read_value - %d\n",
+				__func__, (int)result.physical);
 		/* mdelay(10); */
 	}
 
@@ -393,7 +401,7 @@ int lge_pm_get_cable_info(struct chg_cable_info *cable_info)
 	info->ta_ma = C_NO_INIT_TA_MA;
 	info->usb_ma = C_NO_INIT_USB_MA;
 
-	/* assume: adc value must be existed in ascending order */
+	/* assume : adc value must be existed in ascending order */
 	for (i = 0; i < table_size; i++) {
 		table = &pm8941_acc_cable_type_data[i];
 
@@ -405,11 +413,38 @@ int lge_pm_get_cable_info(struct chg_cable_info *cable_info)
 		}
 	}
 
-	pr_info("\n\n[PM]Cable detected: %d(%s)(%d, %d)\n\n",
+	printk(KERN_ERR "\n\n[PM] Cable detected: %d(%s)(%d, %d)\n\n",
 			acc_read_value, type_str[info->cable_type],
 			info->ta_ma, info->usb_ma);
-
 	return 0;
+}
+
+struct pseudo_batt_info_type pseudo_batt_info = {
+	.mode = 0,
+};
+
+void pseudo_batt_set(struct pseudo_batt_info_type *info)
+{
+	struct power_supply *batt_psy;
+
+	pr_err("pseudo_batt_set\n");
+
+	batt_psy = power_supply_get_by_name("battery");
+
+	if (!batt_psy) {
+		pr_err("called before init\n");
+		return;
+	}
+
+	pseudo_batt_info.mode = info->mode;
+	pseudo_batt_info.id = info->id;
+	pseudo_batt_info.therm = info->therm;
+	pseudo_batt_info.temp = info->temp;
+	pseudo_batt_info.volt = info->volt;
+	pseudo_batt_info.capacity = info->capacity;
+	pseudo_batt_info.charging = info->charging;
+
+	power_supply_changed(batt_psy);
 }
 
 /* Belows are for using in interrupt context */
@@ -431,18 +466,21 @@ unsigned lge_pm_get_usb_current(void)
 }
 
 /* This must be invoked in process context */
-void lge_pm_read_cable_info(void)
+void lge_pm_read_cable_info(struct qpnp_vadc_chip *vadc)
 {
 	lge_cable_info.cable_type = NO_INIT_CABLE;
 	lge_cable_info.ta_ma = C_NO_INIT_TA_MA;
 	lge_cable_info.usb_ma = C_NO_INIT_USB_MA;
 
-	lge_pm_get_cable_info(&lge_cable_info);
+	lge_pm_get_cable_info(vadc, &lge_cable_info);
 }
 #endif
-/*                                                            */
+/* END : janghyun.baek@lge.com 2012-12-26 For cable detection */
 
-/* setting whether uart console is enalbed or disabled */
+#if defined(CONFIG_LGE_KSWITCH)
+static int kswitch_status;
+#endif
+
 #ifdef CONFIG_EARJACK_DEBUGGER
 static unsigned int uart_console_mode;  /* Not initialized */
 #else
@@ -451,6 +489,10 @@ static unsigned int uart_console_mode = 1;  /* Alway Off */
 
 unsigned int lge_get_uart_mode(void)
 {
+#ifdef CONFIG_LGE_KSWITCH
+	if ((kswitch_status & LGE_KSWITCH_UART_DISABLE) >> 3)
+		uart_console_mode = 0;
+#endif
 	return uart_console_mode;
 }
 
@@ -476,24 +518,10 @@ static int __init lge_uart_mode(char *uart_mode)
 }
 __setup("uart_console=", lge_uart_mode);
 
-/* for supporting two LCD types with one image */
-static bool cont_splash_enabled;
-
-static int __init cont_splash_enabled_setup(char *enabled)
-{
-	/* INFO : argument string is from LK */
-	if (!strncmp("true", enabled, 6))
-		cont_splash_enabled = true;
-	printk(KERN_INFO "cont splash enabled : %s\n", enabled);
-	return 1;
-}
-__setup("cont_splash_enabled=", cont_splash_enabled_setup);
-
-bool lge_get_cont_splash_enabled(void)
-{
-	return cont_splash_enabled;
-}
-
+/*
+	for download complete using LAF image
+	return value : 1 --> right after laf complete & reset
+*/
 #ifdef CONFIG_LGE_SUPPORT_LCD_MAKER_ID
 /* get panel maker ID from cmdline */
 static lcd_maker_id lge_panel_maker;
@@ -503,30 +531,25 @@ char *panel_maker[] = {"0", "1", "2"};
 
 static int __init board_panel_maker(char *maker_id)
 {
-	int i;
+ int i;
 
-	for (i = 0; i < LCD_MAKER_MAX; i++) {
-		if (!strncmp(maker_id, panel_maker[i], 1)) {
-			lge_panel_maker = (lcd_maker_id) i;
-			break;
-		}
-	}
+ for (i = 0; i < LCD_MAKER_MAX; i++) {
+ 	if (!strncmp(maker_id, panel_maker[i], 1)) {
+ 		lge_panel_maker = (lcd_maker_id) i;
+ 		break;
+ 	}
+ }
 
-	printk(KERN_DEBUG "MAKER : %s\n", panel_maker[lge_panel_maker]);
-	return 1;
+ printk(KERN_DEBUG "MAKER : %s\n", panel_maker[lge_panel_maker]);
+ return 1;
 }
 __setup("lcd_maker_id=", board_panel_maker);
 
 lcd_maker_id lge_get_panel_maker(void)
 {
-	return lge_panel_maker;
+ return lge_panel_maker;
 }
 #endif
-
-/*
-	for download complete using LAF image
-	return value : 1 --> right after laf complete & reset
-*/
 
 int android_dlcomplete;
 
@@ -557,19 +580,20 @@ int __init lge_boot_mode_init(char *s)
 		lge_boot_mode = LGE_BOOT_MODE_CHARGER;
 	else if (!strcmp(s, "chargerlogo"))
 		lge_boot_mode = LGE_BOOT_MODE_CHARGERLOGO;
-	else if (!strcmp(s, "factory"))
+	else if (!strcmp(s, "qem_130k") || !strcmp(s, "factory"))
 		lge_boot_mode = LGE_BOOT_MODE_FACTORY;
-	else if (!strcmp(s, "factory2"))
+	else if (!strcmp(s, "qem_56k") || !strcmp(s, "factory2"))
 		lge_boot_mode = LGE_BOOT_MODE_FACTORY2;
-	else if (!strcmp(s, "pifboot"))
+	else if (!strcmp(s, "qem_910k"))
+		lge_boot_mode = LGE_BOOT_MODE_FACTORY3;
+	else if (!strcmp(s, "pif_130k") || !strcmp(s, "pifboot"))
 		lge_boot_mode = LGE_BOOT_MODE_PIFBOOT;
-	else if (!strcmp(s, "pifboot2"))
+	else if (!strcmp(s, "pif_56k") || !strcmp(s, "pifboot2"))
 		lge_boot_mode = LGE_BOOT_MODE_PIFBOOT2;
-	/*                            */
-	else if (!strcmp(s, "miniOS"))
-		lge_boot_mode = LGE_BOOT_MODE_MINIOS;
+	else if (!strcmp(s, "pif_910k"))
+		lge_boot_mode = LGE_BOOT_MODE_PIFBOOT3;
 	printk("ANDROID BOOT MODE : %d %s\n", lge_boot_mode, s);
-	/*                            */
+	/* LGE_UPDATE_E for MINIOS2.0 */
 
 	return 1;
 }
@@ -580,6 +604,25 @@ enum lge_boot_mode_type lge_get_boot_mode(void)
 	return lge_boot_mode;
 }
 
+#ifdef CONFIG_MACH_MSM8974_G2_VZW
+static int lge_battery_low = 0;
+int __init lge_is_battery_low(char *status)
+{
+
+	if(!strcmp(status, "trickle"))
+		lge_battery_low = 1;
+
+	return 1;
+	printk("charging status : %s/n", status);
+}
+__setup("is_battery_low=", lge_is_battery_low);
+
+int lge_get_battery_low(void)
+{
+	return lge_battery_low;
+}
+#endif
+
 int lge_get_factory_boot(void)
 {
 	int res;
@@ -588,27 +631,59 @@ int lge_get_factory_boot(void)
 	 *   cable must be factory cable.
 	 */
 	switch (lge_boot_mode) {
-		case LGE_BOOT_MODE_FACTORY:
-		case LGE_BOOT_MODE_FACTORY2:
-		case LGE_BOOT_MODE_PIFBOOT:
-		case LGE_BOOT_MODE_PIFBOOT2:
-		case LGE_BOOT_MODE_MINIOS:
-			res = 1;
-			break;
-		default:
-			res = 0;
-			break;
+	case LGE_BOOT_MODE_FACTORY:
+	case LGE_BOOT_MODE_FACTORY2:
+	case LGE_BOOT_MODE_FACTORY3:
+	case LGE_BOOT_MODE_PIFBOOT:
+	case LGE_BOOT_MODE_PIFBOOT2:
+	case LGE_BOOT_MODE_PIFBOOT3:
+		res = 1;
+		break;
+	default:
+		res = 0;
+		break;
+	}
+	return res;
+}
+
+int lge_get_factory_cable(void)
+{
+	int res;
+
+	switch (lge_cable_info.cable_type) {
+	case CABLE_56K:
+	case CABLE_130K:
+	case CABLE_910K:
+		res = 1;
+		break;
+	default:
+		res = 0;
+		break;
 	}
 	return res;
 }
 
 /* for board revision */
-static hw_rev_type lge_bd_rev = HW_REV_B;
+static hw_rev_type lge_bd_rev = HW_REV_1_0; /* HW_REV_B; */
 
 /* CAUTION: These strings are come from LK. */
+#if defined (CONFIG_MACH_MSM8974_G3_GLOBAL_COM)
+char *rev_str[] = {"evb1", "evb2", "rev_a", "rev_a1", "rev_b", "rev_c", "rev_d",
+	"rev_e", "rev_g", "rev_h", "rev_10", "rev_11", "rev_12",
+	"reserved"};
+#elif defined (CONFIG_MACH_MSM8974_G3_KDDI)
+char *rev_str[] = {"evb1", "evb2", "rev_a", "rev_a1", "rev_b", "rev_c", "rev_d",
+	"rev_e","rev_f", "rev_g", "rev_h", "rev_10", "rev_11", "rev_12",
+	"reserved"};
+#elif defined (CONFIG_MACH_MSM8974_DZNY_DCM)
+char *rev_str[] = {"evb1", "evb2", "rev_a", "rev_b", "rev_c", "rev_d",
+	"rev_e","rev_f", "rev_g", "rev_h", "rev_10", "rev_11", "rev_12",
+	"reserved"};
+#else
 char *rev_str[] = {"evb1", "evb2", "rev_a", "rev_b", "rev_c", "rev_d",
 	"rev_e", "rev_f", "rev_g", "rev_h", "rev_10", "rev_11", "rev_12",
-	"revserved"};
+	"reserved"};
+#endif
 
 static int __init board_revno_setup(char *rev_info)
 {
@@ -623,52 +698,114 @@ static int __init board_revno_setup(char *rev_info)
 		}
 	}
 
-	printk(KERN_INFO "BOARD : LGE %s\n", rev_str[lge_bd_rev]);
+	printk(KERN_INFO "BOARD : LGE %s \n", rev_str[lge_bd_rev]);
 	return 1;
 }
 __setup("lge.rev=", board_revno_setup);
 
 hw_rev_type lge_get_board_revno(void)
 {
-	return lge_bd_rev;
+    return lge_bd_rev;
 }
 
-int on_hidden_reset;
+#ifdef CONFIG_LGE_LCD_TUNING
+static struct platform_device lcd_misc_device = {
+	.name = "lcd_misc_msm",
+	.id = 0,
+};
 
-static int __init lge_check_hidden_reset(char *reset_mode)
+void __init lge_add_lcd_misc_devices(void)
 {
-	on_hidden_reset = 0;
+	platform_device_register(&lcd_misc_device);
+}
+#endif
 
-	if (!strncmp(reset_mode, "on", 2))
-		on_hidden_reset = 1;
+#ifdef CONFIG_LCD_KCAL
+/* LGE_CHANGE_S
+* change code for LCD KCAL
+* 2013-05-08, seojin.lee@lge.com
+*/
+int g_kcal_r = 255;
+int g_kcal_g = 255;
+int g_kcal_b = 255;
 
+int kcal_set_values(int kcal_r, int kcal_g, int kcal_b)
+{
+#if 0
+	int is_update = 0;
+
+	int kcal_r_limit = 250;
+	int kcal_g_limit = 250;
+	int kcal_b_limit = 253;
+
+	g_kcal_r = kcal_r < kcal_r_limit ? kcal_r_limit : kcal_r;
+	g_kcal_g = kcal_g < kcal_g_limit ? kcal_g_limit : kcal_g;
+	g_kcal_b = kcal_b < kcal_b_limit ? kcal_b_limit : kcal_b;
+
+	if (kcal_r < kcal_r_limit || kcal_g < kcal_g_limit || kcal_b < kcal_b_limit)
+		is_update = 1;
+	if (is_update)
+		update_preset_lcdc_lut();
+#else
+	g_kcal_r = kcal_r;
+	g_kcal_g = kcal_g;
+	g_kcal_b = kcal_b;
+#endif
+	return 0;
+}
+
+static int kcal_get_values(int *kcal_r, int *kcal_g, int *kcal_b)
+{
+	*kcal_r = g_kcal_r;
+	*kcal_g = g_kcal_g;
+	*kcal_b = g_kcal_b;
+	return 0;
+}
+
+static int kcal_refresh_values(void)
+{
+	return update_preset_lcdc_lut();
+}
+
+static struct kcal_platform_data kcal_pdata = {
+	.set_values = kcal_set_values,
+	.get_values = kcal_get_values,
+	.refresh_display = kcal_refresh_values
+};
+
+static struct platform_device kcal_platrom_device = {
+	.name   = "kcal_ctrl",
+	.dev = {
+		.platform_data = &kcal_pdata,
+	}
+};
+
+static int __init display_kcal_setup(char *kcal)
+{
+	char vaild_k = 0;
+	int kcal_r = 255;
+	int kcal_g = 255;
+	int kcal_b = 255;
+
+	sscanf(kcal, "%d|%d|%d|%c", &kcal_r, &kcal_g, &kcal_b, &vaild_k);
+	pr_info("kcal is %d|%d|%d|%c\n", kcal_r, kcal_g, kcal_b, vaild_k);
+
+	if (vaild_k != 'K') {
+		pr_info("kcal not calibrated yet : %d\n", vaild_k);
+		kcal_r = kcal_g = kcal_b = 255;
+	}
+
+	kcal_set_values(kcal_r, kcal_g, kcal_b);
 	return 1;
 }
+__setup("lge.kcal=", display_kcal_setup);
 
-__setup("lge.hreset=", lge_check_hidden_reset);
-
-
-static int lge_frst_status;
-
-int get_lge_frst_status(void){
-	return lge_frst_status;
-}
-
-static int __init lge_check_frst(char *frst_status)
+void __init lge_add_lcd_kcal_devices(void)
 {
-	lge_frst_status = 0;
-
-	if (!strncmp(frst_status, "3", 1))
-		lge_frst_status = 3;
-
-	printk(KERN_INFO "lge_frst_status=%d\n", lge_frst_status);
-
-	return 1;
+	pr_info(" KCAL_DEBUG : %s\n", __func__);
+	platform_device_register(&kcal_platrom_device);
 }
-
-__setup("lge.frst=", lge_check_frst);
-
-
+#endif
 
 #if defined(CONFIG_LGE_PM_BATTERY_ID_CHECKER)
 struct lge_battery_id_platform_data lge_battery_id_plat = {
@@ -694,8 +831,8 @@ static enum lge_laf_mode_type lge_laf_mode = LGE_LAF_MODE_NORMAL;
 
 int __init lge_laf_mode_init(char *s)
 {
-	if (strcmp(s, ""))
-		lge_laf_mode = LGE_LAF_MODE_LAF;
+    if (strcmp(s, "") && strcmp(s, "MID"))
+        lge_laf_mode = LGE_LAF_MODE_LAF;
 
 	return 1;
 }
@@ -706,171 +843,131 @@ enum lge_laf_mode_type lge_get_laf_mode(void)
 	return lge_laf_mode;
 }
 
-#if defined(CONFIG_LGE_BOOST_GPIO)
-#define DEBUG
-enum {
-	forced_bypass = 0,	/* gpio low	*/
-	auto_bypass = 1,	/* gpio high	*/
-};
-
-struct lge_boost_gpio_drvdata {
-	int bb_gpio;
-};
-
-struct lge_boost_gpio_platform_data {
-	struct boost_gpio_drvdata *ddata;
-	char *bb_boost_gpio_name;	/* device name */
-	int bb_gpio;
-};
-
-static void lge_boost_gpio_bypass(struct lge_boost_gpio_drvdata *ddata,
-				int bypass)
+#if defined(CONFIG_LGE_KSWITCH)
+static int atoi(const char *name)
 {
-	if (unlikely(ddata == NULL)) {
-		printk(KERN_INFO "data is null\n");
-		return;
+	int val = 0;
+
+	for (;; name++) {
+		switch (*name) {
+		case '0' ... '9':
+			val = 10*val+(*name-'0');
+			break;
+		default:
+			return val;
+		}
 	}
-
-	if (gpio_get_value(ddata->bb_gpio) != bypass)
-		gpio_set_value(ddata->bb_gpio, bypass);
-
-	return;
 }
 
-
-#if defined(CONFIG_OF)
-static int lge_boost_gpio_get_devtree_pdata(struct device *dev,
-		struct lge_boost_gpio_platform_data *pdata)
+static int __init kswitch_setup(char *value)
 {
-	struct device_node *node;
+	kswitch_status = atoi(value);
 
-	node = dev->of_node;
-	if (node == NULL)
-		return -ENODEV;
+	if (kswitch_status < 0)
+		kswitch_status = 0;
 
-	memset(pdata, 0, sizeof(struct lge_boost_gpio_platform_data));
-
-	pdata->bb_boost_gpio_name = (char *)of_get_property(node,
-					"pm8941,bb_boost_gpio_name", NULL);
-
-	pdata->bb_gpio =
-		of_get_named_gpio_flags(node, "pm8941,bb_gpio", 0, NULL);
-
-	return 0;
-
+	printk(KERN_INFO "[KSwitch] %d \n", kswitch_status);
+	return 1;
 }
+__setup("kswitch=", kswitch_setup);
 
-static struct of_device_id lge_boost_gpio_of_match[] = {
-	{ .compatible = "pm8941,lge_boost_gpio", },
-	{ },
-};
-#else
-static int lge_boost_gpio_get_devtree_pdata(struct device *dev,
-		struct gpio_keys_platform_data *altp)
+int lge_get_kswitch_status(void)
 {
-	return -ENODEV;
-}
-
-#define lge_boost_gpio_of_match NULL
-#endif
-
-#ifdef CONFIG_PM_SLEEP
-static int lge_boost_gpio_suspend(struct device *dev)
-{
-	struct lge_boost_gpio_drvdata *ddata = dev_get_drvdata(dev);
-
-	dev_dbg(dev, "%s\n", __func__);
-
-	lge_boost_gpio_bypass(ddata, forced_bypass);
-
-	return 0;
-}
-
-static int lge_boost_gpio_resume(struct device *dev)
-{
-	struct lge_boost_gpio_drvdata *ddata = dev_get_drvdata(dev);
-
-	dev_dbg(dev, "%s\n", __func__);
-
-	lge_boost_gpio_bypass(ddata, auto_bypass);
-
-	return 0;
+    return kswitch_status;
 }
 #endif
 
-static int __devexit lge_boost_gpio_remove(struct platform_device *pdev)
+static int lge_boot_reason = -1; /* undefined for error checking */
+static int __init lge_check_bootreason(char *reason)
 {
-	return 0;
+	int ret = 0;
+
+	/* handle corner case of kstrtoint */
+	if (!strcmp(reason, "0xffffffff")) {
+		lge_boot_reason = 0xffffffff;
+		return 1;
+	}
+
+	ret = kstrtoint(reason, 16, &lge_boot_reason);
+	if (!ret)
+		printk(KERN_INFO "LGE REBOOT REASON: %x\n", lge_boot_reason);
+	else
+		printk(KERN_INFO "LGE REBOOT REASON: Couldn't get bootreason - %d\n",
+				ret);
+
+	return 1;
+}
+__setup("lge.bootreason=", lge_check_bootreason);
+
+int lge_get_bootreason(void)
+{
+	return lge_boot_reason;
 }
 
-static int __devinit lge_boost_gpio_probe(struct platform_device *pdev)
-{
-	const struct lge_boost_gpio_platform_data *pdata =
-		pdev->dev.platform_data;
+#ifdef CONFIG_LGE_QSDL_SUPPORT
+static struct lge_qsdl_platform_data lge_qsdl_pdata = {
+	.oneshot_read = 0,
+	.using_uevent = 0
+};
 
-	struct lge_boost_gpio_drvdata *ddata;
-	struct device *dev = &pdev->dev;
-	struct lge_boost_gpio_platform_data alt_pdata;
-	int err;
-
-	printk(KERN_INFO "%s\n", __func__);
-
-	if (!pdata) {
-		err = lge_boost_gpio_get_devtree_pdata(dev, &alt_pdata);
-		if (err)
-			return err;
-		pdata = &alt_pdata;
-	}
-
-	ddata = kzalloc(sizeof(struct lge_boost_gpio_drvdata), GFP_KERNEL);
-	if (!ddata) {
-		dev_err(dev, "failed to allocate state\n");
-		err = -ENOMEM;
-		goto fail_kzalloc;
-	}
-
-	ddata->bb_gpio = pdata->bb_gpio;
-
-	platform_set_drvdata(pdev, ddata);
-
-	err = gpio_request_one(ddata->bb_gpio,
-				GPIOF_OUT_INIT_HIGH,
-				pdata->bb_boost_gpio_name);
-	if (err < 0) {
-		dev_err(dev, "failed to requset gpio");
-		goto fail_bb_gpio;
-	}
-
-	return 0;
-
-fail_bb_gpio:
-	platform_set_drvdata(pdev, NULL);
-	kfree(ddata);
-
-fail_kzalloc:
-	return err;
-}
-
-
-
-static SIMPLE_DEV_PM_OPS(lge_boost_gpio_pm_ops,
-		lge_boost_gpio_suspend, lge_boost_gpio_resume);
-
-static struct platform_driver lge_boost_gpio_device_driver = {
-	.probe		= lge_boost_gpio_probe,
-	.remove		= __devexit_p(lge_boost_gpio_remove),
-	.driver		= {
-		.name	= "lge_boost_gpio",
-		.pm	= &lge_boost_gpio_pm_ops,
-		.of_match_table	= lge_boost_gpio_of_match,
+static struct platform_device lge_qsdl_device = {
+	.name = LGE_QSDL_DEV_NAME,
+	.id = -1,
+	.dev = {
+		.platform_data = &lge_qsdl_pdata,
 	}
 };
 
-static int __init lge_boost_gpio_late_init(void)
+void __init lge_add_qsdl_device(void)
 {
-	return platform_driver_register(&lge_boost_gpio_device_driver);
+	platform_device_register(&lge_qsdl_device);
+}
+#endif /* CONFIG_LGE_QSDL_SUPPORT */
+
+#ifdef CONFIG_USB_G_LGE_ANDROID
+static int get_factory_cable(void)
+{
+	int res;
+
+	switch (lge_boot_mode) {
+	case LGE_BOOT_MODE_FACTORY:
+	case LGE_BOOT_MODE_PIFBOOT:
+		res = LGEUSB_FACTORY_130K;
+		break;
+	case LGE_BOOT_MODE_FACTORY2:
+	case LGE_BOOT_MODE_PIFBOOT2:
+		res = LGEUSB_FACTORY_56K;
+		break;
+	case LGE_BOOT_MODE_FACTORY3:
+	case LGE_BOOT_MODE_PIFBOOT3:
+		res = LGEUSB_FACTORY_910K;
+		break;
+	default:
+		res = 0;
+		break;
+	}
+	return res;
 }
 
-late_initcall(lge_boost_gpio_late_init);
+struct lge_android_usb_platform_data lge_android_usb_pdata = {
+	.vendor_id = 0x1004,
+	.factory_pid = 0x6000,
+	.iSerialNumber = 0,
+	.product_name = "LGE Android Phone",
+	.manufacturer_name = "LG Electronics Inc.",
+	.factory_composition = "acm,diag",
+	.get_factory_cable = get_factory_cable,
+};
 
-#endif /*                       */
+struct platform_device lge_android_usb_device = {
+	.name = "lge_android_usb",
+	.id = -1,
+	.dev = {
+		.platform_data = &lge_android_usb_pdata,
+	},
+};
+void __init lge_add_android_usb_devices(void)
+{
+	platform_device_register(&lge_android_usb_device);
+}
+#endif

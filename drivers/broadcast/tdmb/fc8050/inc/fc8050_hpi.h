@@ -1,13 +1,13 @@
 /*****************************************************************************
  Copyright(c) 2009 FCI Inc. All Rights Reserved
- 
+
  File name : fc8050_hpi.c
- 
+
  Description : API of dmb baseband module
- 
- History : 
+
+ History :
  ----------------------------------------------------------------------
- 2009/09/11 	jason		initial
+ 2009/09/11     jason        initial
 *******************************************************************************/
 
 #ifndef __FC8050_HPI_H__
@@ -34,4 +34,3 @@ extern int fc8050_hpi_deinit(HANDLE hDevice);
 #endif
 
 #endif // __FC8050_HPI_H__
-

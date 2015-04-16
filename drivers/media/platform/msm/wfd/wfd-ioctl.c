@@ -723,18 +723,10 @@ static int wfd_vidbuf_stop_streaming(struct vb2_queue *q)
 	if (rc)
 		WFD_MSG_ERR("Failed to stop MDP\n");
 
-#ifndef CONFIG_MACH_LGE
 	rc = v4l2_subdev_call(&wfd_dev->enc_sdev, core, ioctl,
 			ENCODE_FLUSH, (void *)inst->venc_inst);
 	if (rc)
 		WFD_MSG_ERR("Failed to flush encoder\n");
-#endif
-
-	 rc = v4l2_subdev_call(&wfd_dev->enc_sdev, core, ioctl, 
-	 ENCODE_FLUSH, (void *)inst->venc_inst); 
-	 if (rc) 
-	 	WFD_MSG_ERR("Failed to flush encoder\n"); 
-	 	
 
 	WFD_MSG_DBG("vsg stop\n");
 	rc = v4l2_subdev_call(&wfd_dev->vsg_sdev, core, ioctl,

@@ -540,7 +540,6 @@ config TSIF_CHRDEV
 	  from this device.
 
 	  This driver may be used as example for TSIF API usage.
-
 	  To compile this driver as module, choose M here: the
 	  module will be called tsif_chrdev.
 
@@ -558,6 +557,13 @@ config TSPP
 	Transport Stream Packet Processor is used to offload the
 	processing of MPEG transport streams from the main processor.
 	This can also be compiled as a loadable module.
+
+config ANDROID_SW_IRRC
+	bool "Android irrc support"
+	default n
+	---help---
+	This option enables device driver support for Android SW IRRC
+	Some functions should be given by platform data for enable PWM, Motor IC, etc.
 
 config CI_BRIDGE_SPI
 	depends on SPI_QUP
@@ -599,6 +605,10 @@ config TSPDRV
     bool "tspdrv"
         default n
 
+config TSPDRV_PMIC_VIBRATOR
+    bool "pmic vibrator suppert"
+	    default n
+
 config LGE_SM100
     bool "lge sm100 vibrator support"
         depends on ANDROID_TIMED_OUTPUT
@@ -606,7 +616,6 @@ config LGE_SM100
         help
           This option enalbes device driver support for SM100 Vibrator driver.
           Some functions should be given by platform data for enable PWM, Motor IC, etc.
-
 config PMIC8XXX_NFC
 	tristate "Qualcomm PM8XXX support for Near Field Communication"
 	depends on MFD_PM8XXX

@@ -18,6 +18,7 @@
 #define APPI_LGE_SOUNDEFFECT_OUTPUTDEVICE_PARAMS    0x10009013
 #define APPI_LGE_SOUNDEFFECT_MEDITYPE_PARAMS        0x10009014
 #define APPI_LGE_SOUNDEFFECT_GEQ_PARAMS             0x10009015
+#define APPI_LGE_SOUNDEFFECT_ALL_PARAM              0x10009016
 
 
 struct asm_lgesoundeffect_param_enable {
@@ -57,14 +58,28 @@ struct asm_lgesoundeffect_param_geq {
 	int32_t                  BandGain;
 } __packed;
 
+struct asm_lgesoundeffect_param_allparam {
+	struct apr_hdr  hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+    int32_t                  enable_flag;
+    int32_t                  ModeType;
+    int32_t                  OutputDeviceType;
+    int32_t                  MediaType;
+    int32_t                  BandGain[7];
+} __packed;
 
+struct lgesoundeffect_allparam_st {
+    int32_t                  enable_flag;
+    int32_t                  ModeType;
+    int32_t                  OutputDeviceType;
+    int32_t                  MediaType;
+    int32_t                  BandGain[7];
+} __packed;
 
 int q6asm_set_lgesoundeffect_enable(struct audio_client *ac, int enable);
 int q6asm_set_lgesoundeffect_modetype(struct audio_client *ac, int modetype);
 int q6asm_set_lgesoundeffect_outputdevicetype(struct audio_client *ac, int outputdevicetype);
 int q6asm_set_lgesoundeffect_mediatype(struct audio_client *ac, int mediatype);
 int q6asm_set_lgesoundeffect_geq(struct audio_client *ac, int geq_band, int geq_gain);
-
-
-
-
+int q6asm_set_lgesoundeffect_allparam(struct audio_client *ac, struct lgesoundeffect_allparam_st *param);

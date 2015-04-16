@@ -62,6 +62,9 @@
 
 #define PRONTO_PMU_CCPU_BOOT_REMAP_ADDR			0x2004
 
+#define PRONTO_PMU_SPARE				0x1088
+#define PRONTO_PMU_SPARE_SSR_BIT			BIT(23)
+
 #define CLK_CTL_WCNSS_RESTART_BIT			BIT(0)
 
 #define AXI_HALTREQ					0x0
@@ -70,6 +73,11 @@
 
 #define HALT_ACK_TIMEOUT_US				500000
 #define CLK_UPDATE_TIMEOUT_US				500000
+
+// LGE_UPDATE_S enable_ramdump only for pronto
+static int enable_pronto_ramdump;
+module_param(enable_pronto_ramdump, int, S_IRUGO | S_IWUSR);
+// LGE_UPDATE_E
 
 struct pronto_data {
 	void __iomem *base;
@@ -85,6 +93,7 @@ struct pronto_data {
 	bool crash;
 	struct delayed_work cancel_vote_work;
 	struct ramdump_device *ramdump_dev;
+	struct work_struct wcnss_wdog_bite_work;
 };
 
 static int pil_pronto_make_proxy_vote(struct pil_desc *pil)
@@ -322,6 +331,16 @@ static irqreturn_t wcnss_err_fatal_intr_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void wcnss_wdog_bite_work_hdlr(struct work_struct *wcnss_work)
+{
+	struct pronto_data *drv = container_of(wcnss_work, struct pronto_data,
+		wcnss_wdog_bite_work);
+
+	wcnss_log_debug_regs_on_bite();
+
+	restart_wcnss(drv);
+}
+
 static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 {
 	struct pronto_data *drv = subsys_to_drv(dev_id);
@@ -334,10 +353,9 @@ static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 		pr_err("Ignoring wcnss bite irq, restart in progress\n");
 		return IRQ_HANDLED;
 	}
-	wcnss_log_debug_regs_on_bite();
 
 	drv->restart_inprogress = true;
-	restart_wcnss(drv);
+	schedule_work(&drv->wcnss_wdog_bite_work);
 
 	return IRQ_HANDLED;
 }
@@ -347,6 +365,8 @@ static void wcnss_post_bootup(struct work_struct *work)
 	struct platform_device *pdev = wcnss_get_platform_device();
 	struct wcnss_wlan_config *pwlanconfig = wcnss_get_wlan_config();
 
+    pr_err("Enter %s()\n", __func__);
+
 	wcnss_wlan_power(&pdev->dev, pwlanconfig, WCNSS_WLAN_SWITCH_OFF, NULL);
 }
 
@@ -354,6 +374,7 @@ static int wcnss_shutdown(const struct subsys_desc *subsys)
 {
 	struct pronto_data *drv = subsys_to_drv(subsys);
 
+    pr_err("Enter %s()\n", __func__);
 	pil_shutdown(&drv->desc);
 	flush_delayed_work(&drv->cancel_vote_work);
 	wcnss_flush_delayed_boot_votes();
@@ -366,8 +387,17 @@ static int wcnss_powerup(const struct subsys_desc *subsys)
 	struct pronto_data *drv = subsys_to_drv(subsys);
 	struct platform_device *pdev = wcnss_get_platform_device();
 	struct wcnss_wlan_config *pwlanconfig = wcnss_get_wlan_config();
-	int    ret = -1;
+	void __iomem *base = drv->base;
+	u32 reg;
+	int ret = -1;
 
+	if (base) {
+		reg = readl_relaxed(base + PRONTO_PMU_SPARE);
+		reg |= PRONTO_PMU_SPARE_SSR_BIT;
+		writel_relaxed(reg, base + PRONTO_PMU_SPARE);
+	}
+
+    pr_err("Enter %s()\n", __func__);
 	if (pdev && pwlanconfig)
 		ret = wcnss_wlan_power(&pdev->dev, pwlanconfig,
 					WCNSS_WLAN_SWITCH_ON, NULL);
@@ -397,7 +427,11 @@ static int wcnss_ramdump(int enable, const struct subsys_desc *subsys)
 {
 	struct pronto_data *drv = subsys_to_drv(subsys);
 
-	if (!enable)
+    pr_err("Enter : wcnss_ramdump(), arg enable = %d,  enable_pronto_ramdump = %d\n", enable, enable_pronto_ramdump);
+// LGE_UPDATE_S enable_ramdump only for pronto
+//	if (!enable)
+	if(!enable_pronto_ramdump)
+// LGE_UPDATE_E
 		return 0;
 
 	return pil_do_ramdump(&drv->desc, drv->ramdump_dev);
@@ -410,6 +444,8 @@ static int __devinit pil_pronto_probe(struct platform_device *pdev)
 	struct pil_desc *desc;
 	int ret;
 	uint32_t regval;
+
+       pr_err("Enter %s()\n", __func__);
 
 	drv = devm_kzalloc(&pdev->dev, sizeof(*drv), GFP_KERNEL);
 	if (!drv)
@@ -490,15 +526,18 @@ static int __devinit pil_pronto_probe(struct platform_device *pdev)
 	drv->subsys_desc.wdog_bite_handler = wcnss_wdog_bite_irq_hdlr;
 
 	INIT_DELAYED_WORK(&drv->cancel_vote_work, wcnss_post_bootup);
+	INIT_WORK(&drv->wcnss_wdog_bite_work, wcnss_wdog_bite_work_hdlr);
 
 	drv->subsys = subsys_register(&drv->subsys_desc);
 	if (IS_ERR(drv->subsys)) {
+		pr_err("Error on subsys_register()\n");
 		ret = PTR_ERR(drv->subsys);
 		goto err_subsys;
 	}
 
 	drv->ramdump_dev = create_ramdump_device("pronto", &pdev->dev);
 	if (!drv->ramdump_dev) {
+		pr_err("Error on create_ramdump_device()\n");
 		ret = -ENOMEM;
 		goto err_irq;
 	}

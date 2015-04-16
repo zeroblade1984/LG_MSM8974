@@ -92,9 +92,8 @@ static inline unsigned ecm_bitrate(struct usb_gadget *g)
  */
 
 #define LOG2_STATUS_INTERVAL_MSEC	5	/* 1 << 5 == 32 msec */
-
 #ifdef CONFIG_USB_G_LGE_ANDROID
-#define ECM_STATUS_BYTECOUNT		64	/*                        */
+#define ECM_STATUS_BYTECOUNT		64	/* LGE United host driver */
 #define ECM_STATUS_NOTIFY_REQ_LEN	16
 #else
 #define ECM_STATUS_BYTECOUNT		16	/* 8 byte header + data */
@@ -620,25 +619,14 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (alt == 1) {
 			struct net_device	*net;
 
-#ifdef CONFIG_USB_G_LGE_ANDROID
-			/*           
-                                                           
-                                                           
-                                      
-    */
-			ecm->port.is_zlp_ok = !(
-					gadget_is_musbhdrc(cdev->gadget)
-					|| gadget_is_ci13xxx_msm(cdev->gadget)
-					|| gadget_is_dwc3(cdev->gadget)
-					);
-#else
 			/* Enable zlps by default for ECM conformance;
 			 * override for musb_hdrc (avoids txdma ovhead).
 			 */
 			ecm->port.is_zlp_ok = !(gadget_is_musbhdrc(cdev->gadget)
-				);
+#ifdef CONFIG_USB_G_LGE_ANDROID
+					|| gadget_is_dwc3(cdev->gadget)
 #endif
-
+				);
 			ecm->port.cdc_filter = DEFAULT_FILTER;
 			DBG(cdev, "activate ecm\n");
 			net = gether_connect(&ecm->port);
@@ -763,6 +751,30 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 
 	status = -ENODEV;
 
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	/* NOTE:  a status/notification endpoint is *OPTIONAL* but we
+	 * don't treat it that way.  It's simpler, and some newer CDC
+	 * profiles (wireless handsets) no longer treat it as optional.
+	 */
+	ep = usb_ep_autoconfig(cdev->gadget, &fs_ecm_notify_desc);
+	if (!ep)
+		goto fail;
+	ecm->notify = ep;
+	ep->driver_data = cdev; /* claim */
+
+	status = -ENOMEM;
+
+	/* allocate notification request and buffer */
+	ecm->notify_req = usb_ep_alloc_request(ep, GFP_KERNEL);
+	if (!ecm->notify_req)
+		goto fail;
+	ecm->notify_req->buf = kmalloc(ECM_STATUS_BYTECOUNT, GFP_KERNEL);
+	if (!ecm->notify_req->buf)
+		goto fail;
+	ecm->notify_req->context = ecm;
+	ecm->notify_req->complete = ecm_notify_complete;
+#endif
+
 	/* allocate instance-specific endpoints */
 	ep = usb_ep_autoconfig(cdev->gadget, &fs_ecm_in_desc);
 	if (!ep)
@@ -776,6 +788,7 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 	ecm->port.out_ep = ep;
 	ep->driver_data = cdev;	/* claim */
 
+#ifndef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
 	/* NOTE:  a status/notification endpoint is *OPTIONAL* but we
 	 * don't treat it that way.  It's simpler, and some newer CDC
 	 * profiles (wireless handsets) no longer treat it as optional.
@@ -797,6 +810,7 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 		goto fail;
 	ecm->notify_req->context = ecm;
 	ecm->notify_req->complete = ecm_notify_complete;
+#endif
 
 	/* copy descriptors, and track endpoint copies */
 	f->descriptors = usb_copy_descriptors(ecm_fs_function);
@@ -925,16 +939,6 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		ecm_string_defs[0].id = status;
 		ecm_control_intf.iInterface = status;
 
-#ifdef CONFIG_USB_G_LGE_ANDROID
-		/* MAC address */
-		status = usb_string_id(c->cdev);
-		if (status < 0)
-			return status;
-		ecm_string_defs[1].id = status;
-		pr_info("%s: iMACAddress = %d\n", __func__, status);
-		ecm_desc.iMACAddress = status;
-#endif
-
 		/* data interface label */
 		status = usb_string_id(c->cdev);
 		if (status < 0)
@@ -942,15 +946,13 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		ecm_string_defs[2].id = status;
 		ecm_data_intf.iInterface = status;
 
-#ifndef CONFIG_USB_G_LGE_ANDROID
-		/* NOTE : if NOT defined */
 		/* MAC address */
 		status = usb_string_id(c->cdev);
 		if (status < 0)
 			return status;
 		ecm_string_defs[1].id = status;
 		ecm_desc.iMACAddress = status;
-#endif
+
 		/* IAD label */
 		status = usb_string_id(c->cdev);
 		if (status < 0)

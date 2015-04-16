@@ -141,29 +141,32 @@ bool smb349_pmic_batt_present(void)
 
 	return val & BIT(7);
 }
-#endif
-
-#ifdef CONFIG_BQ24192_CHARGER
-bool bq24192_pmic_batt_present(void)
+static u16 smb349_pmic_regs[] = {
+	0xDD08, 0xDD10, 0xDD11, 0xDD12,
+	0xDD13, 0xDD14, 0xDD15, 0xDD16,
+	0xDD18, 0xDD19, 0xDD1A, 0xDD1B,
+	0xDD40, 0xDD41, 0xDD42, 0xDD43,
+	0xDD45, 0xDD46,
+};
+void smb349_pmic_reg_dump(void)
 {
+	int i;
 	int rc;
 	u8  val;
 
 	if (!the_spmi) {
-		pr_err("fail to override spmi not init\n");
-		return true;
-	}
-	rc = spmi_ext_register_readl(the_spmi->ctrl,
-				the_spmi->sid, SMBB_BAT_IF_BAT_PRES_STATUS, &val, 1);
-	if (rc) {
-		pr_err("failed to read pmic 0x1208 rc:%d\n", rc);
-		return true;
+		pr_err("fail to pmic_reg dump spmi not init\n");
+		return;
 	}
 
-	return val & BIT(7);
+	for (i = 0 ; i < ARRAY_SIZE(smb349_pmic_regs) ; i++) {
+		rc = spmi_ext_register_readl(the_spmi->ctrl,
+					the_spmi->sid, smb349_pmic_regs[i], &val, 1);
+		pr_err("[DUMP] pmic 0x%04X: 0x%02X\n", smb349_pmic_regs[i], val);
+	}
+
 }
 #endif
-
 static struct qpnp_misc_version irq_support_version[] = {
 	{0x01, 0x02}, /* PM8941 */
 	{0x07, 0x00}, /* PM8226 */

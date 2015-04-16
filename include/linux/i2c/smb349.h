@@ -27,4 +27,5 @@ struct smb349_platform_data {
 	int chg_susp_gpio;
 	int chg_current_ma;
 };
+
 #endif

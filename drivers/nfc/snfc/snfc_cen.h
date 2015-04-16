@@ -1,13 +1,13 @@
 /*
  *  felica_cen.h
- *  
+ *
  */
 #ifndef __SNFC_CEN_H__
 #define __SNFC_CEN_H__
 
 /*
  *  Include header files
- *  
+ *
  */
 
 #include "snfc_gpio.h"

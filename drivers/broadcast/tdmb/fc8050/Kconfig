@@ -5,10 +5,10 @@
 #menu "FC8050 support"
 
 config FC8050_TDMB
-	default n
-	---help---
-	  This driver implements the front-end of the Xen virtual
-	  keyboard and mouse device driver.  It communicates with a back-end
-	  in another domain.
+    default n
+    ---help---
+      This driver implements the front-end of the Xen virtual
+      keyboard and mouse device driver.  It communicates with a back-end
+      in another domain.
 
 #endmenu

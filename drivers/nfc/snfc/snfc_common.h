@@ -1,5 +1,5 @@
 /*
-*	snfc_common.h
+*   snfc_common.h
 *
 */
 
@@ -7,7 +7,7 @@
 #define __SNFC_COMMON_H__
 
 /*
-*	Include header files
+*   Include header files
 */
 #include <linux/kernel.h>/* printk() */
 #include <linux/fs.h>/*file_operations*/
@@ -16,6 +16,9 @@
 #include <linux/types.h>/* size_t */
 #include <linux/miscdevice.h>/*misc_register, misc_deregister*/
 #include <linux/module.h>
+#include <linux/of_gpio.h>
+#include <linux/platform_device.h>
+
 /*
  *  Define
  */
@@ -39,5 +42,7 @@
 #define SNFC_DEBUG_MSG_MIDDLE(...) ((void)0)
 #endif
 
+extern void snfc_avali_poll_felica_status(void);
+extern int snfc_hvdd_wait_rfs_low(void);
 #endif
 

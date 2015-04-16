@@ -21,7 +21,6 @@
 
 
 
-//#define FEATURE_DEBUG_LOW
 #define FELICA_I2C_SLAVE_ADDRESS  0x56
 #define FELICA_I2C_REG_ADDRSS_01  0x01
 #define FELICA_I2C_REG_ADDRSS_02  0x02
@@ -44,23 +43,21 @@ static int felica_cen_open (struct inode *inode, struct file *fp)
 
   if(1 == isopen)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_open - already open \n");
-    #endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] felica_cen_open - already open \n");
+
     return -1;
   }
   else
   {
-    #ifdef FEATURE_DEBUG_LOW
-    FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_open - start \n");
-    #endif
+    FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_open - start \n");
+
     isopen = 1;
   }
 
-//  FELICA_DEBUG_MSG("[FELICA_PON] felica_cen_open current_uid : %d \n",current_uid());
+//  FELICA_DEBUG_MSG_LOW("[FELICA_PON] felica_cen_open current_uid : %d \n",current_uid());
 
 #ifdef FELICA_FN_DEVICE_TEST
-	FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_open - result_open(%d) \n",result_open_cen);
+	FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_open - result_open(%d) \n",result_open_cen);
 	return result_open_cen;
 #else
   return 0;
@@ -78,23 +75,19 @@ static int felica_cen_release (struct inode *inode, struct file *fp)
 
   if(0 == isopen)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_release - not open \n");
-    #endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] felica_cen_release - not open \n");
 
     return -1;
   }
   else
   {
-    #ifdef FEATURE_DEBUG_LOW
-    FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_release - start \n");
-    #endif
+    FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_release - start \n");
 
     isopen = 0;
   }
 
 #ifdef FELICA_FN_DEVICE_TEST
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_release - result_close_cen(%d) \n",result_close_cen);
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_release - result_close_cen(%d) \n",result_close_cen);
   return result_close_cen;
 #else
 	return 0;
@@ -112,40 +105,35 @@ static ssize_t felica_cen_read(struct file *fp, char *buf, size_t count, loff_t 
   int felica_cen = -1, rc = -1;
 
 
-#ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_read - start \n");
-#endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_read - start \n");
+
 
 /* Check error */
   if(NULL == fp)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR fp is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR fp is NULL \n");
+
     return -1;
   }
 
   if(NULL == buf)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR buf is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR buf is NULL \n");
+
     return -1;
   }
 
   if(1 != count)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR count(%d) \n",count);
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR count(%d) \n",count);
+
     return -1;
   }
 
   if(NULL == pos)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR pos is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR pos is NULL \n");
+
     return -1;
   }
 
@@ -155,41 +143,36 @@ static ssize_t felica_cen_read(struct file *fp, char *buf, size_t count, loff_t 
 
   if(rc)
   {
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR felica_i2c_read(%d) \n",rc);
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR felica_i2c_read(%d) \n",rc);
     return -1;
   }
 
   // check bit 7(locken)
   if(read_buf&0x01)  // unlock
   {
-    #ifdef FEATURE_DEBUG_MED
-    FELICA_DEBUG_MSG("[FELICA_CEN] CEN = High (UNLOCK) \n");
-    #endif
+    FELICA_DEBUG_MSG_MED("[FELICA_CEN] CEN = High (UNLOCK) \n");
+
     felica_cen = GPIO_HIGH_VALUE;
   }
   else  // lock
   {
-    #ifdef FEATURE_DEBUG_MED
-    FELICA_DEBUG_MSG("[FELICA_CEN] CEN = Low (LOCK) \n");
-    #endif
+    FELICA_DEBUG_MSG_MED("[FELICA_CEN] CEN = Low (LOCK) \n");
+
     felica_cen = GPIO_LOW_VALUE;
   }
 
   rc = copy_to_user(buf, &felica_cen, count);
   if(rc)
   {
-	#ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR - copy_from_user \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR - copy_from_user \n");
+
     return -1;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_write - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_write - end \n");
 
 #ifdef FELICA_FN_DEVICE_TEST
-	FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_read - result_read_cen = %d,(%d) \n",felica_cen,result_read_cen);
+	FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_read - result_read_cen = %d,(%d) \n",felica_cen,result_read_cen);
 	return result_read_cen;
 #else
   return 1;
@@ -207,40 +190,34 @@ static ssize_t felica_cen_write(struct file *fp, const char *buf, size_t count, 
   int rc = -1;
 
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_write - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_write - start \n");
 
 /* Check error */
   if(NULL == fp)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR fp is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR fp is NULL \n");
+
     return -1;
   }
 
   if(NULL == buf)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR buf is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR buf is NULL \n");
+
     return -1;
   }
 
   if(1 != count)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN]ERROR count(%d) \n",count);
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN]ERROR count(%d) \n",count);
+
     return -1;
   }
 
   if(NULL == pos)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR pos is NULL \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR pos is NULL \n");
+
     return -1;
   }
 
@@ -248,29 +225,24 @@ static ssize_t felica_cen_write(struct file *fp, const char *buf, size_t count, 
   rc = copy_from_user(&write_buf, buf, count);
   if(rc)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR - copy_from_user \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR - copy_from_user \n");
+
     return -1;
   }
 
-    #ifdef FEATURE_DEBUG_MED
-	FELICA_DEBUG_MSG("[FELICA_CEN] copy_from_user(%d) \n",*buf);
-    #endif
+	FELICA_DEBUG_MSG_MED("[FELICA_CEN] copy_from_user(%d) \n",*buf);
 
   /* check user data */
   if(*buf == 1)
   {
-    #ifdef FEATURE_DEBUG_MED
-    FELICA_DEBUG_MSG("[FELICA_CEN] CEN = High (UNLOCK) \n");
-    #endif
+    FELICA_DEBUG_MSG_MED("[FELICA_CEN] CEN = High (UNLOCK) \n");
+
     write_buf = 0x81; // set unlock
   }
   else
   {
-    #ifdef FEATURE_DEBUG_MED
-    FELICA_DEBUG_MSG("[FELICA_CEN] CEN = Low (LOCK) \n");
-    #endif
+    FELICA_DEBUG_MSG_MED("[FELICA_CEN] CEN = Low (LOCK) \n");
+
     write_buf = 0x80; // set lock
   }
 
@@ -287,7 +259,7 @@ static ssize_t felica_cen_write(struct file *fp, const char *buf, size_t count, 
 		rc= request_irq(gpio_to_irq(felica_get_rfs_gpio_num()), felica_rfs_detect_interrupt, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING|IRQF_NO_SUSPEND , FELICA_RFS_NAME, NULL);
 		if (rc)
 		{
-			FELICA_DEBUG_MSG("[FELICA_RFS] FAIL!! can not request_irq %d\n", rc);
+			FELICA_DEBUG_MSG_LOW("[FELICA_RFS] FAIL!! can not request_irq %d\n", rc);
 			return rc;
 		}
 	}
@@ -297,12 +269,11 @@ static ssize_t felica_cen_write(struct file *fp, const char *buf, size_t count, 
 	}
 #endif
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_write - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_write - end \n");
+
   return 1;
 }
-
+
 /*
  *    STRUCT DEFINITION
  */
@@ -332,23 +303,18 @@ static int felica_cen_init(void)
 {
   int rc = -1;
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_init - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_init - start \n");
 
   /* register the device file */
   rc = misc_register(&felica_cen_device);
   if (rc < 0)
   {
-    #ifdef FEATURE_DEBUG_HIGH
-    FELICA_DEBUG_MSG("[FELICA_CEN] ERROR can not register felica_cen \n");
-	#endif
+    FELICA_DEBUG_MSG_HIGH("[FELICA_CEN] ERROR can not register felica_cen \n");
+
     return rc;
   }
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_init - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_init - end \n");
 
   return 0;
 }
@@ -360,16 +326,12 @@ static int felica_cen_init(void)
  */
 static void felica_cen_exit(void)
 {
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_exit - start \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_exit - start \n");
 
   /* deregister the device file */
   misc_deregister(&felica_cen_device);
 
-  #ifdef FEATURE_DEBUG_LOW
-  FELICA_DEBUG_MSG("[FELICA_CEN] felica_cen_exit - end \n");
-  #endif
+  FELICA_DEBUG_MSG_LOW("[FELICA_CEN] felica_cen_exit - end \n");
 }
 
 module_init(felica_cen_init);

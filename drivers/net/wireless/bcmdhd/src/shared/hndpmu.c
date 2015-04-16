@@ -2,7 +2,7 @@
  * Misc utility routines for accessing PMU corerev specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,8 +22,9 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: hndpmu.c 414368 2013-07-24 15:00:23Z $
+ * $Id: hndpmu.c 475037 2014-05-02 23:55:49Z $
  */
+
 
 /*
  * Note: this file contains PLL/FLL related functions. A chip can contain multiple PLLs/FLLs.
@@ -31,7 +32,8 @@
  *
  * Throughout this code, the prefixes 'pmu0_', 'pmu1_' and 'pmu2_' are used.
  * They refer to different revisions of the PMU (which is at revision 18 @ Apr 25, 2012)
- * pmu2_ marks the transition from PLL to ADFLL (Digital Frequency Locked Loop)
+ * pmu1_ marks the transition from PLL to ADFLL (Digital Frequency Locked Loop). It supports
+ * fractional frequency generation. pmu2_ does not support fractional frequency generation.
  */
 
 #include <bcm_cfg.h>
@@ -53,6 +55,16 @@
  * to be on except on private builds.
  */
 #define	PMU_NONE(args)
+
+/** contains resource bit positions for a specific chip */
+struct rsc_per_chip_s {
+	uint8 ht_avail;
+	uint8 macphy_clkavail;
+	uint8 ht_start;
+	uint8 otp_pu;
+};
+
+typedef struct rsc_per_chip_s rsc_per_chip_t;
 
 
 /* SDIO Pad drive strength to select value mappings.
@@ -118,7 +130,7 @@ static const sdiod_drive_str_t sdiod_drive_strength_tab5_1v8[] = {
 
 /* SDIO Drive Strength to sel value table for PMU Rev 13 (3.3v) */
 
-/* SDIO Drive Strength to sel value table for PMU Rev 17 (1.8v) */
+/** SDIO Drive Strength to sel value table for PMU Rev 17 (1.8v) */
 static const sdiod_drive_str_t sdiod_drive_strength_tab6_1v8[] = {
 	{3, 0x3},
 	{2, 0x2},
@@ -126,7 +138,7 @@ static const sdiod_drive_str_t sdiod_drive_strength_tab6_1v8[] = {
 	{0, 0x0} };
 
 
-/*
+/**
  * SDIO Drive Strength to sel value table for 43143 PMU Rev 17, see Confluence 43143 Toplevel
  * architecture page, section 'PMU Chip Control 1 Register definition', click link to picture
  * BCM43143_sel_sdio_signals.jpg. Valid after PMU Chip Control 0 Register, bit31 (override) has
@@ -166,8 +178,6 @@ static const sdiod_drive_str_t sdiod_drive_strength_tab7_1v8[] = {
 void
 si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 {
-	chipcregs_t *cc;
-	uint origidx, intr_val = 0;
 	sdiod_drive_str_t *str_tab = NULL;
 	uint32 str_mask = 0;	/* only alter desired bits in PMU chipcontrol 1 register */
 	uint32 str_shift = 0;
@@ -177,9 +187,6 @@ si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 	if (!(sih->cccaps & CC_CAP_PMU)) {
 		return;
 	}
-
-	/* Remember original core before switch to chipc */
-	cc = (chipcregs_t *) si_switch_core(sih, CC_CORE_ID, &origidx, &intr_val);
 
 	switch (SDIOD_DRVSTR_KEY(sih->chip, sih->pmurev)) {
 	case SDIOD_DRVSTR_KEY(BCM4325_CHIP_ID, 1):
@@ -239,7 +246,7 @@ si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 		break;
 	}
 
-	if (str_tab != NULL && cc != NULL) {
+	if (str_tab != NULL) {
 		uint32 cc_data_temp;
 		int i;
 
@@ -252,19 +259,16 @@ si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 		if (i > 0 && drivestrength > str_tab[i].strength)
 			i--;
 
-		W_REG(osh, &cc->chipcontrol_addr, PMU_CHIPCTL1);
-		cc_data_temp = R_REG(osh, &cc->chipcontrol_data);
+		W_REG(osh, PMUREG(sih, chipcontrol_addr), PMU_CHIPCTL1);
+		cc_data_temp = R_REG(osh, PMUREG(sih, chipcontrol_data));
 		cc_data_temp &= ~str_mask;
 		cc_data_temp |= str_tab[i].sel << str_shift;
-		W_REG(osh, &cc->chipcontrol_data, cc_data_temp);
+		W_REG(osh, PMUREG(sih, chipcontrol_data), cc_data_temp);
 		if (str_ovr_pmuval) { /* enables the selected drive strength */
-			W_REG(osh,  &cc->chipcontrol_addr, str_ovr_pmuctl);
-			OR_REG(osh, &cc->chipcontrol_data, str_ovr_pmuval);
+			W_REG(osh,  PMUREG(sih, chipcontrol_addr), str_ovr_pmuctl);
+			OR_REG(osh, PMUREG(sih, chipcontrol_data), str_ovr_pmuval);
 		}
 		PMU_MSG(("SDIO: %dmA drive strength requested; set to %dmA\n",
 		         drivestrength, str_tab[i].strength));
 	}
-
-	/* Return to original core */
-	si_restore_core(sih, origidx, intr_val);
 } /* si_sdiod_drive_strength_init */

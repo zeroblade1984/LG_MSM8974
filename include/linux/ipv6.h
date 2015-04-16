@@ -154,6 +154,9 @@ struct ipv6_devconf {
 	__s32		max_addresses;
 	__s32		accept_ra_defrtr;
 	__s32		accept_ra_pinfo;
+#ifdef CONFIG_LGE_DHCPV6_WIFI
+	__s32		ra_info_flag;
+#endif	
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	__s32		accept_ra_rtr_pref;
 	__s32		rtr_probe_interval;
@@ -161,6 +164,7 @@ struct ipv6_devconf {
 	__s32		accept_ra_rt_info_max_plen;
 #endif
 #endif
+	__s32		accept_ra_rt_table;
 	__s32		proxy_ndp;
 	__s32		accept_source_route;
 #ifdef CONFIG_IPV6_OPTIMISTIC_DAD
@@ -215,6 +219,10 @@ enum {
 	DEVCONF_ACCEPT_DAD,
 	DEVCONF_FORCE_TLLAO,
 	DEVCONF_ACCEPT_RA_PREFIX_ROUTE,
+	DEVCONF_ACCEPT_RA_RT_TABLE,
+#ifdef CONFIG_LGE_DHCPV6_WIFI
+	DEVCONF_RA_INFO_FLAG,
+#endif
 	DEVCONF_MAX
 };
 

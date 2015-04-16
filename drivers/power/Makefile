@@ -48,15 +48,7 @@ obj-$(CONFIG_BATTERY_MSM8X60)   += msm_charger.o
 obj-$(CONFIG_PM8058_CHARGER)    += pmic8058-charger.o
 obj-$(CONFIG_ISL9519_CHARGER)   += isl9519q.o
 ifdef CONFIG_LGE_PM
-ifdef CONFIG_MACH_MSM8974_Z_KR
-obj-$(CONFIG_SMB349_CHARGER)   += smb349_charger_z_revA.o
-else ifdef CONFIG_MACH_MSM8974_Z_US
-obj-$(CONFIG_SMB349_CHARGER)   += smb349_charger_z_revA.o
-else ifdef CONFIG_MACH_MSM8974_Z_KDDI
-obj-$(CONFIG_SMB349_CHARGER)   += smb349_charger_z_revA.o
-else
 obj-$(CONFIG_SMB349_CHARGER)   += smb349_charger.o
-endif
 else
 obj-$(CONFIG_SMB349_CHARGER)   += smb349.o
 endif
@@ -68,27 +60,12 @@ obj-$(CONFIG_BATTERY_BQ27541)	+= bq27541_fuelgauger.o
 obj-$(CONFIG_BATTERY_BQ28400)	+= bq28400_battery.o
 obj-$(CONFIG_SMB137B_CHARGER)   += smb137b.o
 obj-$(CONFIG_SMB137C_CHARGER)	+= smb137c-charger.o
+obj-$(CONFIG_SMB358_CHARGER)	+= smb358-charger.o
 obj-$(CONFIG_PM8XXX_CCADC)	+= pm8xxx-ccadc.o
 obj-$(CONFIG_PM8921_BMS)	+= pm8921-bms.o
 obj-$(CONFIG_QPNP_BMS)		+= qpnp-bms.o
 obj-$(CONFIG_PM8921_CHARGER)	+= pm8921-charger.o
-ifdef CONFIG_LGE_PM
-ifdef CONFIG_MACH_MSM8974_VU3_KR
 obj-$(CONFIG_QPNP_CHARGER)	+= qpnp-charger.o
-else
-ifdef CONFIG_MACH_MSM8974_G2_KDDI
-obj-$(CONFIG_QPNP_CHARGER)	+= qpnp-charger-kddi.o
-else
-ifdef CONFIG_MACH_MSM8974_B1_KR
-obj-$(CONFIG_QPNP_CHARGER)	+= qpnp-charger_b1_kr.o
-else
-obj-$(CONFIG_QPNP_CHARGER)	+= qpnp-charger_lge_revA.o
-endif
-endif
-endif
-else
-obj-$(CONFIG_QPNP_CHARGER)	+= qpnp-charger.o
-endif
 obj-$(CONFIG_LTC4088_CHARGER)	+= ltc4088-charger.o
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
 obj-$(CONFIG_BATTERY_BCL)	+= battery_current_limit.o
@@ -99,5 +76,13 @@ ftt_wireless-y	+= ftt_charger_v3.o ftt_device.o ftt_sysfs.o ftt_uevent.o ftt_pro
 obj-$(CONFIG_MAX17048_FUELGAUGE)+= max17048_battery.o
 obj-$(CONFIG_MAX17050_FUELGAUGE)+= max17050_battery.o
 obj-$(CONFIG_LGE_PM_BATTERY_ID_CHECKER) += lge_battery_id.o
-obj-$(CONFIG_LGE_CURRENTNOW) += currentnow.o
+obj-$(CONFIG_LGE_PM) += lge_smpl_count.o
+obj-$(CONFIG_BQ24296_CHARGER)   += bq24296_charger.o
+obj-$(CONFIG_CHARGER_MAX77819)   += max77819-charger.o
+obj-$(CONFIG_CHARGER_MAX8971)   += max8971-charger.o
+obj-$(CONFIG_CHARGER_UNIFIED_WLC) += unified_wireless_charger.o
+obj-$(CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT_IDT9025A) += idtp9025a_wireless_power_receiver.o
+obj-$(CONFIG_CHARGER_UNIFIED_WLC_BQ5102X) += bq5102x_wireless_power_receiver.o
+obj-$(CONFIG_LGE_SMART_CHARGING) += smart_charging.o
+obj-$(CONFIG_LGE_CURRENTNOW)	+= currentnow.o
 obj-$(CONFIG_BQ24192_CHARGER) += bq24192_charger.o

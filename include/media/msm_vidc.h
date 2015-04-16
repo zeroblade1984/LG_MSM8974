@@ -7,8 +7,8 @@
 #include <linux/videodev2.h>
 
 enum core_id {
-	MSM_VIDC_CORE_0 = 0,
-	MSM_VIDC_CORE_1,      /* for Q6 core */
+	MSM_VIDC_CORE_VENUS = 0,
+	MSM_VIDC_CORE_Q6,
 	MSM_VIDC_CORES_MAX,
 };
 
@@ -55,11 +55,13 @@ enum smem_cache_ops {
 
 void *msm_vidc_open(int core_id, int session_type);
 int msm_vidc_close(void *instance);
+int msm_vidc_suspend(int core_id);
 int msm_vidc_querycap(void *instance, struct v4l2_capability *cap);
 int msm_vidc_enum_fmt(void *instance, struct v4l2_fmtdesc *f);
 int msm_vidc_s_fmt(void *instance, struct v4l2_format *f);
 int msm_vidc_g_fmt(void *instance, struct v4l2_format *f);
 int msm_vidc_s_ctrl(void *instance, struct v4l2_control *a);
+int msm_vidc_s_ext_ctrl(void *instance, struct v4l2_ext_controls *a);
 int msm_vidc_g_ctrl(void *instance, struct v4l2_control *a);
 int msm_vidc_reqbufs(void *instance, struct v4l2_requestbuffers *b);
 int msm_vidc_prepare_buf(void *instance, struct v4l2_buffer *b);
@@ -95,6 +97,16 @@ int msm_vidc_smem_get_domain_partition(void *instance,
 		int *domain_num, int *partition_num);
 void *msm_vidc_smem_get_client(void *instance);
 #endif
+
+struct msm_vidc_extradata_header {
+	unsigned int size;
+	unsigned int:32; /** Keeping binary compatibility */
+	unsigned int:32; /* with firmware and OpenMAX IL **/
+	unsigned int type; /* msm_vidc_extradata_type */
+	unsigned int data_size;
+	unsigned char data[1];
+};
+
 struct msm_vidc_interlace_payload {
 	unsigned int format;
 };
@@ -160,6 +172,18 @@ struct msm_vidc_s3d_frame_packing_payload {
 	unsigned int fpa_repetition_period;
 	unsigned int fpa_extension_flag;
 };
+struct msm_vidc_frame_qp_payload {
+	unsigned int frame_qp;
+};
+struct msm_vidc_frame_bits_info_payload {
+	unsigned int frame_bits;
+	unsigned int header_bits;
+};
+
+struct msm_vidc_stream_userdata_payload {
+	unsigned int type;
+	unsigned int data[1];
+};
 
 enum msm_vidc_extradata_type {
 	EXTRADATA_NONE = 0x00000000,
@@ -173,11 +197,16 @@ enum msm_vidc_extradata_type {
 	EXTRADATA_PANSCAN_WINDOW = 0x00000008,
 	EXTRADATA_RECOVERY_POINT_SEI = 0x00000009,
 	EXTRADATA_MPEG2_SEQDISP = 0x0000000D,
+	EXTRADATA_STREAM_USERDATA = 0x0000000E,
+	EXTRADATA_FRAME_QP = 0x0000000F,
+	EXTRADATA_FRAME_BITS_INFO = 0x00000010,
 	EXTRADATA_MULTISLICE_INFO = 0x7F100000,
 	EXTRADATA_NUM_CONCEALED_MB = 0x7F100001,
 	EXTRADATA_INDEX = 0x7F100002,
 	EXTRADATA_ASPECT_RATIO = 0x7F100003,
 	EXTRADATA_METADATA_FILLER = 0x7FE00002,
+	MSM_VIDC_EXTRADATA_METADATA_LTR = 0x7F100004,
+	EXTRADATA_METADATA_MBI = 0x7F100005,
 };
 enum msm_vidc_interlace_type {
 	INTERLACE_FRAME_PROGRESSIVE = 0x01,
@@ -192,4 +221,9 @@ enum msm_vidc_recovery_sei {
 	FRAME_RECONSTRUCTION_APPROXIMATELY_CORRECT = 0x02,
 };
 
+enum msm_vidc_userdata_type {
+	MSM_VIDC_USERDATA_TYPE_FRAME = 0x1,
+	MSM_VIDC_USERDATA_TYPE_TOP_FIELD = 0x2,
+	MSM_VIDC_USERDATA_TYPE_BOTTOM_FIELD = 0x3,
+};
 #endif

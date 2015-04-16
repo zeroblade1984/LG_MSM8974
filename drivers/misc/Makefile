@@ -76,4 +76,5 @@ obj-$(CONFIG_EARJACK_DEBUGGER) += lge_earjack_debugger.o
 obj-$(CONFIG_BU52031NVX) += pm8xxx-cradle.o
 obj-$(CONFIG_BU52031NVX_CARKIT) += pm8xxx-carkit.o
 obj-$(CONFIG_TSPDRV) += tspdrv/
+obj-$(CONFIG_ANDROID_SW_IRRC)	+= android_irrc.o
 obj-$(CONFIG_LGE_IRDA_KDDI)	+= lge_irtty-kddi.o

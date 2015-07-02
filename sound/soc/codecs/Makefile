@@ -234,3 +234,6 @@ obj-$(CONFIG_SND_SOC_TPA2015D) 	+= snd-soc-tpa2015d1.o
 ifeq ($(CONFIG_SND_SOC_ES325_SLIM),y)
 obj-$(CONFIG_SND_SOC_ES325_SLIM) += es325.o
 endif
+
+# Kairi
+obj-$(CONFIG_SND_SOC_WCD9320_CONTROL)	+= tamod_control.o

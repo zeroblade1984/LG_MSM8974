@@ -510,7 +510,7 @@ config SND_SOC_ES325_SLIM
 		Audience es325 Dual Mic Noise Reduction
 
 # Kairi
-config SND_SOC_WCD9320_CONTROL
+config WCD9320_CODEC_CONTROL
         bool "Taiko Control"
 	default y if SND_SOC_WCD9320=y
 	help

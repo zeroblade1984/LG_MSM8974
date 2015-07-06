@@ -236,4 +236,4 @@ obj-$(CONFIG_SND_SOC_ES325_SLIM) += es325.o
 endif
 
 # Kairi
-obj-$(CONFIG_SND_SOC_WCD9320_CONTROL)	+= tamod_control.o
+obj-$(CONFIG_WCD9320_CODEC_CONTROL)	+= tamod_control.o

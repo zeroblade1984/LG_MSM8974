@@ -51,7 +51,7 @@
 #include <sound/es325-export.h>
 #endif /* CONFIG_SND_SOC_ES325_SLIM */
 
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 #include "tamod_control.h"
 #endif
 
@@ -2649,7 +2649,7 @@ static int taiko_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		taiko->spkr_pa_widget_on = true;
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 		spkr_toggle = true;
 
 		snd_soc_update_bits(codec, TAIKO_A_SPKR_DRV_EN, 0x80, 0x80);
@@ -2661,7 +2661,7 @@ static int taiko_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 #endif
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 		spkr_toggle = false;
 #endif
 		taiko->spkr_pa_widget_on = false;
@@ -3575,7 +3575,7 @@ static int taiko_hph_pa_event(struct snd_soc_dapm_widget *w,
 						 req_clsh_state,
 						 WCD9XXX_CLSH_REQ_ENABLE,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 		hp_toggle = true;
 
 		if (hp_digigain_con) {
@@ -3603,7 +3603,7 @@ static int taiko_hph_pa_event(struct snd_soc_dapm_widget *w,
 						 req_clsh_state,
 						 WCD9XXX_CLSH_REQ_DISABLE,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 		hp_toggle = false;
 #endif
 		break;
@@ -4469,7 +4469,7 @@ static int taiko_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 	return 0;
 }
 
-#ifndef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifndef CONFIG_WCD9320_CODEC_CONTROL
 static
 #endif
 int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
@@ -7449,7 +7449,7 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 	}
 
 	taiko->codec = codec;
-#ifdef CONFIG_SND_SOC_WCD9320_CONTROL
+#ifdef CONFIG_WCD9320_CODEC_CONTROL
 	wcd9320_codec = codec;
 #endif
 	for (i = 0; i < COMPANDER_MAX; i++) {

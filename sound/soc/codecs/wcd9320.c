@@ -52,7 +52,7 @@
 #endif /* CONFIG_SND_SOC_ES325_SLIM */
 
 #ifdef CONFIG_SND_SOC_WCD9320_CONTROL
-#include "wcd9320_control.h"
+#include "tamod_control.h"
 #endif
 
 #define TAIKO_MAD_SLIMBUS_TX_PORT 12

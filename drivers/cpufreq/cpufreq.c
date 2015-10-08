@@ -1619,7 +1619,7 @@ static void init_freq_table(void)
  *********************************************************************/
 
 #if defined(CONFIG_LGE_LOW_BATT_LIMIT)
-#if defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_TMO_US)
+#if defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM)
 static unsigned int old_max_freq = 0;
 static unsigned int restore_flag = 1;
 #endif
@@ -1642,7 +1642,7 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	pr_debug("target for CPU %u: %u kHz, relation %u \n", policy->cpu,
 		target_freq, relation );
 #if defined(CONFIG_LGE_LOW_BATT_LIMIT)
-#if defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_G3_TMO_US)
+#if defined(CONFIG_MACH_MSM8974_G3_GLOBAL_COM)
 	if (old_max_freq == 0)
 		old_max_freq = policy->max;
 	if (!out_low_battery_limit) {

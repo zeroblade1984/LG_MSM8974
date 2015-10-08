@@ -139,7 +139,7 @@
 		};
 
 		qcom,leds@d300 {
-			flash-boost-supply = <&pm8941_chg_boost>;
+			flash_boost-supply = <&pm8941_chg_boost>;
 		};
 
 	};
@@ -251,14 +251,9 @@
 			interrupt-parent = <&msmgpio>;
 			interrupts = <0x9 0x0>;
 			max17048,alert_gpio = <&msmgpio 0x9 0x0>;
-			max17048,rcomp_lgc = <103>;
-			max17048,temp_co_hot_lgc = <375>;
-			max17048,temp_co_cold_lgc = <6650>;
-			max17048,empty_lgc = <0>;
-			max17048,rcomp_tcd = <55>;
-			max17048,temp_co_hot_tcd = <637>;
-			max17048,temp_co_cold_tcd = <4255>;
-			max17048,empty_tcd = <0>;
+			max17048,rcomp = <103>;
+			max17048,temp_co_hot = <375>;
+			max17048,temp_co_cold = <6650>;
 			max17048,alert_threshold = <0x2>;
 			max17048,full_design = <0xbb8>;
 			max17048,empty = <0>;
@@ -347,11 +342,5 @@
 		interrupts = <34 0x2>;
 		wlc_int_gpio = <&pm8941_gpios 34 0x2>;
 		wlc_full_chg = <&pm8941_gpios 36 0x0>;
-	};
-
-	qcom,msm-thermal {
-		qcom,vdd-apps-rstr{
-			qcom,levels = <0>;
-		};
 	};
 };

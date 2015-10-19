@@ -29,7 +29,11 @@ bool hp_toggle = false;
 bool spkr_toggle = false;
 
 u32 hp_digigain = 0x02;
+#ifdef CONFIG_MACH_MSM8974_G2
 u32 spkr_digigain = 0x04;
+#else
+u32 spkr_digigain = 0x02;
+#endif
 
 struct snd_soc_codec *wcd9320_codec;
 

@@ -40,7 +40,7 @@
 			interrupt-parent = <&pm8941_gpios>;
 			interrupts = <30 0x2>;
 			summit,stat-gpio = <&pm8941_gpios 30 0x02>;
-			summit,chg-current-ma = <1200>;
+			summit,chg-current-ma = <1600>;
 			summit,term-current-ma = <100>;
 
 			lge,no-init-cable = <0 0 0>;
@@ -67,7 +67,7 @@
 			interrupt-parent = <&msmgpio>;
 			interrupts = <74 0x2>;
 			ti,int-gpio = <&msmgpio 74 0x02>;
-			ti,chg-current-ma = <1200>;
+			ti,chg-current-ma = <1600>;
 			ti,term-current-ma = <256>;
 			ti,vbat-max-mv = <4352>;
 			ti,pre-chg-current-ma = <256>;

@@ -248,7 +248,7 @@
 #include <linux/percpu.h>
 #include <linux/cryptohash.h>
 #include <linux/fips.h>
-
+#include <linux/cc_mode.h>
 #ifdef CONFIG_GENERIC_HARDIRQS
 # include <linux/irq.h>
 #endif
@@ -1105,7 +1105,8 @@ static ssize_t
 urandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 #ifdef CONFIG_CRYPTO_FIPS
-	if (get_cc_mode_state())
+	int cc_flag = get_cc_mode_state();
+	if ((cc_flag & FLAG_FORCE_USE_RANDOM_DEV) == FLAG_FORCE_USE_RANDOM_DEV)
 		return random_read(file, buf, nbytes, ppos);
 	else
 #endif

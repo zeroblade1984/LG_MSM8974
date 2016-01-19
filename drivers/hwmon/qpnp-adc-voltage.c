@@ -119,7 +119,7 @@
 #define QPNP_VADC_ERR_COUNT					20
 
 #if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
-#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS)
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS_KR)
 extern void check_touch_xo_therm(int type);
 int touch_thermal_mode = 0;
 #endif
@@ -1515,15 +1515,22 @@ void xo_therm_logging(void)
 		pr_err("vadc is not ready\n");
 		return;
 	}
-
+#if defined(CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) || \
+    defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM)
+	rc = qpnp_vadc_read_lge(LR_MUX8_PU2_AMUX_THM4, &tmp);
+	if (rc)
+		pr_err("VADC read error with %d\n", rc);
+	printk(KERN_INFO "[PA_THERM] Result:%lld Raw:%d\n",
+		tmp.physical, tmp.adc_code);
+#else
 	rc = qpnp_vadc_read_lge(LR_MUX3_PU2_XO_THERM, &tmp);
 	if (rc)
 		pr_err("VADC read error with %d\n", rc);
 	printk(KERN_INFO "[XO_THERM] Result:%lld Raw:%d\n",
 		tmp.physical, tmp.adc_code);
-
+#endif
 #if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
-#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS)
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_G2) || defined (CONFIG_MACH_MSM8974_TIGERS_KR)
 #define TOUCH_HIGH_TEMPERATURE	50
 #define TOUCH_LOW_TEMPERATURE	47
 			if (touch_thermal_mode == 0 && tmp.physical >= TOUCH_HIGH_TEMPERATURE) {

@@ -1259,6 +1259,7 @@ struct incall_music_info {
 	int count;
 	int force;
 	uint16_t port_id;
+	uint32_t incall_music_mute;
 };
 
 struct share_memory_info {

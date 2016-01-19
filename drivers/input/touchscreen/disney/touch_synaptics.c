@@ -72,6 +72,7 @@ static unsigned int cnt;
 u8 int_mask_cust;
 int is_Sensing;
 int mfts_enable;
+bool lpwg_by_lcd_notifier;
 int boot_mode = NORMAL_BOOT_MODE;
 int previous_pm_suspend = 0;
 /*static int ts_suspend = 0;
@@ -191,6 +192,7 @@ extern int touch_ta_status;
 #define LPWG_TOUCH_SLOP_REG2		(LPWG_TOUCH_SLOP_REG + LPWG_BLOCK_SIZE)
 #define LPWG_TAP_DISTANCE_REG2		(LPWG_TAP_DISTANCE_REG + LPWG_BLOCK_SIZE)
 #define LPWG_INTERRUPT_DELAY_REG2	(LPWG_INTERRUPT_DELAY_REG + LPWG_BLOCK_SIZE)
+#define LPWG_PARTIAL_REG			(LPWG_INTERRUPT_DELAY_REG2 + 2)//P1 is '+11'.
 #define MISC_HOST_CONTROL_REG		(ts->f51.dsc.control_base + 7 + LPWG_BLOCK_SIZE)
 /* finger_amplitude(0x80) = 0.5 */
 #define THERMAL_HIGH_FINGER_AMPLITUDE	0x60
@@ -232,6 +234,7 @@ extern int touch_ta_status;
 #define TOUCH_SLOP_CTRL		6
 #define TAP_DISTANCE_CTRL	7
 #define INTERRUPT_DELAY_CTRL	8
+#define PARTIAL_LPWG_ON		9
 
 #define TCI_ENABLE_CTRL2	22
 #define TAP_COUNT_CTRL2		23
@@ -723,6 +726,11 @@ static int tci_control(struct synaptics_ts_data *ts, int type, u8 value)
 					(buffer[0] = (KNOCKON_DELAY << 1) | 0x1)
 					: (buffer[0] = 0)), error);
 		break;
+	case PARTIAL_LPWG_ON:
+		DO_SAFE(synaptics_ts_page_data_write_byte(client,
+					LPWG_PAGE, ts->f51_reg.lpwg_partial_reg,
+					value), error);
+		break;
 	default:
 		break;
 	}
@@ -926,6 +934,15 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6)))  {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG503", 6))) {
+			if (lpwg_by_lcd_notifier) {
+				TOUCH_INFO_MSG("Partial LPWG doens't work after LPWG ON command\n");
+			} else {
+				tci_control(ts, PARTIAL_LPWG_ON, 1);
+			}
+		}
 		if (ts->ts_swipe_data.support_swipe)
 			swipe_enable(ts);
 		break;
@@ -956,10 +973,24 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG503", 6))) {
+			if (lpwg_by_lcd_notifier) {
+				TOUCH_INFO_MSG("Partial LPWG doens't work after LPWG ON command\n");
+			} else {
+				tci_control(ts, PARTIAL_LPWG_ON, 1);
+			}
+		}
 		if (ts->ts_swipe_data.support_swipe)
 			swipe_enable(ts);
 		break;
 	default:
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "PLG503", 6))) {
+			tci_control(ts, PARTIAL_LPWG_ON, 0);
+		}
 		tci_control(ts, TCI_ENABLE_CTRL, 0); /* Tci-1 disable */
 		tci_control(ts, TCI_ENABLE_CTRL2, 0); /* tci-2 disable */
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
@@ -1042,6 +1073,14 @@ void matchUp_f51_regMap(struct synaptics_ts_data *ts)
 		ts->f51_reg.lpwg_touch_slop_reg2 = (LPWG_TOUCH_SLOP_REG + LPWG_BLOCK_SIZE);
 		ts->f51_reg.lpwg_tap_distance_reg2 = (LPWG_TAP_DISTANCE_REG + LPWG_BLOCK_SIZE);
 		ts->f51_reg.lpwg_interrupt_delay_reg2 = (LPWG_INTERRUPT_DELAY_REG + LPWG_BLOCK_SIZE);
+
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))
+				|| !(strncmp(ts->fw_info.fw_product_id, "S332U", 5))) {
+			ts->f51_reg.lpwg_partial_reg = LPWG_PARTIAL_REG + 123;
+		} else {
+			ts->f51_reg.lpwg_partial_reg = LPWG_PARTIAL_REG;
+		}
+
 	} else if (!(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))) {
 
 		TOUCH_INFO_MSG("[%s] This is Lion L\n", __func__);
@@ -4740,8 +4779,8 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 			TOUCH_DEBUG(DEBUG_BASE_INFO, "%s : unknown interrupt in PM_SUSPEND\n", __func__);
 			previous_pm_suspend = 0;
 			tci_control(ts, REPORT_MODE_CTRL, 1);
-			if(!ts->lpwg_ctrl.sensor) { /* Active -> Deep sleep */
-				sleep_control(ts, 0, 0);
+			if(!ts->lpwg_ctrl.sensor && !ts->lpwg_ctrl.qcover) { /* Sensor Near && Quick Cover Open*/
+				sleep_control(ts, 0, 0); /* Active -> Deep sleep */
 				TOUCH_DEBUG(DEBUG_BASE_INFO, "%s : It's Active->deep sleep in PM_SUSPEND\n", __func__);
 			}
 			ts->lpwg_ctrl.protocol9_sleep_flag = true;
@@ -5377,21 +5416,30 @@ enum error_type synaptics_ts_lpwg(struct i2c_client *client,
 	}
 	/* LPWG On Sequence has to be after Display off callback timing. */
 	case LPWG_INCELL_LPWG_ON:
-		tci_control(ts, REPORT_MODE_CTRL, 1);           // wakeup_gesture_only
-		if(!ts->lpwg_ctrl.sensor) { /* Active -> Deep sleep */
-			sleep_control(ts, 0, 0);
+		if (!ts->lpwg_ctrl.lpwg_is_enabled &&
+				ts->lpwg_ctrl.sensor &&
+				!ts->lpwg_ctrl.screen) {
+			tci_control(ts, REPORT_MODE_CTRL, 0);
+			lpwg_by_lcd_notifier = false;
+			TOUCH_DEBUG(DEBUG_BASE_INFO, "LPWG Disable\n");
+		} else {
+			tci_control(ts, REPORT_MODE_CTRL, 1);//wakeup_gesture_only
+			lpwg_by_lcd_notifier = true;
+		}
+
+		if(!ts->lpwg_ctrl.sensor && !ts->lpwg_ctrl.qcover) { /* Sensor Near && Quick Cover Open*/
+			sleep_control(ts, 0, 0); /* Active -> Deep sleep */
 			TOUCH_DEBUG(DEBUG_BASE_INFO, "%s : It's Active->deep sleep\n", __func__);
 		}
 		ts->lpwg_ctrl.protocol9_sleep_flag = true; /* Protocol 9 enable for sleep control */
 		TOUCH_DEBUG(DEBUG_BASE_INFO, "Protocol 9 enable!\n");
 	break;
 	case LPWG_INCELL_LPWG_OFF:
-		mutex_lock(&ts->pdata->thread_lock);
 		DO_SAFE(touch_i2c_write_byte(client, DEVICE_CONTROL_REG, DEVICE_CONTROL_NORMAL_OP | DEVICE_CONTROL_CONFIGURED), error);
 		tci_control(ts, REPORT_MODE_CTRL, 0); /* normal */
+		lpwg_by_lcd_notifier = false;
 		ts->lpwg_ctrl.protocol9_sleep_flag = false; /* Protocol 9 disable for sleep control */
 		TOUCH_DEBUG(DEBUG_BASE_INFO, "Protocol 9 disable!\n");
-		mutex_unlock(&ts->pdata->thread_lock);
 	break;
 	default:
 		break;
@@ -5425,7 +5473,7 @@ static void synapitcs_change_ime_status(struct i2c_client *client,
 					__func__);
 		}
 	} else {
-		udata[3] = 0x0f; /*Drumming Acceleration Threshold*/
+		udata[3] = 0x0a; /*Drumming Acceleration Threshold*/
 		udata[4] = 0x0a; /*Minimum Drumming Separation*/
 		if (touch_i2c_write(ts->client,
 					drumming_address, 5, udata) < 0) {

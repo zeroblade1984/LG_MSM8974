@@ -138,6 +138,14 @@ static unsigned int up_threshold_any_cpu_freq;
 #define DEF_IS_GRID							(0)
 #define DEF_ABOVE_OPTIMAL_MAX_FREQ_DELAY	(20000)
 
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+#define DEF_LCDOFF_MIDDLE_GRID_STEP           		(14)
+#define DEF_LCDOFF_HIGH_GRID_STEP             		(20)
+#define DEF_LCDOFF_MIDDLE_GRID_LOAD			(65)
+#define DEF_LCDOFF_HIGH_GRID_LOAD			(89)
+#define DEF_LCDOFF_OPTIMAL_FREQ			(1574400)
+#endif
+
 static unsigned int middle_grid_step = DEF_MIDDLE_GRID_STEP;
 static unsigned int high_grid_step = DEF_HIGH_GRID_STEP;
 static unsigned int middle_grid_load = DEF_MIDDLE_GRID_LOAD;
@@ -147,6 +155,17 @@ static unsigned int is_grid = DEF_IS_GRID;
 static unsigned int above_optimal_max_freq_delay = DEF_ABOVE_OPTIMAL_MAX_FREQ_DELAY;
 static unsigned int backup_hispeed_freq;
 
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+static unsigned int lcdoff_optimal_max_freq = DEF_LCDOFF_OPTIMAL_FREQ;
+static unsigned int lcdoff_middle_grid_step = DEF_LCDOFF_MIDDLE_GRID_STEP;
+static unsigned int lcdoff_high_grid_step= DEF_LCDOFF_HIGH_GRID_STEP;
+static unsigned int lcdoff_middle_grid_load = DEF_LCDOFF_MIDDLE_GRID_LOAD;
+static unsigned int lcdoff_high_grid_load = DEF_LCDOFF_HIGH_GRID_LOAD;
+#endif
+
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+extern struct msm_fb_data_type *mfd_base;
+#endif
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);
 
@@ -293,6 +312,49 @@ static unsigned int choose_freq_grid(
 
 	load_at_max_freq = cpu_load * freq / pcpu->policy->cpuinfo.max_freq;
 
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+	if(mfd_base != NULL && mfd_base->panel_power_on)
+	{
+		if(load_at_max_freq > high_grid_load)
+		{
+			freq_div = (pcpu->policy->max * high_grid_step) / 100;
+			freq = min(pcpu->policy->max, freq + freq_div);
+		}
+		else if(load_at_max_freq > middle_grid_load)
+		{
+			freq_div = (pcpu->policy->max * middle_grid_step) / 100;
+			freq = min(pcpu->policy->max, freq + freq_div);
+		}
+		else
+		{
+			if(pcpu->policy->max < optimal_max_freq)
+				freq = pcpu->policy->max;
+			else
+				freq = optimal_max_freq;
+		}
+	}
+	else
+	{
+		if(load_at_max_freq > lcdoff_high_grid_load)
+		{
+			freq_div = (pcpu->policy->max * lcdoff_high_grid_step) / 100;
+			freq = min(pcpu->policy->max, freq + freq_div);
+		}
+		else if(load_at_max_freq > lcdoff_middle_grid_load)
+		{
+			freq_div = (pcpu->policy->max * lcdoff_middle_grid_step) / 100;
+			freq = min(pcpu->policy->max, freq + freq_div);
+		}
+		else
+		{
+			if(pcpu->policy->max < lcdoff_optimal_max_freq)
+				freq = pcpu->policy->max;
+			else
+				freq = lcdoff_optimal_max_freq;
+
+		}
+	}
+#else
 	if(load_at_max_freq > high_grid_load){
 		freq_div = (pcpu->policy->max *high_grid_step) / 100;
 		freq = min(pcpu->policy->max, freq + freq_div);
@@ -306,7 +368,9 @@ static unsigned int choose_freq_grid(
 			freq = pcpu->policy->max;
 		else
 			freq = optimal_max_freq;
+
 	}
+#endif
 
 	if(cpufreq_frequency_table_target(
 			pcpu->policy, pcpu->freq_table, freq,
@@ -851,7 +915,7 @@ static ssize_t show_target_loads(
 		ret += sprintf(buf + ret, "%u%s", target_loads[i],
 			       i & 0x1 ? ":" : " ");
 
-	ret += sprintf(buf + --ret, "\n");
+	ret += sprintf(buf + ret - 1, "\n");
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 	return ret;
 }
@@ -897,7 +961,7 @@ static ssize_t show_above_hispeed_delay(
 		ret += sprintf(buf + ret, "%u%s", above_hispeed_delay[i],
 			       i & 0x1 ? ":" : " ");
 
-	ret += sprintf(buf + --ret, "\n");
+	ret += sprintf(buf + ret - 1, "\n");
 	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
 	return ret;
 }
@@ -1143,9 +1207,74 @@ static ssize_t store_boostpulse_duration(
 	boostpulse_duration_val = val;
 	return count;
 }
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+static ssize_t store_lcdoff_middle_grid_step(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	lcdoff_middle_grid_step = input;
+	return count;
+}
+
+static ssize_t store_lcdoff_high_grid_step(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	lcdoff_high_grid_step = input;
+	return count;
+}
+
+static ssize_t store_lcdoff_optimal_max_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	lcdoff_optimal_max_freq = input;
+	return count;
+}
+
+static ssize_t store_lcdoff_middle_grid_load(struct kobject *a,
+			struct attribute *b, const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+
+	if (ret != 1)
+		return -EINVAL;
+	lcdoff_middle_grid_load = input;
+	return count;
+}
+
+static ssize_t store_lcdoff_high_grid_load(struct kobject *a,
+			struct attribute *b, const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+
+	if (ret != 1)
+		return -EINVAL;
+	lcdoff_high_grid_load = input;
+	return count;
+}
+#endif
 
 define_one_global_rw(boostpulse_duration);
-
 static ssize_t show_io_is_busy(struct kobject *kobj,
 			struct attribute *attr, char *buf)
 {
@@ -1252,7 +1381,13 @@ show_one(high_grid_load, high_grid_load);
 show_one(optimal_max_freq, optimal_max_freq);
 show_one(is_grid, is_grid);
 show_one(above_optimal_max_freq_delay,above_optimal_max_freq_delay);
-
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+show_one(lcdoff_middle_grid_step, lcdoff_middle_grid_step);
+show_one(lcdoff_high_grid_step, lcdoff_high_grid_step);
+show_one(lcdoff_middle_grid_load, lcdoff_middle_grid_load);
+show_one(lcdoff_high_grid_load, lcdoff_high_grid_load);
+show_one(lcdoff_optimal_max_freq, lcdoff_optimal_max_freq);
+#endif
 
 
 static ssize_t store_middle_grid_step(struct kobject *a, struct attribute *b,
@@ -1352,6 +1487,7 @@ static ssize_t store_above_optimal_max_freq_delay(struct kobject *a, struct attr
 	return count;
 }
 
+
 static struct global_attr middle_grid_step_attr = __ATTR(middle_grid_step, 0644,
 		show_middle_grid_step, store_middle_grid_step);
 static struct global_attr high_grid_step_attr = __ATTR(high_grid_step, 0644,
@@ -1366,6 +1502,19 @@ static struct global_attr is_grid_attr = __ATTR(is_grid, 0644,
 		show_is_grid, store_is_grid);
 static struct global_attr above_optimal_max_freq_delay_attr = __ATTR(above_optimal_max_freq_delay, 0644,
 		show_above_optimal_max_freq_delay, store_above_optimal_max_freq_delay);
+
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+static struct global_attr lcdoff_optimal_max_freq_attr = __ATTR(lcdoff_optimal_max_freq, 0644,
+		show_lcdoff_optimal_max_freq, store_lcdoff_optimal_max_freq);
+static struct global_attr lcdoff_middle_grid_step_attr = __ATTR(lcdoff_middle_grid_step, 0644,
+		show_lcdoff_middle_grid_step, store_lcdoff_middle_grid_step);
+static struct global_attr lcdoff_high_grid_step_attr = __ATTR(lcdoff_high_grid_step, 0644,
+		show_lcdoff_high_grid_step, store_lcdoff_high_grid_step);
+static struct global_attr lcdoff_middle_grid_load_attr = __ATTR(lcdoff_middle_grid_load, 0644,
+		show_lcdoff_middle_grid_load, store_lcdoff_middle_grid_load);
+static struct global_attr lcdoff_high_grid_load_attr = __ATTR(lcdoff_high_grid_load, 0644,
+		show_lcdoff_high_grid_load, store_lcdoff_high_grid_load);
+#endif
 
 static struct attribute *interactive_attributes[] = {
 	&target_loads_attr.attr,
@@ -1390,6 +1539,13 @@ static struct attribute *interactive_attributes[] = {
 	&optimal_max_freq_attr.attr,
 	&is_grid_attr.attr,
 	&above_optimal_max_freq_delay_attr.attr,
+#ifdef CONFIG_LGE_PM_CPU_FREQ_GOV_LCDOFF
+	&lcdoff_optimal_max_freq_attr.attr,
+	&lcdoff_middle_grid_step_attr.attr,
+	&lcdoff_high_grid_step_attr.attr,
+	&lcdoff_middle_grid_load_attr.attr,
+	&lcdoff_high_grid_load_attr.attr,
+#endif
 	NULL,
 };
 
@@ -1417,6 +1573,7 @@ static int cpufreq_interactive_idle_notifier(struct notifier_block *nb,
 static struct notifier_block cpufreq_interactive_idle_nb = {
 	.notifier_call = cpufreq_interactive_idle_notifier,
 };
+
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event)
@@ -1476,6 +1633,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		idle_notifier_register(&cpufreq_interactive_idle_nb);
 		cpufreq_register_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+
 		mutex_unlock(&gov_lock);
 		break;
 
@@ -1566,6 +1724,7 @@ static int __init cpufreq_interactive_init(void)
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
+
 		pcpu = &per_cpu(cpuinfo, i);
 		init_timer_deferrable(&pcpu->cpu_timer);
 		pcpu->cpu_timer.function = cpufreq_interactive_timer;

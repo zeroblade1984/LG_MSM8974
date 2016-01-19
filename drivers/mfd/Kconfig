@@ -485,6 +485,13 @@ config MFD_TPS65132
 	  if you say yes here you get support for the TPS65132 series of
 	  Power Management chips.
 
+config MFD_TPS65132L
+	bool "TPS65132L Power Management chip"
+	depends on MFD_TPS65132
+	help
+	  if you say yes here you get support for the TPS65132L of
+	  Power Management chips.
+
 config MFD_MAX8925
 	bool "Maxim Semiconductor MAX8925 PMIC Support"
 	depends on I2C=y && GENERIC_HARDIRQS

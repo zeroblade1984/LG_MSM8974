@@ -158,6 +158,7 @@ struct touch_platform_data {
 	struct touch_operation_role	*role;
 	struct touch_power_module	*pwr;
 	struct touch_firmware_module	*fw;
+	struct mutex			thread_lock;
 	const char* inbuilt_fw_name;
 	const char* inbuilt_fw_name_s3621;
 	const char* inbuilt_fw_name_s3528_a1;
@@ -342,7 +343,7 @@ enum window_status {
 
 struct touch_device_driver {
 	enum error_type (*probe) (struct i2c_client *client,
-		const struct touch_platform_data *lge_ts_data,
+		struct touch_platform_data *lge_ts_data,
 		const struct state_info *state,
 		struct attribute ***attribute_list);
 	enum error_type (*remove) (struct i2c_client *client);
@@ -385,7 +386,6 @@ struct lge_touch_data {
 	struct delayed_work		work_trigger_handle;
 	struct delayed_work		work_crack;
 	struct delayed_work		work_thermal;
-	struct mutex			thread_lock;
 	struct bouncing_filter_info	bouncing_filter;
 	struct grip_filter_info		grip_filter;
 	struct accuracy_filter_info	accuracy_filter;
@@ -723,6 +723,7 @@ do {								\
 #define TOUCH_TRACE()						\
 	TOUCH_DEBUG(DEBUG_TRACE, " - %s %d\n", __func__, __LINE__)
 
+extern int factory_boot;
 
 /* sysfs
  *

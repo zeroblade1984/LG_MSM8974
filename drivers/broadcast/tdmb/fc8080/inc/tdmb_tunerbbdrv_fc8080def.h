@@ -94,6 +94,7 @@ typedef enum	fc8080_service_type
 	FC8080_DATA,
 	FC8080_ENSQUERY = 6,	/* LGE Added */
 	FC8080_BLT_TEST = 9,
+    FC8080_DABP = 10,
 	FC8080_SERVICE_MAX
 } fc8080_service_type;
 
@@ -112,6 +113,7 @@ typedef enum	fc8080_service_type
 extern	int8 tunerbb_drv_fc8080_power_on(void);
 extern	int8 tunerbb_drv_fc8080_power_off(void);
 extern	int8 tunerbb_drv_fc8080_select_antenna(unsigned int sel);
+extern	int8 tunerbb_drv_fc8080_set_nation(unsigned int nation);
 extern	int8 tunerbb_drv_fc8080_init(void);
 extern	int8 tunerbb_drv_fc8080_stop(void);
 extern	int8 tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info);

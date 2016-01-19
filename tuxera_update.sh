@@ -2,6 +2,9 @@
 
 # ================= NO CHANGE NEEDED BELOW! =====================
 
+CROSS_COMPILE_PATH=${ANDROID_BUILD_TOP}/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/
+PATH=${CROSS_COMPILE_PATH}:${PATH}
+
 usage() {
     usagestr=$(cat <<EOF
 Usage: tuxera_update.sh [OPTION...]
@@ -144,6 +147,11 @@ detect_arch_dirs() {
         grep -q '^#define CONFIG_X86_64' "$ac" && archdirs="$archdirs x86_64"
     fi
 
+    if [ "$archdirs" == "arm64" ] ; then
+        # Nvidia Tegra 3.10.61
+        grep -q '^#define CONFIG_ARCH_TEGRA' "$ac" && archdirs="$archdirs arm"
+    fi
+
     # Realtek RLX fix
     [ "$archdirs" == "mips" ] && grep -q '^#define CONFIG_CPU_RLX' "$ac" && archdirs="rlx"
 
@@ -179,6 +187,8 @@ build_package() {
     KERNEL_LINK="${LINK_DIR}"/kernel
     OUTPUT_LINK="${LINK_DIR}"/output
     MEDIATEK_LINK="${LINK_DIR}"/mediatek
+    EXTRA_SEARCH_NEW_MEDIATEK="${KERNEL_LINK}"/drivers/misc/mediatek/mach
+    EXTRA_SEARCH_NEW_MEDIATEK_INCLUDE="${KERNEL_LINK}"/drivers/misc/mediatek/include
     [ -d "$source_dir"/../mediatek ] && have_mediatek=1
 
     # Create kernel and output links to LINK_DIR. Only create link to output
@@ -240,10 +250,10 @@ build_package() {
 
     detect_arch_dirs
 
-    SEARCHPATHS="$(for d in $archdirs; do echo "${KERNEL_LINK}/arch/$d"; done) ${KERNEL_LINK}/include ${KERNEL_LINK}/scripts ${KERNEL_LINK}/mediatek/Makefile ${KERNEL_LINK}/mediatek/platform ${MEDIATEK_LINK}/config ${MEDIATEK_LINK}/platform ${MEDIATEK_LINK}/build/libs ${MEDIATEK_LINK}/build/Makefile ${MEDIATEK_LINK}/build/kernel ${MEDIATEK_LINK}/kernel/include/linux ${MEDIATEK_LINK}/kernel/Makefile ${KERNEL_LINK}/KMC ${KERNEL_LINK}/init/secureboot ${KERNEL_LINK}/mvl-avb-version ${KERNEL_LINK}/tools/gcc"
+    SEARCHPATHS="$(for d in $archdirs; do echo "${KERNEL_LINK}/arch/$d"; done) ${KERNEL_LINK}/include ${KERNEL_LINK}/scripts ${KERNEL_LINK}/mediatek/Makefile ${KERNEL_LINK}/mediatek/platform ${MEDIATEK_LINK}/config ${MEDIATEK_LINK}/platform ${MEDIATEK_LINK}/build/libs ${MEDIATEK_LINK}/build/Makefile ${MEDIATEK_LINK}/build/kernel ${MEDIATEK_LINK}/kernel/include/linux ${MEDIATEK_LINK}/kernel/Makefile ${KERNEL_LINK}/KMC ${KERNEL_LINK}/init/secureboot ${KERNEL_LINK}/mvl-avb-version ${EXTRA_SEARCH_NEW_MEDIATEK} ${EXTRA_SEARCH_NEW_MEDIATEK_INCLUDE}"
 
     if [ -L "${OUTPUT_LINK}" ] ; then
-        SEARCHPATHS="${SEARCHPATHS} $(for d in $archdirs; do echo "${OUTPUT_LINK}/arch/$d"; done) ${OUTPUT_LINK}/include ${OUTPUT_LINK}/scripts ${OUTPUT_LINK}/KMC ${OUTPUT_LINK}/init/secureboot ${OUTPUT_LINK}/mvl-avb-version ${OUTPUT_LINK}/tools/gcc"
+        SEARCHPATHS="${SEARCHPATHS} $(for d in $archdirs; do echo "${OUTPUT_LINK}/arch/$d"; done) ${OUTPUT_LINK}/include ${OUTPUT_LINK}/scripts ${OUTPUT_LINK}/KMC ${OUTPUT_LINK}/init/secureboot ${OUTPUT_LINK}/mvl-avb-version"
     fi
 
     # Not all of the directories always exist, so check for them first to avoid an error message
@@ -442,7 +452,7 @@ gen_header_checksums() {
     fi
 
     make -C "$kernel" ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE $CUST_KENV M="${cache_dir}/pkgtmp/dependency_mod" depmod.i > $dbgdev
-    
+
     if [ $? -ne 0 ] ; then
         echo "Compilation failed. Unable to compute header dependency tree."
         return 1
@@ -464,7 +474,7 @@ check_symvers() {
     symvers_parsed=$(mktemp)
 
     sort $(find "$searchdir" -name \*.mod.c) | uniq | \
-        egrep "{ 0x[[:xdigit:]]{8}," | awk '{print $2,$3}' | tr -d ',\"' > $searchvers
+        sed -rn 's/^[[:space:]]*\{[[:space:]]*0x([[:xdigit:]]{8}),.*["(](.*)[")].*\}.*/0x\1 \2/p' > $searchvers
 
     awk '{print $1,$2}' "$symvers" > "$symvers_parsed"
 
@@ -646,7 +656,7 @@ do_remote_build() {
         echo "Check connectivity and username/password."
         exit 1
     fi
-    
+
     status=$(echo "$reply" | head -n 1)
 
     # If status is OK, build ID should be included as well
@@ -656,13 +666,13 @@ do_remote_build() {
         echo "$status"
         exit 1
     fi
-    
+
     # ID of this build is given in the reply
     build_id=$(echo "$reply" | head -n 2 | tail -n 1)
-    
+
     echo "Build started, id ${build_id}"
     echo "Polling for completion every 10 seconds..."
-    
+
     statusurl="https://${server}/builds/${build_id}/.status"
 
     for i in `seq $max_polls`
@@ -672,7 +682,7 @@ do_remote_build() {
         else
             reply=$($curl_quiet "$statusurl")
         fi
-        
+
         if [ $? -ne 0 ] ; then
             if [ $i -eq $max_polls ] ; then
                 echo "Maximum attempts exceeded. Build process"
@@ -685,37 +695,37 @@ do_remote_build() {
             sleep 10
             continue
         fi
-        
+
         break
     done
-    
+
     echo "Build finished."
 
     # Downloadable filename given in the reply
     status=$(echo "$reply" | head -n 1)
-    
+
     if [ "$status" != "OK" ] ; then
         echo "Build failed. Cannot download package."
         echo "Tuxera has been notified of this failure."
         exit 1
     fi
-    
+
     filename=$(echo "$reply" | head -2 | tail -1)
     fileurl="https://${server}/builds/${build_id}/${filename}"
-    
+
     echo "Downloading ${filename} ..."
-    
+
     if [ "$http_client" = "wget" ] ; then
         $wget -O "$filename" "$fileurl"
     else
         $curl -o "$filename" "$fileurl"
     fi
-    
+
     if [ $? -ne 0 ] ; then
         echo "Failed. You can still try to download using the link in the e-mail that was sent."
         exit 1
     fi
-    
+
     echo "Download finished."
 
     # Create cache entry.
@@ -863,7 +873,7 @@ check_http_client() {
         wget_quiet=${wget_quiet}" -q"
         wget=${wget}" -nv"
     fi
-    
+
     if [ -n "$ignore_certificates" ] ; then
         curl_quiet=${curl_quiet}" -k"
         wget_quiet=${wget_quiet}" --no-check-certificate"
@@ -1013,7 +1023,7 @@ set_source_dir() {
 # Script start
 #
 
-script_version="14.9.27"
+script_version="15.10.30"
 cache_dir=".tuxera_update_cache"
 dbgdev="/dev/null"
 cache_lookup_time="none"
@@ -1081,6 +1091,18 @@ if [ -z "$target" ] ; then
 fi
 
 check_cmds tar find grep readlink cut sed
+
+# Check specified output-dir exists
+if [ -n "$output_dir" ] && [ ! -d "$(readlink -f "$output_dir")" ]; then
+    echo "Specified --output_dir '$output_dir' doesn't exist. Unable to continue."
+    exit 1
+fi
+
+# Check specified source-dir exists
+if [ -n "$source_dir" ] && [ ! -d "$(readlink -f "$source_dir")" ]; then
+    echo "Specified --source_dir '$source_dir' doesn't exist. Unable to continue."
+    exit 1
+fi
 
 set_source_dir
 

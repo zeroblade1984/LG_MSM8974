@@ -857,9 +857,4 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      const struct iovec __user *rvec,
 				      unsigned long riovcnt,
 				      unsigned long flags);
-
-//FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION[S]
-asmlinkage long sys_set_media_property(int value);
-asmlinkage long sys_set_media_ext(char *mediaExtList);
-//FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION[E]
 #endif

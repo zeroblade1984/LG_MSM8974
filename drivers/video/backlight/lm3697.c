@@ -216,9 +216,8 @@ void lm3697_lcd_backlight_set_level(int level)
 			ret = lm3697_bl_enable(lm3697_bl, 1);
 	}
 
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error enable or disable backlight\n", __func__);
-	}
 
 #ifdef CONFIG_MACH_LGE
 	if (level >= pdata->blmap_size)
@@ -238,9 +237,8 @@ void lm3697_lcd_backlight_set_level(int level)
 	ret = lm3697_bl_set_brightness(lm3697_bl, level);
 #endif
 
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error set backlight\n", __func__);
-	}
 }
 EXPORT_SYMBOL(lm3697_lcd_backlight_set_level);
 
@@ -300,9 +298,8 @@ static void lm3697_lcd_backlight_set_level_nomapping(int level)
 		level = 2047;
 
 	ret = lm3697_bl_set_brightness(lm3697_bl, level);
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error set backlight\n", __func__);
-	}
 };
 
 static int lm3697_bl_get_brightness(struct backlight_device *bl_dev)
@@ -760,7 +757,7 @@ static struct lm3697_bl *lm3697_bl_register(struct lm3697_bl_chip *chip)
 #endif
 		if (lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY) {
 			each->bl_dev->props.brightness = 0;
-			pr_info("%s : 130K is connected \n", __func__);
+			pr_info("%s : 130K is connected\n", __func__);
 		} else {
 			backlight_status = BL_ON;
 			backlight_update_status(each->bl_dev);

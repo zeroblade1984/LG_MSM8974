@@ -1149,6 +1149,24 @@ regulator_turn_off:
 	return 0;
 }
 
+#if defined(CONFIG_MACH_MSM8974_DZNY_DCM)
+static void qpnp_flash_status(struct qpnp_led_data *led)
+{
+	int i;
+	u8 val;
+	u8 regs[] = {0x08, 0x10};
+
+	for (i = 0; i < 2; i++) {
+		spmi_ext_register_readl(led->spmi_dev->ctrl,
+					led->spmi_dev->sid,
+					led->base + regs[i],
+					&val, sizeof(val));
+		pr_info("%s: 0x%x = 0x%x\n", led->cdev.name,
+					led->base + regs[i], val);
+	}
+}
+#endif
+
 static int qpnp_flash_set(struct qpnp_led_data *led)
 {
 	int rc, error;
@@ -1517,7 +1535,11 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 #endif //CONFIG_LGE_PM_CHARGING_CHARGER_TEMP
 	}
 
+#if defined(CONFIG_MACH_MSM8974_DZNY_DCM)
+	qpnp_flash_status(led);
+#else
 	qpnp_dump_regs(led, flash_debug_regs, ARRAY_SIZE(flash_debug_regs));
+#endif
 
 	return 0;
 
@@ -4670,7 +4692,7 @@ void make_blink_led_pattern(int rgb, int delay_on, int delay_off)
 	rgb_lut_params.lut_pause_hi = delay_off/2;
 	rgb_lut_params.lut_pause_lo = delay_on/2;
 	rgb_lut_params.ramp_step_ms = 1;
-	rgb_lut_params.flags = 89;
+	rgb_lut_params.flags = 91;
 
 	/* mix_brightness_tunning = (((rgb >> 16) & 0xFF) && 1) +
 		(((rgb >> 8) & 0xFF) && 1) + ((rgb & 0xFF) && 1); */

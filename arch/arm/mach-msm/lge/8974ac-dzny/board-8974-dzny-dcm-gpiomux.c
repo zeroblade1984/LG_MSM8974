@@ -134,7 +134,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 #if defined(CONFIG_LGE_NFC_SONY)
 static struct gpiomux_setting gpio_uart_felica = {
 	.func = GPIOMUX_FUNC_2,
-	.drv = GPIOMUX_DRV_8MA,
+	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
 static struct gpiomux_setting gpio_uart_felica_active = {
@@ -650,17 +650,6 @@ static struct gpiomux_setting touch_reset_act_cfg = {
 	.dir = GPIOMUX_IN,
 };
 
-static struct gpiomux_setting touch_ldoen_act_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_8MA,
-	.dir = GPIOMUX_IN,
-};
-
-static struct gpiomux_setting touch_ldoen_sus_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.dir = GPIOMUX_IN,
-};
 #endif
 
 static struct msm_gpiomux_config msm_touch_configs[] __initdata = {
@@ -681,35 +670,6 @@ static struct msm_gpiomux_config msm_touch_configs[] __initdata = {
 
 };
 
-#ifdef CONFIG_MACH_LGE
-static struct gpiomux_setting hsic_sus_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
-	.dir = GPIOMUX_OUT_LOW,
-};
-#else /* qmc original */
-static struct gpiomux_setting hsic_sus_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
-};
-#endif
-
-#if 0
-static struct gpiomux_setting hsic_act_cfg = {
-	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_12MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-#endif
-static struct gpiomux_setting hsic_hub_act_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-	.dir = GPIOMUX_IN,
-};
-
 #ifndef CONFIG_MACH_LGE
 static struct gpiomux_setting hsic_resume_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -724,16 +684,6 @@ static struct gpiomux_setting hsic_resume_susp_cfg = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 #endif
-
-static struct msm_gpiomux_config msm_hsic_hub_configs[] = {
-	{
-		.gpio = 50,               /* HSIC_HUB_INT_N */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &hsic_hub_act_cfg,
-			[GPIOMUX_SUSPENDED] = &hsic_sus_cfg,
-		},
-	},
-};
 
 static struct gpiomux_setting hall_ic_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -1210,6 +1160,20 @@ static struct gpiomux_setting cam_settings[] = {
 		.drv = GPIOMUX_DRV_2MA,
 		.pull = GPIOMUX_PULL_DOWN,
 	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, /*active 2*/ /* 5 */ /* for INPUT pin */
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_UP,
+		.dir = GPIOMUX_IN,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, /*suspend 2*/ /* 6 */ /* for INPUT pin */
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_NONE,
+		.dir = GPIOMUX_IN,
+	},
 };
 
 static struct gpiomux_setting sd_card_det_active_config = {
@@ -1343,14 +1307,6 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &cam_settings[4],
 		},
 	},
-
-	{
-		.gpio = 23, /* FLASH_LED_EN */
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &touch_ldoen_act_cfg,
-			[GPIOMUX_SUSPENDED] = &touch_ldoen_sus_cfg,
-		},
-	},
 	{
 		.gpio = 24, /* FLASH_LED_NOW */
 		.settings = {
@@ -1358,7 +1314,6 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-
 #if 0 //unused gpio
 	{
 		.gpio = 25, /* WEBCAM2_RESET_N */
@@ -2085,10 +2040,6 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_sdc4_install();
 
 	msm_gpiomux_install(msm_taiko_config, ARRAY_SIZE(msm_taiko_config));
-
-	//msm_gpiomux_install(msm_hsic_configs, ARRAY_SIZE(msm_hsic_configs));
-	msm_gpiomux_install(msm_hsic_hub_configs,
-				ARRAY_SIZE(msm_hsic_hub_configs));
 
 	msm_gpiomux_install(msm_hdmi_configs, ARRAY_SIZE(msm_hdmi_configs));
 	if (of_board_is_fluid())

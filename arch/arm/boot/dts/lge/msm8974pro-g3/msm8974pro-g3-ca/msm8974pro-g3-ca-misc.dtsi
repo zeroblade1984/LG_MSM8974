@@ -39,8 +39,7 @@
 	i2c@f9967000 {
 		lp5521@32 {
 			compatible = "ti,lp5521";
-			status = "ok";
-			revision = "evb1...rev_c";
+			status = "disable";
 			reg = <0x32>;
 			ti,led_en = <&pm8941_gpios 25 0x0>;
 		};

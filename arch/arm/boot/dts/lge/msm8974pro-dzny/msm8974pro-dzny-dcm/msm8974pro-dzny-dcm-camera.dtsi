@@ -13,6 +13,19 @@
 
 /include/ "../../../skeleton.dtsi"
 
+&pm8941_gpios {
+	gpio@c000 { /* GPIO 1 */
+		status = "ok";			/* LDAF_EN */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <2>;	/* QPNP_PIN_OUT_STRENGTH_MED */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+};
+
 &pm8941_l3 {
 	regulator-min-microvolt = <1000000>;
 	regulator-max-microvolt = <1200000>;
@@ -21,6 +34,14 @@
 
 &pm8941_torch {
 	qcom,current = <90>;
+};
+
+&pm8941_flash0 {
+	qcom,current = <675>;
+};
+
+&pm8941_flash1 {
+	qcom,current = <675>;
 };
 
 &soc {

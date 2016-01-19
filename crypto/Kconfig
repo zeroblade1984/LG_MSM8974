@@ -29,6 +29,15 @@ config CRYPTO_FIPS
 	  required if you want to system to operate in a FIPS 200
 	  certification.  You should say no unless you know what
 	  this is.
+	  
+config CRYPTO_FIPS_INTEG_COPY_ADDRESS
+	hex "FIPS integrity check zImage offset"
+		default 0x30000000
+        help
+          This options sets the offset from stext address where
+          zImage will be copied for integrity check in FIPS mode.
+	      If you need to change this value, change in device
+	      specific configuration file instead of here.
 
 config CRYPTO_ALGAPI
 	tristate

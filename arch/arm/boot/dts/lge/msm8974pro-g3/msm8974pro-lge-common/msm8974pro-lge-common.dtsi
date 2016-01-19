@@ -32,6 +32,15 @@
 		uart99 = &uart5;
 	};
 //CONFIG_LGE_BLUETOOTH (-) - Set UART5
+
+    memory {
+        crash_fb_mem: crash_fb_mem {
+            linux,contiguous-region;
+            linux,reserve-region;
+            reg = <0x0d800000 0xc00000>;
+            label = "crash_fb_mem";
+        };
+    };
 };
 
 &sdhc_1 {
@@ -76,8 +85,16 @@
 	vdd-supply = <&pm8941_l21>;
 };
 
+
+
 &soc {
 	/delete-node/spi_eth_phy_vreg;
+
+    crash_fb {
+        compatible = "crash_fb";
+        mem-addr = <0x0d800000>;
+        mem-size = <0xc00000>;
+    };
 
 	/* label: i2c_0 (label defined in msm8974.dtsi) */
 	i2c@f9967000 {

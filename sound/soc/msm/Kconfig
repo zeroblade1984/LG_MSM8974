@@ -322,4 +322,10 @@ config SND_LGE_DSDP_DUAL_AUDIO
     help
      LGE Sound DSPD Dual Audio
 
+config LGE_SW_IRRC_MUTE_SPEAKER
+    bool "LGE SW IRRC MUTE SPEAKER"
+    default n
+    help
+     To support mute stereo speaker for msm8974
+
 endmenu

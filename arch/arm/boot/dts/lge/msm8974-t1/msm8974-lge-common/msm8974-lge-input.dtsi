@@ -1,0 +1,108 @@
+/* Copyright (c) 2013, LGE Electronics. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+
+	i2c@f9924000 {
+
+		atmel_2954@4a {									/*touch ic I2C bus adddress*/
+			revision = "evb1...evb2";								/*board version */
+			compatible = "atmel,2954";						/*dtsi name*/
+			status = "ok";									/*OK-used*/
+			reg = <0x4a>;									/*touch ic I2C bus adddress 0x4a -> @4a*/
+			interrupt-parent = <&msmgpio>;
+			interrupts = <5 0x2>;							/*interrupt pin number*/
+			vdd_ana-supply = <&pm8941_l22>;
+			vcc_i2c-supply = <&pm8941_lvs3>;
+			vcc_dig-supply = <&pm8941_l23>;							/*because of  GPIO use*/
+			//atmel,ldo2-gpio = <&msmgpio 16 0x00>;	//GPIO[016] TOUCH_LDO2_EN
+			//atmel,ldo1-gpio = <&msmgpio 112 0x00>;	//GPIO[112] TOUCH_LDO1_EN
+			atmel,reset-gpio = <&msmgpio 8 0x00>;
+			atmel,irq-gpio = <&msmgpio 5 0x00>;
+			atmel,numtouch = <10>;							/*multi-touch count*/
+			atmel,irqflags = <0x00000002>;					/*interrup flag type*/
+			atmel,t15_num_keys = <0>;
+			atmel,fw_name = "atmel/t1lte_att_us/T1_bu_01.fw";
+			atmel,panel_check = <0>;
+			atmel,extra_fw_name = "atmel/t1lte_att_us/T1_bu_01.fw";
+			atmel,accuracy_filter_enable = <0>;
+			atmel,knock_on_type = <1>;
+			atmel,auto_fw_update = <0>;
+			// atmel,t15_extra_key_state = <0 0>;
+			atmel,global_access_pixel = <0>;
+			atmel,use_mfts = <1>; // Enable for CoF type only
+			atmel,lcd_x = <1080>;
+			atmel,lcd_y = <1920>;
+			atmel,butt_check_enable = <0>;
+			atmel,ghost_detection_enable = <0>;
+			atmel,ghost_detection_value = <10 10 100 25 250 10>;
+		};
+		atmel_2954_rev_a@4a {									/*touch ic I2C bus adddress*/
+			revision = "rev_a...";								/*board version */
+			compatible = "atmel,2954";						/*dtsi name*/
+			status = "ok";									/*OK-used*/
+			reg = <0x4a>;									/*touch ic I2C bus adddress 0x4a -> @4a*/
+			interrupt-parent = <&msmgpio>;
+			interrupts = <5 0x2>;							/*interrupt pin number*/
+			vdd_ana-supply = <&pm8941_l22>;
+			vcc_i2c-supply = <&pm8941_lvs3>;
+			vcc_dig-supply = <&pm8941_l23>;							/*because of  GPIO use*/
+			atmel,ldo2-gpio = <&msmgpio 60 0x00>;	//GPIO[016] TOUCH_LDO2_EN(=vdd_ana)
+			atmel,ldo1-gpio = <&msmgpio 145 0x00>;	//GPIO[112] TOUCH_LDO1_EN(=vdd_dig)
+			atmel,reset-gpio = <&msmgpio 8 0x00>;
+			atmel,irq-gpio = <&msmgpio 5 0x00>;
+			atmel,numtouch = <10>;							/*multi-touch count*/
+			atmel,irqflags = <0x00000002>;					/*interrup flag type*/
+			atmel,t15_num_keys = <0>;
+			atmel,fw_name = "atmel/t1lte_att_us/T1_bu_01.fw";
+			atmel,panel_check = <0>;
+			atmel,extra_fw_name = "atmel/t1lte_att_us/T1_bu_01.fw";
+			atmel,accuracy_filter_enable = <0>;
+			atmel,knock_on_type = <1>;
+			atmel,auto_fw_update = <0>;
+			// atmel,t15_extra_key_state = <0 0>;
+			atmel,global_access_pixel = <0>;
+			atmel,use_mfts = <1>; // Enable for CoF type only
+			atmel,lcd_x = <1080>;
+			atmel,lcd_y = <1920>;
+			atmel,butt_check_enable = <0>;
+			atmel,ghost_detection_enable = <0>;
+			atmel,ghost_detection_value = <10 10 100 25 250 10>;
+		};
+	};
+
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm8941_gpios 3 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+			revision = "evb1...evb2";
+		};
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 2 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+	};
+
+};

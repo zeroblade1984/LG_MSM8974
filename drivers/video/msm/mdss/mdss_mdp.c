@@ -49,6 +49,7 @@
 #include <mach/memory.h>
 #include <mach/msm_memtypes.h>
 #include <mach/rpm-regulator-smd.h>
+#include <mach/scm.h>
 
 #include "mdss.h"
 #include "mdss_fb.h"
@@ -80,6 +81,8 @@ struct msm_mdp_interface mdp5 = {
 
 #define IB_QUOTA 800000000
 #define AB_QUOTA 800000000
+
+#define MEM_PROTECT_SD_CTRL 0xF
 
 static DEFINE_SPINLOCK(mdp_lock);
 static DEFINE_MUTEX(mdp_clk_lock);
@@ -1237,14 +1240,91 @@ static ssize_t fps_ratio_show(struct device *dev,
 	return r;
 }
 
+ssize_t fps_fcnt_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+#if IS_ENABLED(CONFIG_FB_MSM_MDSS_MDP3)
+	int r = 0;
+	struct msm_fb_data_type *mfd;
+	struct mdp3_session_data *mdp3_session;
+	static int fbi_list_lookuped;
+	static struct fb_info **fbi_list;
+	static int fps_cnt_before = 0;
+
+	if (!fbi_list_lookuped) {
+		fbi_list = (struct fb_info **)kallsyms_lookup_name("fbi_list");
+		fbi_list_lookuped = 1;
+	}
+
+	if (fbi_list[0] == NULL)
+		goto ERROR;
+
+	mfd = fbi_list[0]->par;
+	if (mfd == NULL)
+		goto ERROR;
+
+	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
+	if (mdp3_session == NULL)
+		goto ERROR;
+
+	r = snprintf(buf, PAGE_SIZE, "%d\n", mdp3_session->play_cnt-fps_cnt_before);
+	fps_cnt_before = mdp3_session->play_cnt;
+
+	return r;
+
+ERROR:
+	r = snprintf(buf, PAGE_SIZE, "0\n");
+	return r;
+#else
+	int r = 0;
+	struct msm_fb_data_type *mfd;
+	struct mdss_overlay_private *mdp5_data;
+	struct mdss_mdp_ctl *ctl;
+	static int fbi_list_lookuped = 0;
+	static struct fb_info **fbi_list;
+	static int fps_cnt_before = 0;
+
+	if (!fbi_list_lookuped) {
+		fbi_list = (struct fb_info **)kallsyms_lookup_name("fbi_list");
+		fbi_list_lookuped = 1;
+	}
+
+	if (fbi_list[0] == NULL)
+		goto ERROR;
+
+	mfd = fbi_list[0]->par;
+	if (mfd == NULL)
+		goto ERROR;
+
+	mdp5_data = mfd_to_mdp5_data(mfd);
+	if (mdp5_data == NULL)
+		goto ERROR;
+
+	ctl = mdp5_data->ctl;
+	if (ctl == NULL)
+		goto ERROR;
+
+	r = snprintf(buf, PAGE_SIZE, "%d\n", ctl->play_cnt-fps_cnt_before);
+	fps_cnt_before = ctl->play_cnt;
+	return r;
+
+ERROR:
+	r = snprintf(buf, PAGE_SIZE, "0\n");
+	return r;
+#endif
+}
+
+
 static DEVICE_ATTR(vfps, S_IRUGO | S_IWUSR, fps_show, fps_store);
 static DEVICE_ATTR(vfps_ratio, 0644, fps_ratio_show, NULL);
+static DEVICE_ATTR(vfps_fcnt, 0644, fps_fcnt_show, NULL);
 #endif
 static struct attribute *mdp_fs_attrs[] = {
 	&dev_attr_caps.attr,
 #ifdef CONFIG_LGE_VSYNC_SKIP
 	&dev_attr_vfps.attr,
 	&dev_attr_vfps_ratio.attr,
+	&dev_attr_vfps_fcnt.attr,
 #endif
 	NULL
 };
@@ -1288,6 +1368,7 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mdata);
 	mdss_res = mdata;
 	mutex_init(&mdata->reg_lock);
+	atomic_set(&mdata->sd_client_count, 0);
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mdp_phys");
 	if (!res) {
@@ -2381,6 +2462,8 @@ static int mdss_mdp_parse_dt_misc(struct platform_device *pdev)
 	mdata->ab_factor_limit.denom = mdata->ab_factor.denom;
 	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ab-factor-limit",
 		&mdata->ab_factor_limit);
+	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ib-factor-limit",
+		&mdata->ib_factor_limit);
 #endif
 
 	mdata->clk_factor.numer = 1;
@@ -2701,6 +2784,26 @@ int mdss_mdp_footswitch_ctrl_ulps(int on, struct device *dev)
 	}
 
 	return 0;
+}
+
+int mdss_mdp_secure_display_ctrl(unsigned int enable)
+{
+	struct sd_ctrl_req {
+		unsigned int enable;
+	} __attribute__ ((__packed__)) request;
+	unsigned int resp = -1;
+	int ret = 0;
+
+	request.enable = enable;
+
+	ret = scm_call(SCM_SVC_MP, MEM_PROTECT_SD_CTRL,
+		&request, sizeof(request), &resp, sizeof(resp));
+	pr_debug("scm_call MEM_PROTECT_SD_CTRL(%u): ret=%d, resp=%x",
+				enable, ret, resp);
+	if (ret)
+		return ret;
+
+	return resp;
 }
 
 static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata)

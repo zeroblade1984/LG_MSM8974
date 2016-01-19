@@ -381,6 +381,12 @@ config BACKLIGHT_LM3631
      help
      If you have a LM3631 backlight on the device, enable this feature
 
+config BACKLIGHT_RT8555
+     tristate "Backlight Driver for RT8555"
+     depends on BACKLIGHT_CLASS_DEVICE && I2C
+     help
+     If you have a RT8555 backlight on the device, enable this feature
+
 config MACH_LGE_BACKLIGHT_SUPPORT
 	tristate "SUPPORT Backlight Driver Abstraction"
 	depends on BACKLIGHT_CLASS_DEVICE && I2C

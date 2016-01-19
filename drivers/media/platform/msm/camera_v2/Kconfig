@@ -137,6 +137,20 @@ config IMX132
 	---help---
 	  SONY 2.4M BAYER MIPI Sensor without Autofocus
 
+config T4KB3
+	bool "Sensor T4KB3 (BAYER 13M)"
+	depends on MSMB_CAMERA
+	---help---
+		The T4KB3 is a 13M-pixel CMOS color image sensor.
+		It has a pixel array of 4208 (H) × 3120 (V) and satisfies
+		the 1/3.07-inch optical format. The T4KB3 has a pixel size of 1.12
+		µm × 1.12 µm. It maintains the low power consumption
+		advantage of a CMOS process without compromising the 30 fps
+		speed at 13M/4K2K resolution. The new 'Bright Mode'
+		feature delivers high-frame-rate (slow-motion) video without
+		causing a luminance drop. These features make the T4KB3 ideal
+		for mobile phone and smartphone applications.
+
 config IMX208
         bool "Sensor IMX208 2.1MP MIPI (Bayer 2.1M)"
 	depends on MSMB_CAMERA
@@ -159,6 +173,22 @@ config IMX134
 		4 mipi lanes full resolution @30fps and
 		HFR @60fps and @120fps
 		Video HDR support.
+
+config IMX219
+	bool "Sensor imx219 (Sony 8MP)"
+	depends on MSMB_CAMERA
+	---help---
+		Support for IMX219 sensor driver.
+		This is a Sony 8MP Bayer Sensor with autofocus.
+		Say Y if the platform uses IMX219 sensor.
+
+config HI544
+	bool "Sensor hi544 (Hynix 5MP)"
+	depends on MSMB_CAMERA
+	---help---
+		Support for HI544 sensor driver.
+		This is a Hynix 5MP Bayer Sensor with autofocus.
+		Say Y if the platform uses HI544 sensor.
 
 config OV9724
 	bool "Sensor OV9724 (BAYER 2M)"
@@ -185,6 +215,13 @@ config OV5648
 		OmniVision 5 MP Bayer Sensor, only use 1 mipi lane,
 		preview set to 1296*972 at 30 fps,
 		snapshot set to 2592*1944 at 12 fps,
+		This sensor driver does not support auto focus.
+
+config OV2740
+	bool "Sensor OV2740 (BAYER 2M)"
+	depends on MSMB_CAMERA
+	---help---
+		OmniVision 2 MP Bayer Sensor, use 1 or 2 mipi lane,
 		This sensor driver does not support auto focus.
 
 config MT9M114

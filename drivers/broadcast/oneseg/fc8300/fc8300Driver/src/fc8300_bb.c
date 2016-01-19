@@ -4464,7 +4464,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 	if (i == tmcc_timeout)
 		return BBM_NOK;
 
-	ts_err_free_timeout = 950;
+	ts_err_free_timeout = 950 / SCAN_CHK_PERIOD;
 
 	switch (broadcast_type) {
 	case ISDBT_1SEG:

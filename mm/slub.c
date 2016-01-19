@@ -628,6 +628,7 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
 		print_section("Padding ", p + off, s->size - off);
 
 	dump_stack();
+	panic("lge slub debug panic\n");
 }
 
 static void object_err(struct kmem_cache *s, struct page *page,

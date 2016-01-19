@@ -11,9 +11,9 @@ config LGE_BROADCAST_ONESEG_TCC3530
 	help
 	  Select this if you want to use Japanese 1Seg mobile broadcast service
 
-config LGE_BROADCAST_ONESEG_TCC3535
+config LGE_BROADCAST_ISDBT_JAPAN_TCC3535
 	bool "1Seg broacast tuner chipset tcc3535  device driver"
-	depends on LGE_BROADCAST_JFULLSEG
+	depends on (LGE_BROADCAST_ISDBT_JAPAN && MACH_MSM8974_G3_KDDI)
 	default y
 	help
 	  Select this if you want to use Japanese 1Seg mobile broadcast service

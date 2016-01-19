@@ -1053,8 +1053,8 @@ static inline int __xfrm_policy_check2(struct sock *sk, int dir,
 
 	if (sk && sk->sk_policy[XFRM_POLICY_IN])
 		return __xfrm_policy_check(sk, ndir, skb, family);
-
-/* TD #60721(case 01588795), the kernel panic issue seeing on the specific AP.
+/* 2015-03-23 ty.moon@lge.com LGP_DATA_KERNEL_CRASHFIX_XFRM_POLICY_CHECK2 [START] */
+/*
 	return	(!net->xfrm.policy_count[dir] && !skb->sp) ||
 		(skb_dst(skb)->flags & DST_NOPOLICY) ||
 		__xfrm_policy_check(sk, ndir, skb, family);
@@ -1062,6 +1062,7 @@ static inline int __xfrm_policy_check2(struct sock *sk, int dir,
     return  (!net->xfrm.policy_count[dir] && !skb->sp) ||
         ((skb_dst(skb)!= NULL) && (skb_dst(skb)->flags & DST_NOPOLICY)) ||
         __xfrm_policy_check(sk, ndir, skb, family);
+/* 2015-03-23 ty.moon@lge.com LGP_DATA_KERNEL_CRASHFIX_XFRM_POLICY_CHECK2 [END] */
 }
 
 static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb, unsigned short family)

@@ -50,9 +50,9 @@
 
 static struct i2c_client *lm3630_i2c_client;
 
-static int store_level_used = 0;
+static int store_level_used;
 #if defined(CONFIG_B1_LGD_PANEL)
-static int factory_boot = 0;
+static int factory_boot;
 #endif
 
 struct backlight_platform_data {
@@ -189,7 +189,7 @@ static void lm3630_set_main_current_level(struct i2c_client *client, int level)
 	mutex_lock(&dev->bl_mutex);
 
 #if defined(CONFIG_B1_LGD_PANEL)
-	if(factory_boot)
+	if (factory_boot)
 		level = min_brightness;
 #endif
 #if defined(CONFIG_G2_LGD_PANEL) || defined(CONFIG_B1_LGD_PANEL)
@@ -223,7 +223,7 @@ static void lm3630_set_main_current_level(struct i2c_client *client, int level)
 
 	mutex_unlock(&dev->bl_mutex);
 
-	pr_info("%s : backlight level=%d, cal_value=%d \n",
+	pr_info("%s : backlight level=%d, cal_value=%d\n",
 				__func__, level, cal_value);
 }
 
@@ -244,11 +244,10 @@ static void lm3630_set_main_current_level_no_mapping(
 	store_level_used = 1;
 
 	mutex_lock(&main_lm3630_dev->bl_mutex);
-	if (level != 0) {
+	if (level != 0)
 		lm3630_write_reg(client, 0x03, level);
-	} else {
+	else
 		lm3630_write_reg(client, 0x00, 0x00);
-	}
 	mutex_unlock(&main_lm3630_dev->bl_mutex);
 }
 
@@ -315,11 +314,10 @@ void lm3630_lcd_backlight_set_level(int level)
 		level = MAX_BRIGHTNESS_LM3630;
 
 	if (lm3630_i2c_client != NULL) {
-		if (level == 0) {
+		if (level == 0)
 			lm3630_backlight_off();
-		} else {
+		else
 			lm3630_backlight_on(level);
-		}
 	} else {
 		pr_err("%s(): No client\n", __func__);
 	}
@@ -384,8 +382,7 @@ static ssize_t lcd_backlight_store_level(struct device *dev,
 	level = simple_strtoul(buf, NULL, 10);
 
 	lm3630_set_main_current_level_no_mapping(client, level);
-	pr_info("write %d direct to "
-			"backlight register\n", level);
+	pr_info("write %d direct to backlight register\n", level);
 
 	return count;
 }
@@ -484,7 +481,7 @@ static ssize_t lcd_backlight_show_pwm(struct device *dev,
 	mdelay(3);
 	mutex_unlock(&main_lm3630_dev->bl_mutex);
 
-	r = snprintf(buf, PAGE_SIZE, "Show PWM level: %d pwm_low: %d "
+	r = snprintf(buf, PAGE_SIZE, "Show PWM level: %d pwm_low: %d " \
 			"pwm_high: %d config: %d\n", level, pwm_low,
 			pwm_high, config);
 
@@ -564,7 +561,7 @@ static int lm3630_parse_dt(struct device *dev,
 		pdata->blmap = NULL;
 	}
 
-	pr_info("%s gpio: %d, max_current: %d, min: %d, "
+	pr_info("%s gpio: %d, max_current: %d, min: %d, " \
 			"default: %d, max: %d, pwm : %d , blmap_size : %d\n",
 			__func__, pdata->gpio,
 			pdata->max_current,
@@ -578,7 +575,7 @@ static int lm3630_parse_dt(struct device *dev,
 }
 #endif
 
-static struct backlight_ops lm3630_bl_ops = {
+static const struct backlight_ops lm3630_bl_ops = {
 	.update_status = bl_set_intensity,
 	.get_brightness = bl_get_intensity,
 };
@@ -613,9 +610,8 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 	pdata = i2c_dev->dev.platform_data;
 #endif
 	pr_info("%s: gpio = %d\n", __func__, pdata->gpio);
-	if (pdata->gpio && gpio_request(pdata->gpio, "lm3630 reset") != 0) {
+	if (pdata->gpio && gpio_request(pdata->gpio, "lm3630 reset") != 0)
 		return -ENODEV;
-	}
 
 	lm3630_i2c_client = i2c_dev;
 
@@ -634,9 +630,9 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 			NULL, &lm3630_bl_ops, &props);
 	bl_dev->props.max_brightness = MAX_BRIGHTNESS_LM3630;
 #if defined(CONFIG_B1_LGD_PANEL)
-	if(lge_get_boot_mode() == LGE_BOOT_MODE_CHARGERLOGO)
-		bl_dev->props.brightness = 0x99; // same to LK
-	else if(lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY
+	if (lge_get_boot_mode() == LGE_BOOT_MODE_CHARGERLOGO)
+		bl_dev->props.brightness = 0x99; /* same to LK */
+	else if (lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY
 			|| lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY2
 			|| lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY3
 			|| lge_get_boot_mode() == LGE_BOOT_MODE_PIFBOOT
@@ -671,7 +667,8 @@ static int lm3630_probe(struct i2c_client *i2c_dev,
 	}
 
 #ifdef CONFIG_LGE_LCD_OFF_DIMMING
-	if ((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561)) {
+	if ((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561)
+		|| (lge_get_bootreason() == 0x77665562)) {
 		dev->bl_dev->props.brightness = 50;
 		pr_info("%s : fota reboot - backlight set 50\n", __func__);
 	}

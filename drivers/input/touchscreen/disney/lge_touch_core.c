@@ -965,8 +965,10 @@ void release_all_touch_event(struct lge_touch_data *ts)
 	}
 
 	memset(&ts->ts_curr_data, 0, sizeof(struct touch_data));
-	if (ts->ts_prev_data.total_num)
+	if (ts->ts_prev_data.total_num) {
 		report_event(ts);
+		ts->ts_prev_data.total_num = 0;
+	}
 	if (ts->pdata->caps->button_support)
 		key_event(ts);
 
@@ -1052,6 +1054,8 @@ static int interrupt_control(struct lge_touch_data *ts, int on_off)
 static void safety_reset(struct lge_touch_data *ts)
 {
 	u32 ret = 0;
+	int prev_power_state = atomic_read(&ts->state.power_state);
+
 	TOUCH_TRACE();
 
 	TOUCH_INFO_MSG("safety_reset start\n");
@@ -1081,6 +1085,8 @@ static void safety_reset(struct lge_touch_data *ts)
 		msleep(ts->pdata->role->reset_delay);
 		DO_SAFE(power_control(ts, POWER_ON), error);
 		msleep(ts->pdata->role->booting_delay);
+		if (prev_power_state != POWER_ON)
+			DO_SAFE(power_control(ts, prev_power_state), error);
 		break;
 	default:
 		break;
@@ -3258,6 +3264,7 @@ static int touch_resume(struct device *dev)
 
 	mutex_lock(&ts->pdata->thread_lock);
 
+	#if 0
 	if (ts->pdata->role->use_sleep_mode) {
 		power_control(ts, POWER_OFF);
 		power_control(ts, POWER_ON);
@@ -3265,6 +3272,7 @@ static int touch_resume(struct device *dev)
 		power_control(ts, POWER_ON);
 	}
 	msleep(ts->pdata->role->booting_delay);
+	#endif
 
 	if (atomic_read(&ts->state.upgrade_state) != UPGRADE_START) {
 		touch_device_func->resume(ts->client);
@@ -3273,8 +3281,10 @@ static int touch_resume(struct device *dev)
 				"'[Touch]%s:F/W-upgrade' is not finished.\n",
 				__func__);
 
+	#if 0
 	if (touch_ic_init(ts, 0) < 0)
 		TOUCH_ERR_MSG("%s : touch ic init fail\n", __func__);
+	#endif
 
 	TOUCH_INFO_MSG("%s : touch_resume done\n", __func__);
 	mutex_unlock(&ts->pdata->thread_lock);
@@ -3323,6 +3333,10 @@ static int fb_notifier_callback(struct notifier_block *self,
 static int lcd_notifier_callback(struct notifier_block *this,
 		unsigned long event, void *data)
 {
+	struct lge_touch_data *ts =
+		container_of(this, struct lge_touch_data, notif);
+
+	mutex_lock(&ts->pdata->thread_lock);
 	TOUCH_DEBUG(DEBUG_BASE_INFO,"%s: event = %lu\n", __func__, event);
 	switch (event) {
 		case LCD_EVENT_TOUCH_LPWG_ON:
@@ -3331,9 +3345,16 @@ static int lcd_notifier_callback(struct notifier_block *this,
 			break;
 		case LCD_EVENT_TOUCH_LPWG_OFF:
 			TOUCH_DEBUG(DEBUG_BASE_INFO, "LCD_EVENT_TOUCH_LPWG_OFF\n");
+			previous_pm_suspend = 0;
+			power_control(ts, POWER_OFF);
+			msleep(ts->pdata->role->reset_delay);
+			power_control(ts, POWER_ON);
+			msleep(ts->pdata->role->booting_delay);
+			touch_ic_init(ts, 0);
 			touch_device_func->lpwg(ts_data->client, LPWG_INCELL_LPWG_OFF, 0, NULL);
 			break;
 	}
+	mutex_unlock(&ts->pdata->thread_lock);
 	return 0;
 }
 static int touch_probe(struct i2c_client *client,

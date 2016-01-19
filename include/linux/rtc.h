@@ -275,17 +275,8 @@ int rtc_timer_cancel(struct rtc_device *rtc, struct rtc_timer* timer);
 void rtc_timer_do_work(struct work_struct *work);
 
 #ifdef CONFIG_LGE_PM_RTC_PWROFF_ALARM
-/*
-enum RTC_PWR_TYPE {
-	LG_RTC_POWER_ON_ENABLE,
-	LG_RTC_POWER_ON_TIME,
-	LG_RTC_POWER_ON_MAX,
-};
-*/
-
 extern int rtc_set_po_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm);
-/*extern void write_rtc_pwron_in_misc(struct rtc_wkalrm *alarm, enum RTC_PWR_TYPE type);*/
-/*extern unsigned long read_rtc_pwron_in_misc(struct rtc_wkalrm *alarm, enum RTC_PWR_TYPE type);*/
+extern void write_rtc_pwron_in_misc(struct rtc_wkalrm *alarm);
 #endif
 
 static inline bool is_leap_year(unsigned int year)

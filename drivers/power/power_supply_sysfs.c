@@ -87,6 +87,9 @@ static ssize_t power_supply_show_property(struct device *dev,
 #if defined(CONFIG_CHARGER_UNIFIED_WLC) || defined(CONFIG_WIRELESS_CHARGER)
 		"Wireless"
 #endif
+#if defined CONFIG_LGE_PM_BATTERY_RT9428_FUELGAUGE
+		"Rt9428"
+#endif
 	};
 	static char *status_text[] = {
 		"Unknown", "Charging", "Discharging", "Not charging", "Full"
@@ -295,8 +298,11 @@ static struct device_attribute power_supply_attrs[] = {
 #endif
 #if defined(CONFIG_CHARGER_MAX77819) || defined(CONFIG_CHARGER_MAX8971) || \
     defined(CONFIG_BQ24296_CHARGER) || defined(CONFIG_SMB349_CHARGER)
-	POWER_SUPPLY_ATTR(charger_timer),
+	POWER_SUPPLY_ATTR(safety_timer),
 	POWER_SUPPLY_ATTR(charging_complete),
+#endif
+#ifdef CONFIG_LGE_PM_USB_CURRENT_MAX_MODE
+        POWER_SUPPLY_ATTR(usb_current_max_mode),
 #endif
 #ifdef CONFIG_FTT_CHARGER_V3
 	POWER_SUPPLY_ATTR(ftt_anntena_level),
@@ -305,8 +311,10 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(battery_condition),
 	POWER_SUPPLY_ATTR(battery_age),
 #endif
+#if defined CONFIG_LGE_PM_BATTERY_EXTERNAL_FUELGAUGE
+	POWER_SUPPLY_ATTR(use_fuelgauge),
+#endif
 #if defined(CONFIG_CHARGER_UNIFIED_WLC)
-	POWER_SUPPLY_ATTR(wireless_charger_switch),
 #ifdef CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT
 	POWER_SUPPLY_ATTR(alignment),
 #if defined(CONFIG_CHARGER_UNIFIED_WLC_ALIGNMENT_IDT9025A) && defined(CONFIG_CHARGER_FACTORY_MODE)

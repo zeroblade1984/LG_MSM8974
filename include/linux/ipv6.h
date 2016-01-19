@@ -156,7 +156,7 @@ struct ipv6_devconf {
 	__s32		accept_ra_pinfo;
 #ifdef CONFIG_LGE_DHCPV6_WIFI
 	__s32		ra_info_flag;
-#endif	
+#endif
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	__s32		accept_ra_rtr_pref;
 	__s32		rtr_probe_interval;
@@ -177,6 +177,7 @@ struct ipv6_devconf {
 	__s32		accept_dad;
 	__s32		force_tllao;
 	__s32		accept_ra_prefix_route;
+	__s32		accept_ra_mtu;
 	void		*sysctl;
 };
 
@@ -223,6 +224,7 @@ enum {
 #ifdef CONFIG_LGE_DHCPV6_WIFI
 	DEVCONF_RA_INFO_FLAG,
 #endif
+	DEVCONF_ACCEPT_RA_MTU,
 	DEVCONF_MAX
 };
 

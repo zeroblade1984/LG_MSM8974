@@ -156,7 +156,7 @@ struct synaptics_ts_data {
 	struct delayed_work	cap_diff;
 	struct delayed_work	work_palm;
 	struct wake_lock	timer_wake_lock;
-	const struct touch_platform_data	*pdata;
+	struct touch_platform_data	*pdata;
 	const struct state_info	*state;
 	u8	fw_flag;
 	struct state_flag		ts_state_flag;

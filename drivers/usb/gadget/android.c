@@ -65,6 +65,9 @@
 #ifdef CONFIG_SND_PCM
 #include "f_audio_source.c"
 #endif
+#ifdef CONFIG_USB_G_LGE_ANDROID
+#include "f_midi.c"
+#endif
 #include "f_mass_storage.c"
 #include "u_serial.c"
 #include "u_sdio.c"
@@ -119,6 +122,13 @@ static const char longname[] = "Gadget Android";
 #define ANDROID_DEVICE_NODE_NAME_LENGTH 11
 #ifdef CONFIG_USB_EMBEDDED_BATTERY_REBOOT
 static int firstboot_check = 1;
+#endif
+#ifdef CONFIG_USB_G_LGE_ANDROID
+/* f_midi configuration */
+#define MIDI_INPUT_PORTS    1
+#define MIDI_OUTPUT_PORTS   1
+#define MIDI_BUFFER_SIZE    256
+#define MIDI_QUEUE_LENGTH   32
 #endif
 
 struct android_usb_function {
@@ -448,7 +458,8 @@ static void android_work(struct work_struct *data)
 			msleep(50); /*wait for usb gadget disconnect*/
 			kernel_restart(NULL);
 		} else if (lge_pm_get_cable_type() == CABLE_910K &&
-					(lge_get_sbl_cable_type() != 11 || !firstboot_check)) {
+					(lge_get_sbl_cable_type() != 11 || !firstboot_check) &&
+					!lge_get_laf_mode()) {
 			usb_gadget_disconnect(cdev->gadget);
 			usb_ep_dequeue(cdev->gadget->ep0, cdev->req);
 			pr_info("[FACTORY] reset due to 910K cable, pm:%d, sbl:%d, firstboot_check:%d\n",
@@ -572,6 +583,11 @@ static void adb_android_function_enable(struct android_usb_function *f)
 	struct android_dev *dev = f->android_dev;
 	struct adb_data *data = f->config;
 
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	if (data->enabled)
+		return;
+#endif
+
 	data->enabled = true;
 
 
@@ -584,6 +600,11 @@ static void adb_android_function_disable(struct android_usb_function *f)
 {
 	struct android_dev *dev = f->android_dev;
 	struct adb_data *data = f->config;
+
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	if (!data->enabled)
+		return;
+#endif
 
 	data->enabled = false;
 
@@ -2379,6 +2400,62 @@ static struct android_usb_function uasp_function = {
 	.bind_config	= uasp_function_bind_config,
 };
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+static int midi_function_init(struct android_usb_function *f,
+					struct usb_composite_dev *cdev)
+{
+	struct midi_alsa_config *config;
+
+	config = kzalloc(sizeof(struct midi_alsa_config), GFP_KERNEL);
+	f->config = config;
+	if (!config)
+		return -ENOMEM;
+	config->card = -1;
+	config->device = -1;
+	return 0;
+}
+
+static void midi_function_cleanup(struct android_usb_function *f)
+{
+	kfree(f->config);
+}
+
+static int midi_function_bind_config(struct android_usb_function *f,
+						struct usb_configuration *c)
+{
+	struct midi_alsa_config *config = f->config;
+
+	return f_midi_bind_config(c, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
+			MIDI_INPUT_PORTS, MIDI_OUTPUT_PORTS, MIDI_BUFFER_SIZE,
+			MIDI_QUEUE_LENGTH, config);
+}
+
+static ssize_t midi_alsa_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct midi_alsa_config *config = f->config;
+
+	/* print ALSA card and device numbers */
+	return sprintf(buf, "%d %d\n", config->card, config->device);
+}
+
+static DEVICE_ATTR(alsa, S_IRUGO, midi_alsa_show, NULL);
+
+static struct device_attribute *midi_function_attributes[] = {
+	&dev_attr_alsa,
+	NULL
+};
+
+static struct android_usb_function midi_function = {
+	.name		= "midi",
+	.init		= midi_function_init,
+	.cleanup	= midi_function_cleanup,
+	.bind_config	= midi_function_bind_config,
+	.attributes	= midi_function_attributes,
+};
+#endif
+
 static struct android_usb_function *supported_functions[] = {
 	&mbim_function,
 	&ecm_qc_function,
@@ -2411,6 +2488,9 @@ static struct android_usb_function *supported_functions[] = {
 	&accessory_function,
 #ifdef CONFIG_SND_PCM
 	&audio_source_function,
+#endif
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	&midi_function,
 #endif
 	&uasp_function,
 	NULL

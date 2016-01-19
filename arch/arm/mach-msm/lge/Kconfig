@@ -3,6 +3,7 @@ config MACH_LGE
 
 menu "LGE Board Selection"
 
+source "arch/arm/mach-msm/lge/8974-t1/Kconfig"
 source "arch/arm/mach-msm/lge/8974-g2/Kconfig"
 source "arch/arm/mach-msm/lge/8974ac-g3/Kconfig"
 source "arch/arm/mach-msm/lge/8974ac-dzny/Kconfig"
@@ -120,5 +121,60 @@ config LGE_GDSC_SWCONTROL
 	help
 	  When enable this, LGE's sw control code for gdsc enable and diasble
 	  are used. Normally, msm8974AA chipset based LGE model may use it.
+
+config LGE_KRAIT_BOOST_ENABLE
+        bool "Support Kraits Voltage Boost up"
+        help
+        Select if enable Krait Voltage Boost up.
+
+config PRE_SELF_DIAGNOSIS
+	tristate "Support LGE self diagnosis for factory"
+	default n
+	depends on MACH_LGE
+	help
+	  Support for the Qualcomm MSM8974 T1 AT&T device.
+
+config LGE_USE_DEFAULT_HARD_RESET
+	bool "On reboot, apply hard reset unless memory contents must be maintained"
+	default n
+	help
+	  Nobody can guarantee stablity upon continuous warm resets.
+
+config LGE_KERNEL_FTM_ITEM
+	tristate "Support LGE Kernel FTM ITEM"
+	default n
+	depends on MACH_LGE
+	help
+	Read/Write ftm items in misc.
+
+config LGE_GPIO_SIM_DETECT
+	tristate "Support LGE GPIO SIM DETECT"
+	default n
+	depends on MACH_LGE
+	help
+	read SIM detect pin by GPIO.
+
+config LGE_SET_CRASH_HANDLER_DEFAULT_DISABLE
+       bool "Set download_mode's default value to 0"
+       default n
+       depends on MACH_LGE
+
+config POWER_OFF_DVDD_SHUTDOWN
+	bool "Use dVdd shutdown when power off"
+	default n
+	help
+	 PM8941's PBS boot sequence is hang sometimes.
+	 dVdd shutdown will prevent PBS hang.
+
+config LGE_PM_UNIFIED_NODE
+	bool "enable LGE PM Unified sysfs node"
+	help
+	Support LGE PM Unified sysfs node
+
+config LGE_KRAIT_BOOST_ENABLE
+	bool "Support Kraits Voltage Boost up"
+	default n
+	help
+	 Select if enable Krait Voltage Boost up.
 
 endmenu

@@ -842,30 +842,30 @@ EXPORT_SYMBOL(subsystem_restart);
  */
 int subsys_modem_restart(void)
 {
-	int ret;
-	int rsl;
-	struct subsys_tracking *track;
-	struct subsys_device *dev = find_subsys("modem");
+       int ret;
+       int rsl;
+       struct subsys_tracking *track;
+       struct subsys_device *dev = find_subsys("modem");
 
-	if (!dev)
-		return -ENODEV;
+       if (!dev)
+               return -ENODEV;
 
-	track = subsys_get_track(dev);
+       track = subsys_get_track(dev);
 
-	if (dev->track.state != SUBSYS_ONLINE ||
-		track->p_state != SUBSYS_NORMAL)
-		return -ENODEV;
+       if (dev->track.state != SUBSYS_ONLINE ||
+               track->p_state != SUBSYS_NORMAL)
+               return -ENODEV;
 
-	rsl = dev->restart_level;
-	dev->restart_level = RESET_SUBSYS_COUPLED;
-	subsys_set_crash_status(dev, true);
-	ret = subsystem_restart_dev(dev);
-	dev->restart_level = rsl;
+       rsl = dev->restart_level;
+       dev->restart_level = RESET_SUBSYS_COUPLED;
+       subsys_set_crash_status(dev, true);
+       ret = subsystem_restart_dev(dev);
+       dev->restart_level = rsl;
 #ifdef CONFIG_MACH_LGE
-	//modem_reboot_cnt--;
+       //modem_reboot_cnt--;
 #endif
-	put_device(&dev->dev);
-	return ret;
+       put_device(&dev->dev);
+       return ret;
 }
 EXPORT_SYMBOL(subsys_modem_restart);
 /* END : subsys_modem_restart : testmode */

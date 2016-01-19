@@ -11,6 +11,11 @@ ifeq ($(KERNEL_BUILD),1)
 	# Need to explicitly define for Kernel-based builds
 	MODNAME := wlan
 	WLAN_ROOT := drivers/staging/prima
+	WLAN_FEATURE_NEIGHBOR_ROAMING :=y
+	WLAN_FEATURE_VOWIFI_11R :=y
+	FEATURE_WLAN_ESE :=y
+	FEATURE_WLAN_LFR :=y
+	CONFIG_ENABLE_LINUX_REG := y
 endif
 
 ifeq ($(KERNEL_BUILD), 0)
@@ -303,6 +308,9 @@ SME_P2P_OBJS = $(SME_SRC_DIR)/p2p/p2p_Api.o
 
 SME_RRM_OBJS := $(SME_SRC_DIR)/rrm/sme_rrm.o
 
+SME_NAN_OBJS = $(SME_SRC_DIR)/nan/nan_Api.o
+
+
 SME_OBJS :=	$(SME_BTC_OBJS) \
 		$(SME_CCM_OBJS) \
 		$(SME_CMN_OBJS) \
@@ -311,7 +319,8 @@ SME_OBJS :=	$(SME_BTC_OBJS) \
 		$(SME_P2P_OBJS) \
 		$(SME_PMC_OBJS) \
 		$(SME_QOS_OBJS) \
-		$(SME_RRM_OBJS)
+		$(SME_RRM_OBJS) \
+		$(SME_NAN_OBJS)
 
 ############ SVC ############
 SVC_DIR :=	CORE/SVC
@@ -575,6 +584,11 @@ endif
 ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
 CDEFINES += -DTIMER_MANAGER
 CDEFINES += -DMEMORY_DEBUG
+endif
+
+
+ifeq ($(PRODUCT_SUPPORT_MDFPP), true)
+CDEFINES += -DFEATURE_WLAN_DISA
 endif
 
 ifeq ($(HAVE_CFG80211),1)

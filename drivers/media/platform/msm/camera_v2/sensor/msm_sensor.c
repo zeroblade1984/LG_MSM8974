@@ -29,6 +29,8 @@
 #endif
 /* LGE_CHANGE_E, For laser sensor, 2014-02-24, sungmin.woo@lge.com */
 
+#define I2C_USER_REG_DATA_MAX 1024
+
 /*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
@@ -507,14 +509,6 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int rc = 0;
 	uint16_t chipid = 0;
-
-/* [LGE_CHANGE_S] youngbae.choi@lge.com, 2013-05-16
- * when failed matching ID , retry the read. */
-	int i = 0;
-	int n_res = 0;
-/* [LGE_CHANGE_E] youngbae.choi@lge.com, 2013-05-16
- * when failed matching ID , retry the read. */
-
 	struct msm_camera_i2c_client *sensor_i2c_client;
 	struct msm_camera_slave_info *slave_info;
 	const char *sensor_name;
@@ -535,46 +529,6 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		return -EINVAL;
 	}
 
-/* [LGE_CHANGE_S] youngbae.choi@lge.com, 2013-05-16
- * when failed matching ID , retry the read. */
-#if 1
-	for(i =0;i<3;i++){
-		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
-			s_ctrl->sensor_i2c_client,
-			s_ctrl->sensordata->slave_info->sensor_id_reg_addr,
-			&chipid, MSM_CAMERA_I2C_WORD_DATA);
-
-			if(rc >= 0){
-				n_res = 1;
-				break;
-			}
-			msleep(5);
-	}
-
-	if(n_res == 0){
-		pr_err("%s: %s: read id failed\n", __func__,
-			s_ctrl->sensordata->sensor_name);
-#if 1
-		if(strcmp(s_ctrl->sensordata->sensor_name, "imx135") == 0){
-			chipid = 0x135; //imx135
-			s_ctrl->sensordata->slave_info->sensor_id = 0x135; //imx135
-		}
-#endif
-		if(strcmp(s_ctrl->sensordata->sensor_name, "imx132") == 0){
-			chipid = 132; //imx132
-			s_ctrl->sensordata->slave_info->sensor_id = 132; //imx132
-		}
-
-		if(strcmp(s_ctrl->sensordata->sensor_name, "imx208") == 0){
-			chipid = 0x208; //imx208
-			s_ctrl->sensordata->slave_info->sensor_id = 0x208; //imx208
-		}
-		rc = 0;
-
-		pr_err("%s: %s: forcelly mapping the chip ID\n", __func__,
-			s_ctrl->sensordata->sensor_name);
-	}
-#else /* QCT original */
 	rc = sensor_i2c_client->i2c_func_tbl->i2c_read(
 		sensor_i2c_client, slave_info->sensor_id_reg_addr,
 		&chipid, MSM_CAMERA_I2C_WORD_DATA);
@@ -582,9 +536,6 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: %s: read id failed\n", __func__, sensor_name);
 		return rc;
 	}
-#endif
-/* [LGE_CHANGE_S] youngbae.choi@lge.com, 2013-05-16
- * when failed matching ID , retry the read. */
 
 	CDBG("%s: read id: %x expected id %x:\n", __func__, chipid,
 		slave_info->sensor_id);
@@ -653,8 +604,8 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 	long rc = 0;
 	int i = 0;
 	mutex_lock(s_ctrl->msm_sensor_mutex);
-	//CDBG("%s:%d %s cfgtype = %d\n", __func__, __LINE__,
-	//	s_ctrl->sensordata->sensor_name, cdata->cfgtype);
+	CDBG("%s:%d %s cfgtype = %d\n", __func__, __LINE__,
+		s_ctrl->sensordata->sensor_name, cdata->cfgtype);
 	switch (cdata->cfgtype) {
 	case CFG_GET_SENSOR_INFO:
 		memcpy(cdata->cfg.sensor_info.sensor_name,
@@ -836,8 +787,12 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			rc = -EFAULT;
 			break;
 		}
-
-		if (!conf_array.size) {
+#ifdef CONFIG_HI544
+		if (!conf_array.size)  {
+#else
+		if ((!conf_array.size) ||
+			(conf_array.size > I2C_USER_REG_DATA_MAX )) {
+#endif
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -1011,7 +966,8 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			break;
 		}
 
-		if (!conf_array.size) {
+		if ((!conf_array.size) ||
+			(conf_array.size > I2C_USER_REG_DATA_MAX )) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -1388,7 +1344,6 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 	}
 
 #if defined(CONFIG_MACH_MSM8974_G3_KDDI)
-/* LGE_CHANGE, Check sensor type whether 30 fps or not, 2014-05-21, jinw.kim@lge.com */
 	if(!strcmp(s_ctrl->sensordata->sensor_name, "imx135")) {
 
 		uint16_t chip_type;
@@ -1423,7 +1378,7 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 	}
 #endif
 
-	pr_err("%s %s probe succeeded\n", __func__, /* LGE_CHANGE_S, enable log for probing check, 2014-02-07, jungryoul.choi@lge.com */
+	pr_info("%s %s probe succeeded\n", __func__,
 		s_ctrl->sensordata->sensor_name);
 	v4l2_subdev_init(&s_ctrl->msm_sd.sd,
 		s_ctrl->sensor_v4l2_subdev_ops);

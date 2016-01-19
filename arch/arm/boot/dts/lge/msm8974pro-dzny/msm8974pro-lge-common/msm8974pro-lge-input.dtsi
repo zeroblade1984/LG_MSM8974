@@ -139,7 +139,7 @@
 				crack.min.cap = <300>;
 
 				/*ghost_detection -S*/
-				ghost_detection_enable = <0>;
+				ghost_detection_enable = <1>;
 				ghost_detection_chk_cnt = <3>;
 				jitter_value = <20>;
 				ta_noise_chk = <0>;
@@ -191,7 +191,7 @@
 				ref_chk_option = <0 0 1 1>;
 
 				/* firmware & panel_spec path */
-				fw_image = "synaptics/dzny_dcm_jp/PLG503-V0.09-PR1820142-DS5.2.13.0.1014_40052109.img";
+				fw_image = "synaptics/dzny_dcm_jp/PLG503-V1.04-PR1854003-DS5.2.13.0.1014_40052184.img";
 				panel_spec = "synaptics/dzny_dcm_jp/dzny_dcm_jp_limit.txt";
 				panel_spec_mfts = "synaptics/dzny_dcm_jp/dzny_dcm_jp_limit_mfts.txt";
 			};

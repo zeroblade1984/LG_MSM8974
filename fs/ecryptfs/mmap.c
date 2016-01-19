@@ -97,7 +97,7 @@ static int ecryptfs_writepage(struct page *page, struct writeback_control *wbc)
 	struct ecryptfs_page_crypt_req *page_crypt_req;
 	int rc = 0;
 #endif
-#if 1 // FEATURE_SDCARD_ENCRYPTION
+#ifdef FEATURE_SDCARD_ENCRYPTION
 	struct inode *ecryptfs_inode;
 	struct ecryptfs_crypt_stat *crypt_stat =
 		&ecryptfs_inode_to_private(page->mapping->host)->crypt_stat;
@@ -118,7 +118,7 @@ static int ecryptfs_writepage(struct page *page, struct writeback_control *wbc)
 		goto out;
 	}
 
-#if 1 // FEATURE_SDCARD_ENCRYPTION
+#ifdef FEATURE_SDCARD_ENCRYPTION
 	if (!crypt_stat || !(crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
 		ecryptfs_printk(KERN_DEBUG,
 				"Passing through unencrypted page\n");

@@ -35,6 +35,9 @@
 #define CLK_DISABLE 0
 #define CLK_PIN 1
 #define CLK_CONT 2
+#define CLKS_XO 1
+#define CLKS_PMIC 2
+static unsigned int clk_source = CLKS_XO;
 #endif
 
 static bool sIsWakeLocked = false;
@@ -50,6 +53,18 @@ static struct i2c_client *pn547_client;
 struct wake_lock nfc_wake_lock;
 
 #ifdef CONFIG_LGE_NFC_USE_PMIC
+static bool use_xtal_revision(void)
+{
+    bool ret_val = false;
+#if defined(CONFIG_MACH_MSM8974_TIGERS_KR)  // [NFC-2698]
+    if (lge_get_board_revno() >= HW_REV_1_0)
+    {
+         ret_val = true;
+    }
+#endif
+   return ret_val;
+}
+
 static void pn547_change_clk(struct pn547_dev *pn547_dev, unsigned int clk_state)
 {
     static unsigned int nOldClkState = CLK_DISABLE;
@@ -320,7 +335,9 @@ static long pn547_dev_unlocked_ioctl(struct file *filp, unsigned int cmd, unsign
             dprintk(PN547_DRV_NAME ":%s power on\n", __func__);
             if (sPowerState == NFC_POWER_OFF) {
 #ifdef CONFIG_LGE_NFC_USE_PMIC
+            if (!use_xtal_revision ()) {
                 pn547_change_clk(pn547_dev, CLK_PIN);
+            }
 #endif
                 gpio_set_value(pn547_dev->firm_gpio, 0);
                 gpio_set_value(pn547_dev->ven_gpio, 1);
@@ -349,7 +366,9 @@ static long pn547_dev_unlocked_ioctl(struct file *filp, unsigned int cmd, unsign
             dprintk(PN547_DRV_NAME ":%s power off\n", __func__);
             if (sPowerState == NFC_POWER_ON) {
 #ifdef CONFIG_LGE_NFC_USE_PMIC
-                pn547_change_clk(pn547_dev, CLK_DISABLE);
+                if (!use_xtal_revision ()) {
+                    pn547_change_clk(pn547_dev, CLK_DISABLE);
+                }
 #endif
                 gpio_set_value(pn547_dev->firm_gpio, 0);
                 gpio_set_value(pn547_dev->ven_gpio, 0);
@@ -387,6 +406,22 @@ static long pn547_dev_unlocked_ioctl(struct file *filp, unsigned int cmd, unsign
         {
             return pn547_get_hw_revision();
         }
+#ifdef CONFIG_LGE_NFC_USE_PMIC
+    case pn547_CLKS_SET:
+        {
+            if(arg == 0){
+                clk_source = CLKS_XO;
+                dprintk(PN547_DRV_NAME "%s: clock source X-tal set!\n", __func__);
+            }else if(arg == 1){
+                clk_source = CLKS_PMIC;
+                dprintk(PN547_DRV_NAME "%s: clock source PMIC set!\n", __func__);
+            }else{
+                pr_err("%s: wrong clock source set clk source : %ld\n", __func__, arg);
+                return -1;
+            }
+        }
+        break;
+#endif
     default:
         pr_err("%s bad ioctl %d\n", __func__, cmd);
         return -EINVAL;
@@ -450,8 +485,10 @@ static int pn547_probe(struct i2c_client *client,
     ret = gpio_direction_input(pn547_dev->irq_gpio);
 
 #ifdef CONFIG_LGE_NFC_USE_PMIC
-    pn547_get_clk_source(pn547_dev);
-    pn547_change_clk(pn547_dev, CLK_PIN);
+    if(!use_xtal_revision ()){
+        pn547_get_clk_source(pn547_dev);
+        pn547_change_clk(pn547_dev, CLK_PIN);
+    }
 #endif
     /* init mutex and queues */
     init_waitqueue_head(&pn547_dev->read_wq);
@@ -520,7 +557,9 @@ static __devexit int pn547_remove(struct i2c_client *client)
     misc_deregister(&pn547_dev->pn547_device);
     mutex_destroy(&pn547_dev->read_mutex);
 #ifdef CONFIG_LGE_NFC_USE_PMIC
-    pn547_change_clk(pn547_dev, CLK_DISABLE);
+    if (!use_xtal_revision ()) {
+        pn547_change_clk(pn547_dev, CLK_DISABLE);
+    }
 #endif
     gpio_free(pn547_dev->firm_gpio);
     gpio_free(pn547_dev->ven_gpio);

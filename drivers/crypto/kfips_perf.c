@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) INSIDE Secure Oy 2011-2014.
+ *      Copyright (c) INSIDE Secure Oy 2011-2015.
  *      All Rights Reserved
  *
  *      This software is open source; you can redistribute it and/or modify
@@ -405,12 +405,11 @@ static const struct file_operations file_fops = {
 #ifndef KFIPS_USE_CREATE_PROC_ENTRY
 #ifdef KFIPS_PROC_STATUS
 /* Read status information. */
-static int kfips_proc_status_read(char *buf,
-				  char **start,
-				  off_t off,
-				  int count,
-				  int *eof,
-				  void *data);
+
+static ssize_t kfips_proc_status_read(struct file *filp,
+				  __user char *buf,
+				  size_t count,
+				  loff_t *offp);
 
 static const struct file_operations status_file_fops = {
 	.read = kfips_proc_status_read
@@ -1025,6 +1024,26 @@ static void kfips_aes_cra_exit(struct crypto_tfm *tfm)
 
 static struct crypto_alg algs[] = {
 	{
+		.cra_name = "fipsaes",
+		.cra_driver_name = "fipsaes-generic",
+		.cra_priority = 500,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
+		.cra_blocksize = AES_BLOCK_SIZE,
+		.cra_ctxsize = sizeof(struct kfips_transform_context),
+		.cra_alignmask = 0,
+		.cra_type = &crypto_ablkcipher_type,
+		.cra_module = THIS_MODULE,
+		.cra_init = kfips_aes_cra_init,
+		.cra_exit = kfips_aes_cra_exit,
+		.cra_u.ablkcipher = {
+			.min_keysize = AES_MIN_KEY_SIZE,
+			.max_keysize = AES_MAX_KEY_SIZE,
+			.ivsize = 0,
+			.setkey = kfips_aes_setkey,
+			.encrypt = kfips_aes_ecb_encrypt,
+			.decrypt = kfips_aes_ecb_decrypt,
+		}
+	}, {
 		.cra_name = "ecb(fipsaes)",
 		.cra_driver_name = "ecb-fipsaes",
 		.cra_priority = 500,
@@ -1120,12 +1139,12 @@ static void kfips_aes_mod_unload(enum kfips_load_state mstate)
 
 #ifdef KFIPS_PROC_STATUS
 /* Read status information. */
-static int kfips_proc_status_read(char *buf,
-				  char **start,
-				  off_t off,
-				  int count,
-				  int *eof,
-				  void *data)
+static int kfips_proc_status_read_inner(char *buf,
+					char **start,
+					off_t off,
+					int count,
+					int *eof,
+					void *data)
 {
 	int len = 0;
 	unsigned l_count;
@@ -1138,6 +1157,7 @@ static int kfips_proc_status_read(char *buf,
 
 	/* Global information. */
 	spin_lock_bh(&g_kfips_lock);
+
 	len += snprintf(buf + len, PAGE_SIZE - len,
 			"Num queues: %d/%d\n", g_num_queues,
 			KFIPS_MAX_WORKERS);
@@ -1202,7 +1222,52 @@ static int kfips_proc_status_read(char *buf,
 	buf[len] = 0;
 	return len;
 }
-#endif
+
+#ifndef KFIPS_USE_CREATE_PROC_ENTRY
+/* A 3.10 wrapper for the pre-3.10 inner function */
+static ssize_t kfips_proc_status_read(struct file *filp,
+				  __user char *buf,
+				  size_t count,
+				  loff_t *offp)
+{
+	char *kbuf = NULL;
+	ssize_t bytes_read;
+	int rv;
+	int eof = 0;
+
+	if (!filp)
+		return -EIO;
+
+	if (*offp > PAGE_SIZE)
+		return -EIO;
+
+	kbuf = kmalloc(2 * PAGE_SIZE, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	bytes_read = (ssize_t)kfips_proc_status_read_inner(kbuf,
+							   0,
+							   (off_t)*offp,
+							   count,
+							   &eof,
+							   0);
+
+	if (bytes_read < 0)
+		goto out;
+
+	rv = copy_to_user(buf, kbuf, bytes_read);
+	if (rv != 0)
+		goto out;
+
+	*offp += bytes_read;
+ out:
+	kfree(kbuf);
+
+	return bytes_read;
+}
+#endif /* KFIPS_USE_CREATE_PROC_ENTRY */
+
+#endif /* KFIPS_PROC_STATUS */
 
 /* Keep statistics of CPUs up and down.
    Wake up more workers if more CPUs go online. */
@@ -1582,6 +1647,7 @@ static int __init kfips_aes_mod_init(void)
 	{
 		kfips_cpu(1, cpu_id);
 	}
+
 	put_online_cpus();
 
 	spin_lock_init(&g_lock);
@@ -1622,7 +1688,7 @@ static int __init kfips_aes_mod_init(void)
 	}
 
 #ifdef KFIPS_USE_CREATE_PROC_ENTRY
-	g_proc_status_entry->read_proc = kfips_proc_status_read;
+	g_proc_status_entry->read_proc = kfips_proc_status_read_inner;
 #endif /* KFIPS_USE_CREATE_PROC_ENTRY */
 #endif
 
@@ -1665,7 +1731,7 @@ module_exit(kfips_aes_mod_exit);
 
 MODULE_DESCRIPTION("INSIDE Secure FIPS AES-XTS/AES-CBC Driver.");
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("1.2");
+MODULE_VERSION("2.0.0.0");
 MODULE_AUTHOR("INSIDE Secure Oy");
 
 module_param(uid, int, 0);

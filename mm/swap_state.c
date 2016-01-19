@@ -149,6 +149,11 @@ int add_to_swap(struct page *page)
 	VM_BUG_ON(!PageLocked(page));
 	VM_BUG_ON(!PageUptodate(page));
 
+#ifdef CONFIG_HSWAP
+	if (!current_is_kswapd())
+		entry = get_lowest_prio_swap_page();
+	else
+#endif
 	entry = get_swap_page();
 	if (!entry.val)
 		return 0;
@@ -376,7 +381,8 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 	struct page *page;
 	unsigned long offset = swp_offset(entry);
 	unsigned long start_offset, end_offset;
-	unsigned long mask = (1UL << page_cluster) - 1;
+	unsigned long mask = is_swap_fast(entry) ? 0 :
+				(1UL << page_cluster) - 1;
 
 	/* Read a page_cluster sized and aligned cluster around offset. */
 	start_offset = offset & ~mask;

@@ -251,7 +251,7 @@ enum {
 
 #define DSI_EV_PLL_UNLOCKED		0x0001
 #define DSI_EV_MDP_FIFO_UNDERFLOW	0x0002
-#define DSI_EV_DSI_FIFO_EMPTY		0x0003
+#define DSI_EV_DSI_FIFO_EMPTY		0x0004
 #define DSI_EV_MDP_BUSY_RELEASE		0x80000000
 
 struct mdss_dsi_ctrl_pdata {
@@ -297,7 +297,7 @@ int disp_en_gpio2;
 	int new_fps;
 	int pwm_enabled;
 #ifdef CONFIG_MACH_LGE
-int io_gpio; /* for china model */
+	int io_gpio; /* for china model */
 #endif
 #ifdef CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
 	int dsv_ena;
@@ -305,6 +305,7 @@ int io_gpio; /* for china model */
 	int dsv_manufacturer;
 	struct notifier_block notif;
 #endif
+	bool dmap_iommu_map;
 	struct pwm_device *pwm_bl;
 	struct dsi_drv_cm_data shared_pdata;
 	u32 pclk_rate;
@@ -316,7 +317,13 @@ int io_gpio; /* for china model */
 
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds off_cmds;
-
+#ifdef CONFIG_LGE_READER_MODE
+	struct dsi_panel_cmds reader_mode_initial_on_cmds;
+	struct dsi_panel_cmds reader_mode_on_cmds;
+	struct dsi_panel_cmds reader_mode_off_cmds;
+	struct dsi_panel_cmds charging_time_on_cmds;
+	struct dsi_panel_cmds charging_time_off_cmds;
+#endif
 #ifdef CONFIG_MACH_LGE
 int num_of_dsv_enable_pin;
 int lm3697_start_rev;

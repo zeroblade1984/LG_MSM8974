@@ -79,7 +79,6 @@ limDeactivateMinChannelTimerDuringScan(tpAniSirGlobal pMac)
             */
         
         limDeactivateAndChangeTimer(pMac,eLIM_MIN_CHANNEL_TIMER);
-        MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, NO_SESSION, eLIM_MAX_CHANNEL_TIMER));
         if (tx_timer_activate(&pMac->lim.limTimers.gLimMaxChannelTimer)
                                           == TX_TIMER_ERROR)
         {
@@ -545,13 +544,13 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
     if (WDA_GET_OFFLOADSCANLEARN(pRxPacketInfo))
     {
-       limLog(pMac, LOG2, FL(" pHdr->addr1:"MAC_ADDRESS_STR),
+       limLog(pMac, LOG1, FL(" pHdr->addr1:"MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pHdr->addr1));
-       limLog(pMac, LOG2, FL(" pHdr->addr2:"MAC_ADDRESS_STR),
+       limLog(pMac, LOG1, FL(" pHdr->addr2:"MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pHdr->addr2));
-       limLog(pMac, LOG2, FL(" pHdr->addr3:"MAC_ADDRESS_STR),
+       limLog(pMac, LOG1, FL(" pHdr->addr3:"MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pHdr->addr3));
-       limLog( pMac, LOG2, FL("Save this entry in LFR cache"));
+       limLog( pMac, LOG1, FL("Save this entry in LFR cache"));
        status = limLookupNaddLfrHashEntry(pMac, pBssDescr, LIM_HASH_ADD, dontUpdateAll);
     }
     else

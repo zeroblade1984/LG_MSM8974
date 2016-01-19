@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -305,8 +305,9 @@ static u32 mdss_mdp_perf_calc_pipe_prefill_cmd(struct mdss_mdp_prefill_params
 }
 
 #ifdef VIDEO_PLAYBACK_AB_1_1_G3
-#define SIZE_720P 1280*720
-static u32 mdss_mdp_get_bw_vote_mode(struct mdss_mdp_pipe *pipe) {
+#define SIZE_720P (1280*720)
+static u32 mdss_mdp_get_bw_vote_mode(struct mdss_mdp_pipe *pipe)
+{
 	u32 bw_mode = MDSS_MDP_BW_MODE_NONE;
 
 	if (pipe->src_fmt->is_yuv) {
@@ -381,7 +382,7 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 	 * no need to account for these lines in MDP clock or request bus
 	 * bandwidth to fetch them.
 	 */
-	src_h = src.h >> pipe->vert_deci;
+	src_h = DECIMATED_DIMENSION(src.h, pipe->vert_deci);
 
 	quota = fps * src.w * src_h;
 
@@ -649,7 +650,6 @@ static u32 mdss_mdp_get_vbp_factor_max(struct mdss_mdp_ctl *ctl)
 	return vbp_max;
 }
 
-#ifndef BW_CHECK_AGAIN_FOR_UNDERRUN
 static bool mdss_mdp_video_mode_intf_connected(struct mdss_mdp_ctl *ctl)
 {
 	int i;
@@ -671,7 +671,6 @@ static bool mdss_mdp_video_mode_intf_connected(struct mdss_mdp_ctl *ctl)
 
 	return false;
 }
-#endif
 
 static void __mdss_mdp_perf_calc_ctl_helper(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_perf_params *perf,
@@ -740,7 +739,8 @@ int mdss_mdp_perf_bw_check(struct mdss_mdp_ctl *ctl,
 {
 	struct mdss_data_type *mdata = ctl->mdata;
 	struct mdss_mdp_perf_params perf;
-	u32 bw, threshold;
+	u32 bw, threshold, i;
+	u64 bw_sum_of_intfs = 0;
 
 	/* we only need bandwidth check on real-time clients (interfaces) */
 	if (ctl->intf_type == MDSS_MDP_NO_INTF)
@@ -748,13 +748,28 @@ int mdss_mdp_perf_bw_check(struct mdss_mdp_ctl *ctl,
 
 	__mdss_mdp_perf_calc_ctl_helper(ctl, &perf,
 			left_plist, left_cnt, right_plist, right_cnt);
+	ctl->bw_pending = perf.bw_ctl;
+
+	for (i = 0; i < mdata->nctl; i++) {
+		struct mdss_mdp_ctl *temp = mdata->ctl_off + i;
+		if (temp->power_on && (temp->intf_type != MDSS_MDP_NO_INTF))
+			bw_sum_of_intfs += temp->bw_pending;
+	}
 
 	/* convert bandwidth to kb */
+#ifndef BW_CHECK_AGAIN_FOR_UNDERRUN
+	bw = DIV_ROUND_UP_ULL(bw_sum_of_intfs, 1000);
+#else
 	bw = DIV_ROUND_UP_ULL(perf.bw_ctl, 1000);
+#endif
 	pr_debug("calculated bandwidth=%uk\n", bw);
 
-	threshold = ctl->is_video_mode ? mdata->max_bw_low : mdata->max_bw_high;
+	threshold = (ctl->is_video_mode ||
+		mdss_mdp_video_mode_intf_connected(ctl)) ?
+		mdata->max_bw_low : mdata->max_bw_high;
+
 	if (bw > threshold) {
+		ctl->bw_pending = 0;
 		pr_debug("exceeds bandwidth: %ukb > %ukb\n", bw, threshold);
 		return -E2BIG;
 	}
@@ -767,6 +782,12 @@ static void mdss_mdp_perf_calc_ctl(struct mdss_mdp_ctl *ctl,
 {
 	struct mdss_mdp_pipe **left_plist, **right_plist;
 
+#ifdef MDP_BW_LIMIT_AB
+	struct mdss_overlay_private *mdp5_data = NULL;
+
+	if (ctl->mfd)
+		mdp5_data = mfd_to_mdp5_data(ctl->mfd);
+#endif
 	left_plist = ctl->mixer_left ? ctl->mixer_left->stage_pipe : NULL;
 	right_plist = ctl->mixer_right ? ctl->mixer_right->stage_pipe : NULL;
 
@@ -776,16 +797,24 @@ static void mdss_mdp_perf_calc_ctl(struct mdss_mdp_ctl *ctl,
 
 #ifdef BW_CHECK_AGAIN_FOR_UNDERRUN
 	if (ctl->is_video_mode) {
-		if (perf->bw_overlap > perf->bw_prefill)
+#ifdef MDP_BW_LIMIT_AB
+		if (mdp5_data && mdp5_data->bw_limit_vt) {
 			perf->bw_ctl = apply_fudge_factor(perf->bw_ctl,
-				&mdss_res->ib_factor_overlap);
-		else
-			perf->bw_ctl = apply_fudge_factor(perf->bw_ctl,
-				&mdss_res->ib_factor);
+				&mdss_res->ib_factor_limit);
+		} else
+#endif
+		{
+			if (perf->bw_overlap > perf->bw_prefill)
+				perf->bw_ctl = apply_fudge_factor(perf->bw_ctl,
+						&mdss_res->ib_factor_overlap);
+			else
+				perf->bw_ctl = apply_fudge_factor(perf->bw_ctl,
+						&mdss_res->ib_factor);
 
-		if (DIV_ROUND_UP_ULL(perf->bw_ctl, 1000) > 3200000) {
-			perf->bw_ctl = max(apply_fudge_factor(perf->bw_overlap,	&mdss_res->ib_factor_overlap),
-					apply_fudge_factor(perf->bw_prefill, &mdss_res->ib_factor));
+			if (DIV_ROUND_UP_ULL(perf->bw_ctl, 1000) > 3200000) {
+				perf->bw_ctl = max(apply_fudge_factor(perf->bw_overlap,	&mdss_res->ib_factor_overlap),
+						apply_fudge_factor(perf->bw_prefill, &mdss_res->ib_factor));
+			}
 		}
 #else
 	if (ctl->is_video_mode || ((ctl->intf_type != MDSS_MDP_NO_INTF) &&
@@ -943,20 +972,18 @@ static inline void mdss_mdp_ctl_perf_update_bus(struct mdss_mdp_ctl *ctl)
 		if (mdp5_data && mdp5_data->bw_limit) {
 			/* change the value as you want but should not cause underrun */
 			pr_debug(" B/W limited !!!\n");
-			if(bus_ib_quota < 2400000000UL)
+			if (bus_ib_quota < 2400000000UL)
 				bus_ib_quota = 2400000000UL;
 			bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
 				&mdss_res->ab_factor_limit);
-		}
-		else
+		} else
 			bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
 				&mdss_res->ab_factor);
 #else
 		bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
 			&mdss_res->ab_factor);
 #endif
-	}
-	else
+	} else
 		bus_ab_quota = fudge_factor(bw_sum_of_intfs, (u32)11, (u32)10);
 #else
 
@@ -964,12 +991,11 @@ static inline void mdss_mdp_ctl_perf_update_bus(struct mdss_mdp_ctl *ctl)
 	if (mdp5_data && mdp5_data->bw_limit) {
 		/* change the value as you want but should not cause underrun */
 		pr_debug(" B/W limited !!!\n");
-		if(bus_ib_quota < 2400000000UL)
+		if (bus_ib_quota < 2400000000UL)
 				bus_ib_quota = 2400000000UL;
 		bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
 			&mdss_res->ab_factor_limit);
-	}
-	else
+	} else
 		bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
 			&mdss_res->ab_factor);
 #else
@@ -2340,6 +2366,7 @@ int mdss_mdp_ctl_addr_setup(struct mdss_data_type *mdata,
 {
 	struct mdss_mdp_ctl *head;
 	struct mutex *shared_lock = NULL;
+	struct mutex *wb_lock = NULL;
 	u32 i;
 	u32 size = len;
 
@@ -2353,6 +2380,14 @@ int mdss_mdp_ctl_addr_setup(struct mdss_data_type *mdata,
 			return -ENOMEM;
 		}
 		mutex_init(shared_lock);
+		wb_lock = devm_kzalloc(&mdata->pdev->dev,
+					   sizeof(struct mutex),
+					   GFP_KERNEL);
+		if (!wb_lock) {
+			pr_err("unable to allocate mem for mutex\n");
+			return -ENOMEM;
+		}
+		mutex_init(wb_lock);
 	}
 
 	head = devm_kzalloc(&mdata->pdev->dev, sizeof(struct mdss_mdp_ctl) *
@@ -2372,6 +2407,7 @@ int mdss_mdp_ctl_addr_setup(struct mdss_data_type *mdata,
 
 	if (!mdata->has_wfd_blk) {
 		head[len - 1].shared_lock = shared_lock;
+		head[len - 1].wb_lock = wb_lock;
 		/*
 		 * Allocate a virtual ctl to be able to perform simultaneous
 		 * line mode and block mode operations on the same

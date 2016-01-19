@@ -25,8 +25,25 @@ TcpalSemaphore_t Tcc353xDrvSem;
 
 static struct msm_xo_voter *xo_handle_tcc;
 
-/*#define _NOT_USE_WAKE_LOCK_*/
+static Device_drv device_tcc353x = {
+	&broadcast_tcc353x_drv_if_power_on,
+	&broadcast_tcc353x_drv_if_power_off,
+	&broadcast_tcc353x_drv_if_open,
+	&broadcast_tcc353x_drv_if_close,
+	&broadcast_tcc353x_drv_if_set_channel,
+	&broadcast_tcc353x_drv_if_resync,
+	&broadcast_tcc353x_drv_if_detect_sync,
+	&broadcast_tcc353x_drv_if_get_sig_info,
+	&broadcast_tcc353x_drv_if_get_ch_info,
+	&broadcast_tcc353x_drv_if_get_dmb_data,
+	&broadcast_tcc353x_drv_if_reset_ch,
+	&broadcast_tcc353x_drv_if_user_stop,
+	&broadcast_tcc353x_drv_if_select_antenna,
+	&broadcast_tcc353x_drv_if_read_control,
+	&broadcast_tcc353x_drv_if_get_mode,
+};
 
+/*#define _NOT_USE_WAKE_LOCK_*/
 struct broadcast_tcc3530_ctrl_data
 {
 	int			pwr_state;
@@ -36,7 +53,6 @@ struct broadcast_tcc3530_ctrl_data
 };
 
 static struct broadcast_tcc3530_ctrl_data  IsdbCtrlInfo;
-int broadcast_dmb_drv_start(void);
 
 struct i2c_client*	TCC_GET_I2C_DRIVER(void)
 {
@@ -197,7 +213,7 @@ int __devinit broadcast_dmb_drv_init(void)
 {
 	int rc;
 	TcpalPrintStatus((I08S *)"[%s]\n", __func__);
-	rc = broadcast_dmb_drv_start();	
+	rc = broadcast_dmb_drv_start(&device_tcc353x);	
 	if (rc) 
 	{
 		TcpalPrintErr((I08S *)"failed to load\n");

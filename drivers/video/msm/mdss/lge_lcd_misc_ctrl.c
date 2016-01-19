@@ -44,7 +44,7 @@ int num_cmds;
 int tun_len[REGNUM];
 
 char init_buf[TUNING_REGSIZE];
-struct tuning_init{
+struct tuning_init {
 	char buf[TUNING_REGSIZE];
 	int size[REGNUM];
 	int numcmds;
@@ -53,7 +53,7 @@ struct tuning_init{
 int read_porch(unsigned long tmp)
 {
 	int size = ARRAY_SIZE(tun_porch_value)*4;
-	pr_info(KERN_INFO "read_porch_value \n");
+	pr_info(KERN_INFO "read_porch_value\n");
 	if (copy_to_user((uint32_t *)tmp, tun_porch_value, size)) {
 		pr_info(KERN_ERR "read_file : error of copy_to_user_buff\n");
 		return -EFAULT;
@@ -236,7 +236,7 @@ static struct platform_driver this_driver = {
 
 int __init lcd_misc_init(void)
 {
-	pr_debug("lcd_misc_init \n");
+	pr_debug("lcd_misc_init\n");
 	return platform_driver_register(&this_driver);
 }
 

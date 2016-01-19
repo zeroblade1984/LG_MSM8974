@@ -140,9 +140,8 @@ void lm3631_lcd_backlight_set_level(int level)
 			ret = lm3631_bl_enable(lm3631_bl, 1);
 	}
 
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error enable or disable backlight\n", __func__);
-	}
 
 #ifdef CONFIG_MACH_LGE
 	if (level >= pdata->blmap_size)
@@ -161,10 +160,9 @@ void lm3631_lcd_backlight_set_level(int level)
 	ret = lm3631_bl_set_brightness(lm3631_bl, level);
 #endif
 
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error set backlight\n", __func__);
-	}
-};
+}
 EXPORT_SYMBOL(lm3631_lcd_backlight_set_level);
 
 static int lm3631_bl_update_status(struct backlight_device *bl_dev)
@@ -223,9 +221,8 @@ static void lm3631_lcd_backlight_set_level_nomapping(int level)
 		level = 2047;
 
 	ret = lm3631_bl_set_brightness(lm3631_bl, level);
-	if (ret) {
+	if (ret)
 		pr_err("%s DEBUG error set backlight\n", __func__);
-	}
 };
 
 static const struct backlight_ops lm3631_bl_ops = {
@@ -269,9 +266,9 @@ static void lm3631_bl_unregister(struct lm3631_bl *lm3631_bl)
 
 static int lm3631_bl_set_ovp(struct lm3631_bl *lm3631_bl)
 {
-    /* Set OVP to 25V by default */
-    return lm3631_update_bits(lm3631_bl->lm3631, LM3631_REG_BL_BOOST,
-								LM3631_BOOST_OVP_MASK, LM3631_BOOST_OVP_25V);
+	/* Set OVP to 25V by default */
+	return lm3631_update_bits(lm3631_bl->lm3631, LM3631_REG_BL_BOOST,
+				LM3631_BOOST_OVP_MASK, LM3631_BOOST_OVP_25V);
 }
 
 static int lm3631_bl_set_ctrl_mode(struct lm3631_bl *lm3631_bl)
@@ -318,8 +315,8 @@ static int lm3631_bl_configure(struct lm3631_bl *lm3631_bl)
 {
 	int ret;
 
-    ret = lm3631_bl_set_ovp(lm3631_bl);
-    if (ret)
+	ret = lm3631_bl_set_ovp(lm3631_bl);
+	if (ret)
 		return ret;
 
 	ret = lm3631_bl_set_ctrl_mode(lm3631_bl);

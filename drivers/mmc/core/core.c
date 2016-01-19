@@ -337,6 +337,11 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	}
 
 	WARN_ON(!host->claimed);
+#ifdef CONFIG_MACH_LGE
+	if (!host->claimed) {
+		printk("XXXXXX, %s: claimed is 0, host_name : %s \n", __func__, mmc_hostname(host));
+	}
+#endif
 
 	mrq->cmd->error = 0;
 	mrq->cmd->mrq = mrq;
@@ -1178,6 +1183,11 @@ int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries
 	struct mmc_request mrq = {NULL};
 
 	WARN_ON(!host->claimed);
+#ifdef CONFIG_MACH_LGE
+	if (!host->claimed) {
+		printk("XXXXXX, %s: claimed is 0, host_name : %s \n", __func__, mmc_hostname(host));
+	}
+#endif
 
 	memset(cmd->resp, 0, sizeof(cmd->resp));
 	cmd->retries = retries;
@@ -1511,12 +1521,21 @@ void mmc_release_host(struct mmc_host *host)
 	unsigned long flags;
 
 	WARN_ON(!host->claimed);
+#ifdef CONFIG_MACH_LGE
+	if (!host->claimed) {
+		printk("XXXXXX, %s: claimed is 0, host_name : %s \n", __func__, mmc_hostname(host));
+	}
+#endif
 
 	if (host->ops->disable && host->claim_cnt == 1)
 		host->ops->disable(host);
 
 	spin_lock_irqsave(&host->lock, flags);
 	if (--host->claim_cnt) {
+#ifdef CONFIG_MACH_LGE
+		if (host->claim_cnt < 0)
+			host->claim_cnt = 0;
+#endif
 		/* Release for nested claim */
 		spin_unlock_irqrestore(&host->lock, flags);
 	} else {
@@ -2938,7 +2957,8 @@ out:
 	return;
 }
 
-static bool mmc_is_vaild_state_for_clk_scaling(struct mmc_host *host)
+static bool mmc_is_vaild_state_for_clk_scaling(struct mmc_host *host,
+				enum mmc_load state)
 {
 	struct mmc_card *card = host->card;
 	u32 status;
@@ -2951,7 +2971,8 @@ static bool mmc_is_vaild_state_for_clk_scaling(struct mmc_host *host)
 	 */
 	if (!card || (mmc_card_mmc(card) &&
 			card->part_curr == EXT_CSD_PART_CONFIG_ACC_RPMB)
-			|| host->clk_scaling.invalid_state)
+			|| (state != MMC_LOAD_LOW &&
+				host->clk_scaling.invalid_state))
 		goto out;
 
 	if (mmc_send_status(card, &status)) {
@@ -2982,7 +3003,7 @@ static int mmc_clk_update_freq(struct mmc_host *host,
 	}
 
 	if (freq != host->clk_scaling.curr_freq) {
-		if (!mmc_is_vaild_state_for_clk_scaling(host)) {
+		if (!mmc_is_vaild_state_for_clk_scaling(host, state)) {
 			err = -EAGAIN;
 			goto error;
 		}

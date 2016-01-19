@@ -528,8 +528,10 @@ static int count_configs(struct usb_composite_dev *cdev, unsigned type)
 static int bos_desc(struct usb_composite_dev *cdev)
 {
 	struct usb_ext_cap_descriptor	*usb_ext;
+#ifndef CONFIG_USB_G_LGE_ANDROID
 	struct usb_ss_cap_descriptor	*ss_cap;
 	struct usb_dcd_config_params	dcd_config_params;
+#endif
 	struct usb_bos_descriptor	*bos = cdev->req->buf;
 
 	bos->bLength = USB_DT_BOS_SIZE;
@@ -549,6 +551,20 @@ static int bos_desc(struct usb_composite_dev *cdev)
 	usb_ext->bLength = USB_DT_USB_EXT_CAP_SIZE;
 	usb_ext->bDescriptorType = USB_DT_DEVICE_CAPABILITY;
 	usb_ext->bDevCapabilityType = USB_CAP_TYPE_EXT;
+	/*
+	 * 1. Some of PC USB3.0 host controller is keep sending LPM packets
+	 * if device supports LPM mode in BOS Descriptor. And the device's
+	 * usb controller is NOT working well like this :
+	 * the device responses with ACK for LPM packets from the host. In this
+	 * case, the host change bus status from L0(ON) to L1(sleep).
+	 * So, we need to set 'unsupport LPM' in bmAttributes'
+	 *
+	 * 2. To disable a popup message in Windows7/8/etc, we need to eleminate
+	 * super-speed information in capability descriptors.
+	 */
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	usb_ext->bmAttributes = 0;
+#else /* QCT native */
 	usb_ext->bmAttributes = cpu_to_le32(USB_LPM_SUPPORT);
 
 	if (gadget_is_superspeed(cdev->gadget)) {
@@ -582,6 +598,7 @@ static int bos_desc(struct usb_composite_dev *cdev)
 		ss_cap->bU1devExitLat = dcd_config_params.bU1devExitLat;
 		ss_cap->bU2DevExitLat = dcd_config_params.bU2DevExitLat;
 	}
+#endif
 
 	return le16_to_cpu(bos->wTotalLength);
 }
@@ -707,6 +724,19 @@ static int set_config(struct usb_composite_dev *cdev,
 			     |  (ep->bEndpointAddress & 0x0f);
 			set_bit(addr, f->endpoints);
 		}
+
+#ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+		if (f->set_config) {
+			result = f->set_config(f);
+			if (result < 0) {
+				DBG(cdev, "interface %d (%s/%p) config %d --> %d\n",
+						tmp, f->name, f, number, result);
+
+				reset_config(cdev);
+				goto done;
+			}
+		}
+#endif
 
 		result = f->set_alt(f, tmp, 0);
 		if (result < 0) {

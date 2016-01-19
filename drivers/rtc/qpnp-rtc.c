@@ -45,6 +45,9 @@
 #define TO_SECS(arr)		(arr[0] | (arr[1] << 8) | (arr[2] << 16) | \
 							(arr[3] << 24))
 
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+static unsigned long rtc_fake_secs;
+#endif
 /* Module parameter to control power-on-alarm */
 #ifdef CONFIG_LGE_PM_RTC_PWROFF_ALARM
 extern bool poweron_alarm;
@@ -115,6 +118,10 @@ qpnp_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(dev);
 
 	rtc_tm_to_time(tm, &secs);
+
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+	secs -= rtc_fake_secs;
+#endif
 
 	value[0] = secs & 0xFF;
 	value[1] = (secs >> 8) & 0xFF;
@@ -273,7 +280,11 @@ qpnp_rtc_read_time(struct device *dev, struct rtc_time *tm)
 		}
 	}
 
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+	secs = rtc_fake_secs + TO_SECS(value);
+#else
 	secs = TO_SECS(value);
+#endif
 
 	rtc_time_to_tm(secs, tm);
 
@@ -337,6 +348,10 @@ qpnp_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 			return 0;
 		}
 	}
+#endif
+
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+	secs -= rtc_fake_secs;
 #endif
 
 	value[0] = secs & 0xFF;
@@ -403,7 +418,11 @@ qpnp_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	}
 #endif
 
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+	secs = rtc_fake_secs + TO_SECS(value);
+#else
 	secs = TO_SECS(value);
+#endif
 	rtc_time_to_tm(secs, &alarm->time);
 
 	rc = rtc_valid_tm(&alarm->time);
@@ -544,6 +563,7 @@ qpnp_rtc_set_po_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 		if (secs < secs_rtc) {
 			g_poalarm.enabled = 0;
+			write_rtc_pwron_in_misc(&g_poalarm);
 			dev_err(dev, "Trying to set alarm in the past\n");
 			return -EINVAL;
 		}
@@ -673,6 +693,11 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 #ifdef CONFIG_LGE_PM_RTC_PWROFF_ALARM
 	u8 ctrl_reg;
 #endif
+
+#ifdef CONFIG_LGE_RTC_FAKE_SECS
+	rtc_fake_secs = mktime(2015, 1, 1, 0, 0, 0);
+#endif
+
 	rtc_dd = devm_kzalloc(&spmi->dev, sizeof(*rtc_dd), GFP_KERNEL);
 	if (rtc_dd == NULL) {
 		dev_err(&spmi->dev, "Unable to allocate memory!\n");
@@ -816,11 +841,11 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 	pr_info("[%s %d] %x reg : value = %d\n",__func__, __LINE__,
 				rtc_dd->alarm_base + REG_OFFSET_ALARM_CTRL1, ctrl_reg);
 
-	if (ctrl_reg == 1) {
-		poweron_alarm = 0;
+	if ((ctrl_reg >> 7) & 0x01) {
+		poweron_alarm = 1;
 	}
 	else {
-		poweron_alarm = 1;
+		poweron_alarm = 0;
 	}
 	pr_info("[%s %d] poweron_alarm = %d\n",__func__, __LINE__, poweron_alarm);
 

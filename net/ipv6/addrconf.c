@@ -219,6 +219,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
 	.accept_ra_prefix_route = 1,
+	.accept_ra_mtu		= 1,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -258,6 +259,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
 	.accept_ra_prefix_route = 1,
+	.accept_ra_mtu		= 1,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -4117,6 +4119,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #ifdef CONFIG_LGE_DHCPV6_WIFI
 	array[DEVCONF_RA_INFO_FLAG] = cnf->ra_info_flag;
 #endif	
+	array[DEVCONF_ACCEPT_RA_MTU] = cnf->accept_ra_mtu;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -4803,13 +4806,20 @@ static struct addrconf_sysctl_table
 		},
 #ifdef CONFIG_LGE_DHCPV6_WIFI
 		{
-			.procname		= "ra_info_flag",
-			.data			= &ipv6_devconf.ra_info_flag,
-			.maxlen 		= sizeof(int),
-			.mode			= 0644,
+			.procname	= "ra_info_flag",
+			.data		= &ipv6_devconf.ra_info_flag,
+			.maxlen 	= sizeof(int),
+			.mode		= 0644,
 			.proc_handler	= proc_dointvec
 		},
 #endif
+		{
+			.procname	= "accept_ra_mtu",
+			.data		= &ipv6_devconf.accept_ra_mtu,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= proc_dointvec,
+		},
 		{
 			/* sentinel */
 		}

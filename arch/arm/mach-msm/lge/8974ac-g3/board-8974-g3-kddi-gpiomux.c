@@ -283,8 +283,8 @@ static struct gpiomux_setting wcnss_5gpio_active_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-/* LGE_BROADCAST_JFULLSEG { */
-#if defined (CONFIG_LGE_BROADCAST_JFULLSEG)
+/* LGE_BROADCAST_ISDBT_JAPAN { */
+#if defined (CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 static struct gpiomux_setting lge_fullseg_i2c_config_active = {
 	/* 80-NA437-1B_MSM8274-MSM8674-MSM8974_GPIO_CONFIGURATION_SPREADSHEET.xlsm  */
 	.func = GPIOMUX_FUNC_3,
@@ -325,10 +325,10 @@ static struct gpiomux_setting lge_fullseg_tsif_config_suspend = {
 	.dir = GPIOMUX_IN,
 };
 #endif
-/* LGE_BROADCAST_JFULLSEG } */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
 
-/* LGE_BROADCAST_JFULLSEG { */
-#if defined (CONFIG_LGE_BROADCAST_JFULLSEG)
+/* LGE_BROADCAST_ISDBT_JAPAN { */
+#if defined (CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 static struct msm_gpiomux_config lge_fullseg_blsp8_i2c_tsif_configs[] __initdata = {
 	{
 		.gpio		= 47,				/* FULLSEG_I2C_SDA, BLSP8_1 */
@@ -393,7 +393,7 @@ static struct msm_gpiomux_config lge_fullseg_blsp8_i2c_tsif_configs[] __initdata
 	},
 };
 #endif
-/* LGE_BROADCAST_JFULLSEG } */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
 
 static struct gpiomux_setting gpio_i2c_config = {
 	.func = GPIOMUX_FUNC_3,
@@ -498,17 +498,16 @@ static struct gpiomux_setting irda_pwdn_active_config = {
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_UP,
 };
-
-static struct gpiomux_setting gpio_irda_tx_active_config = {
-	.func = GPIOMUX_FUNC_2,
+static struct gpiomux_setting gpio_irda_active_config = {
+	.func = GPIOMUX_FUNC_3,
 	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_DOWN,
+	.pull = GPIOMUX_PULL_NONE,
 };
 
-static struct gpiomux_setting gpio_irda_tx_suspended_config = {
-	.func = GPIOMUX_FUNC_2,
+static struct gpiomux_setting gpio_irda_suspended_config = {
+	.func = GPIOMUX_FUNC_3,
 	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
+	.pull = GPIOMUX_PULL_NONE,
 };
 
 static struct msm_gpiomux_config irda_pwdn_config[] __initdata = {
@@ -522,14 +521,15 @@ static struct msm_gpiomux_config irda_pwdn_config[] __initdata = {
 	{
 		.gpio	   = 85, 		/* BLSP12 UART TX */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_irda_tx_active_config,
-			[GPIOMUX_SUSPENDED] = &gpio_irda_tx_suspended_config,
+			[GPIOMUX_SUSPENDED] = &gpio_irda_suspended_config,
+			[GPIOMUX_ACTIVE] = &gpio_irda_active_config,
 		},
 	},
 	{
 		.gpio	   = 86, 		/* BLSP12 UART RX */
 		.settings = {
-			[GPIOMUX_SUSPENDED] = &gpio_uart_config,
+			[GPIOMUX_SUSPENDED] = &gpio_irda_suspended_config,
+			[GPIOMUX_ACTIVE] = &gpio_irda_active_config,
 		},
 	},
 };
@@ -1791,8 +1791,8 @@ static struct gpiomux_setting sdc4_data_1_suspend_cfg = {
 
 static struct msm_gpiomux_config msm8974_sdc4_configs[] __initdata = {
 
-/* LGE_BROADCAST_JFULLSEG { */
-#if !defined (CONFIG_LGE_BROADCAST_JFULLSEG)
+/* LGE_BROADCAST_ISDBT_JAPAN { */
+#if !defined (CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 	{
 		/* DAT3 */
 		.gpio      = 92,
@@ -1802,7 +1802,7 @@ static struct msm_gpiomux_config msm8974_sdc4_configs[] __initdata = {
 		},
 	},
 #endif
-/* LGE_BROADCAST_JFULLSEG } */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
 #if !defined(CONFIG_LGE_NFC_SONY)
 	{
 		/* DAT2 */
@@ -1824,8 +1824,8 @@ static struct msm_gpiomux_config msm8974_sdc4_configs[] __initdata = {
 	},
 #endif
 /* TSIF1 GPIO 89~92 is used for 1seg tsif */
-/* LGE_BROADCAST_JFULLSEG { */
-#if !defined (CONFIG_LGE_BROADCAST_JFULLSEG)
+/* LGE_BROADCAST_ISDBT_JAPAN { */
+#if !defined (CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 	{
 		/* CMD */
 		.gpio      = 91,
@@ -1835,7 +1835,7 @@ static struct msm_gpiomux_config msm8974_sdc4_configs[] __initdata = {
 		},
 	},
 #endif
-/* LGE_BROADCAST_JFULLSEG } */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
 	{
 		/* CLK */
 		.gpio      = 93,
@@ -2063,11 +2063,11 @@ void __init msm_8974_init_gpiomux(void)
 		return;
 	}
 
-/* LGE_BROADCAST_JFULLSEG { */
-#if defined (CONFIG_LGE_BROADCAST_JFULLSEG)
+/* LGE_BROADCAST_ISDBT_JAPAN { */
+#if defined (CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 	    msm_gpiomux_install(lge_fullseg_blsp8_i2c_tsif_configs, ARRAY_SIZE(lge_fullseg_blsp8_i2c_tsif_configs));
 #endif
-/* LGE_BROADCAST_JFULLSEG } */
+/* LGE_BROADCAST_ISDBT_JAPAN } */
 
 #if defined(CONFIG_LGE_NFC_SONY)
        if(lge_get_board_revno() >= HW_REV_B){

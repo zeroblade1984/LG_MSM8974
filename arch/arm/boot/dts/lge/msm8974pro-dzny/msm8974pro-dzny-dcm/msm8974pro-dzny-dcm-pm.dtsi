@@ -19,6 +19,10 @@
 
 		max17048@36 {
 			status =  "ok";
+			max17048,rcomp_lgc = <59>;
+			max17048,temp_co_hot_lgc = <5875>;
+			max17048,temp_co_cold_lgc = <54875>;
+			max17048,empty_lgc = <0>;
 			max17048,rcomp_tcd = <59>;
 			max17048,temp_co_hot_tcd = <5875>;
 			max17048,temp_co_cold_tcd = <54875>;
@@ -209,10 +213,11 @@
 
 		pm8941_bms: qcom,bms  {
 			status = "ok";
+			qcom,use-external-rsense;
 		};
 
 		qcom,currentnow@3800 {
-			status = "ok";
+			status = "disable";
 		};
 		pm8941_coincell: qcom,coincell@2800 {
 			qcom,vset-millivolts = <3200>;
@@ -223,7 +228,7 @@
 		qcom,vibrator@c000 {
 			status = "okay";
 			qcom,vib-timeout-ms = <15000>;
-			qcom,vib-vtg-level-mV = <3100>;
+			qcom,vib-vtg-level-mV = <2500>;
 			ti,label = "vibrator";
 		};
 
@@ -319,67 +324,6 @@
 				linux,default-trigger = "none";
 			};
 		};
-
-	qcom,leds@e200 {
-			status = "okay";
-			qcom,kpdbl1 {
-				label = "kpdbl";
-				linux,name = "button-backlight1";
-				qcom,mode = "pwm";
-				qcom,pwm-channel = <8>;
-				qcom,pwm-us = <1000>;
-				qcom,id = <7>;
-				qcom,row-id = <0x00>;
-				qcom,max-current = <20>;
-				qcom,qcom,row-src-vbst = <0>;
-				qcom,row-scan-en = <1>;
-				qcom,row-src-en = <1>;
-			};
-			qcom,kpdbl2 {
-				label = "kpdbl";
-				linux,name = "button-backlight2";
-				qcom,mode = "pwm";
-				qcom,pwm-channel = <9>;
-				qcom,pwm-us = <1000>;
-				qcom,id = <7>;
-				qcom,row-id = <0x00>;
-				qcom,max-current = <20>;
-				qcom,qcom,row-src-vbst = <0>;
-				qcom,row-scan-en = <1>;
-				qcom,row-src-en = <1>;
-			};			
-	};
-
-	qcom,leds@e200 {
-			status = "okay";
-			qcom,kpdbl1 {
-				label = "kpdbl";
-				linux,name = "button-backlight1";
-				qcom,mode = "pwm";
-				qcom,pwm-channel = <8>;
-				qcom,pwm-us = <1000>;
-				qcom,id = <7>;
-				qcom,row-id = <0x00>;
-				qcom,max-current = <20>;
-				qcom,qcom,row-src-vbst = <0>;
-				qcom,row-scan-en = <1>;
-				qcom,row-src-en = <1>;
-			};
-			qcom,kpdbl2 {
-				label = "kpdbl";
-				linux,name = "button-backlight2";
-				qcom,mode = "pwm";
-				qcom,pwm-channel = <9>;
-				qcom,pwm-us = <1000>;
-				qcom,id = <7>;
-				qcom,row-id = <0x00>;
-				qcom,max-current = <20>;
-				qcom,qcom,row-src-vbst = <0>;
-				qcom,row-scan-en = <1>;
-				qcom,row-src-en = <1>;
-			};			
-	};
-		
 
 		qcom,leds@d300 {
 			flash-boost-supply = <&pm8941_chg_boost>;

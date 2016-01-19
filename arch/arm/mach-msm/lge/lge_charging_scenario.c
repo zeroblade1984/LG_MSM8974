@@ -33,8 +33,8 @@ static int time_order = 1;
 static struct batt_temp_table chg_temp_table[CHG_MAXIDX] = {
 	{INT_MIN,        -4,    CHG_BATTEMP_BL_M11},
 	{     -3,        -2,    CHG_BATTEMP_M10_M5},
-	{     -1,        41,    CHG_BATTEMP_M4_41},
-	{     42,        45,    CHG_BATTEMP_42_45},
+	{     -1,        41,    CHG_BATTEMP_M4_42},
+	{     42,        45,    CHG_BATTEMP_43_45},
 	{     46,        53,    CHG_BATTEMP_46_51},
 	{     54,   INT_MAX,    CHG_BATTEMP_AB_OT},
 };
@@ -42,8 +42,8 @@ static struct batt_temp_table chg_temp_table[CHG_MAXIDX] = {
 static struct batt_temp_table chg_temp_table[CHG_MAXIDX] = {
 	{INT_MIN,       -11,    CHG_BATTEMP_BL_M11},
 	{    -10,        -5,    CHG_BATTEMP_M10_M5},
-	{     -4,        41,    CHG_BATTEMP_M4_41},
-	{     42,        45,    CHG_BATTEMP_42_45},
+	{     -4,        42,    CHG_BATTEMP_M4_42},
+	{     43,        45,    CHG_BATTEMP_43_45},
 	{     46,        51,    CHG_BATTEMP_46_51},
 	{     52,        55,    CHG_BATTEMP_52_OT},
 	{     56,   INT_MAX,    CHG_BATTEMP_AB_OT},
@@ -159,12 +159,12 @@ determine_lge_charging_state(enum lge_battemp_states battemp_st, int batt_volt)
 
 			next_state = CHG_BATT_STPCHG_STATE;
 #ifdef CONFIG_MACH_MSM8974_G3_SPR_US
-		} else if (battemp_st <= CHG_BATTEMP_42_45) {
+		} else if (battemp_st <= CHG_BATTEMP_43_45) {
 			states_change = STS_CHE_DECCUR_TO_NORAML;
 			pseudo_chg_ui = 0;
 			next_state = CHG_BATT_NORMAL_STATE;
 #else
-		} else if (battemp_st <= CHG_BATTEMP_M4_41) {
+		} else if (battemp_st <= CHG_BATTEMP_M4_42) {
 			states_change = STS_CHE_DECCUR_TO_NORAML;
 			pseudo_chg_ui = 0;
 			next_state = CHG_BATT_NORMAL_STATE;
@@ -184,14 +184,14 @@ determine_lge_charging_state(enum lge_battemp_states battemp_st, int batt_volt)
 			states_change = STS_CHE_STPCHG_TO_DECCUR;
 			pseudo_chg_ui = 0;
 			next_state = CHG_BATT_DECCUR_STATE;
-		} else if (battemp_st <= CHG_BATTEMP_42_45 &&
+		} else if (battemp_st <= CHG_BATTEMP_43_45 &&
 			battemp_st >= CHG_BATTEMP_M10_M5) {
 			states_change = STS_CHE_STPCHG_TO_NORMAL;
 			pseudo_chg_ui = 0;
 			next_state = CHG_BATT_NORMAL_STATE;
 		}
 #else
-		if (battemp_st == CHG_BATTEMP_M4_41) {
+		if (battemp_st == CHG_BATTEMP_M4_42) {
 			states_change = STS_CHE_STPCHG_TO_NORMAL;
 			pseudo_chg_ui = 0;
 			next_state = CHG_BATT_NORMAL_STATE;

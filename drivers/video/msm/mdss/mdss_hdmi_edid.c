@@ -21,7 +21,7 @@
 #define DEV_DBG(fmt, args...) pr_err(fmt, ##args)
 #endif
 
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 extern int slimport_read_edid_block(int block, uint8_t *edid_buf);
 #endif
 #define DBC_START_OFFSET 4
@@ -419,7 +419,7 @@ static int hdmi_edid_read_block(struct hdmi_edid_ctrl *edid_ctrl, int block,
 {
 	const u8 *b = NULL;
 	u32 ndx, check_sum, print_len;
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	int status;
 	int retry_cnt = 0;
 #else /* QCT Original */
@@ -436,7 +436,7 @@ static int hdmi_edid_read_block(struct hdmi_edid_ctrl *edid_ctrl, int block,
 	}
 
 read_retry:
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	status = slimport_read_edid_block(block, edid_buf);
 #else /* QCT Original */
 	block_size = 0x80;
@@ -919,7 +919,7 @@ static void hdmi_edid_add_sink_3d_format(struct hdmi_edid_sink_data *sink_data,
 		string, added ? "added" : "NOT added");
 } /* hdmi_edid_add_sink_3d_format */
 
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 extern unchar sp_get_link_bw(void);
 void limit_supported_video_format(u32 *video_format)
 {
@@ -958,7 +958,7 @@ static void hdmi_edid_add_sink_video_format(
 	const struct msm_hdmi_mode_timing_info *timing =
 		hdmi_get_supported_mode(video_format);
 	u32 supported = timing != NULL;
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	limit_supported_video_format(&video_format);
 #endif
 
@@ -1192,15 +1192,14 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl,
 	svd = num_of_cea_blocks ?
 		hdmi_edid_find_block(data_buf+0x80, DBC_START_OFFSET,
 			VIDEO_DATA_BLOCK, &len) : NULL;
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	if (edid_ctrl->sink_mode) {
 #endif
-	if (num_of_cea_blocks && (len == 0 || len > MAX_DATA_BLOCK_SIZE)) {
-		DEV_DBG("%s: No/Invalid Video Data Block\n",
-			__func__);
-		return;
-	}
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+		if (num_of_cea_blocks && (len == 0 || len > MAX_DATA_BLOCK_SIZE)) {
+			DEV_DBG("%s: No/Invalid Video Data Block\n", __func__);
+			return;
+		}
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	}
 #endif
 

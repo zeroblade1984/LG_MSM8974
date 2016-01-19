@@ -34,9 +34,9 @@ extern struct mdss_panel_data *pdata_base;
 
 #if defined(CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL)
 extern int dw8768_mode_change(int mode);
-static bool touch_driver_registered=false;
+static bool touch_driver_registered;
 #include <linux/input/lge_touch_notify.h>
-#endif //CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
+#endif /* CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL */
 
 static int mdss_dsi_regulator_init(struct platform_device *pdev)
 {
@@ -103,7 +103,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 				}
 
 				/* B1 LCD workaround for Tl DSV VSN current inrush problem */
-				if(gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+				if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 					/* toggle the dsv */
 					gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 					mdelay(1);
@@ -113,15 +113,15 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 					msleep(10);
 				} else {
 					pr_err("%s disp_en line is not configured\n", __func__);
-					return -1;
+					return -EIO;
 				}
 			} else {
-				if(gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+				if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 					gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 					mdelay(1);
 				} else {
 					pr_err("%s disp_en line is not configured\n", __func__);
-					return -1;
+					return -EIO;
 				}
 			}
 		}
@@ -169,6 +169,8 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 #if defined(CONFIG_MACH_MSM8974_G3)
 		mdss_dsi_panel_io(pdata, 1);
 #endif
+
+#ifndef CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
 		ret = msm_dss_enable_vreg(
 			ctrl_pdata->power_data.vreg_config,
 			ctrl_pdata->power_data.num_vreg, 1);
@@ -177,16 +179,17 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 				__func__, ret);
 			goto error;
 		}
+#endif /* CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL */
 
 #ifdef CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
-        //------------
-        // DSV Enable
-        //------------
-        dw8768_mode_change(1);
+		/*------------
+		* DSV Enable
+		------------*/
+		dw8768_mode_change(1);
 #endif
 
 		if (!pdata->panel_info.mipi.lp11_init) {
-#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS)
+#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS_KR) || defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
 			if (!pdata->panel_info.panel_power_on)
 				ret = mdss_dsi_panel_reset(pdata, 1);
 			else {
@@ -209,7 +212,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 			}
 		}
 	} else {
-#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS)
+#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 		ret = msm_dss_enable_vreg(
 			ctrl_pdata->power_data.vreg_config+1,
 			1, 0);
@@ -236,9 +239,11 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 					__func__, ret);
 			goto error;
 		}
-#if defined(CONFIG_MACH_MSM8974_G3) 
+#if defined(CONFIG_MACH_MSM8974_G3)
 		mdss_dsi_panel_io(pdata, 0);
 #endif
+
+#ifndef CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
 
 		ret = msm_dss_enable_vreg(
 			ctrl_pdata->power_data.vreg_config,
@@ -247,6 +252,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 			pr_err("%s: Failed to disable vregs.rc=%d\n",
 				__func__, ret);
 		}
+#endif /* CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL */
 #endif
 	}
 error:
@@ -294,7 +300,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		pr_debug("%s: no vreg\n", __func__);
 		goto novreg;
 	} else {
-#if defined(CONFIG_MACH_MSM8974_G3) || defined(CONFIG_MACH_MSM8974_DZNY)
+#if defined(CONFIG_MACH_MSM8974_G3)
 		if (lge_get_board_revno() >= HW_REV_B && mp->num_vreg == NUM_MAX_VREG)
 					--mp->num_vreg;
 #endif
@@ -316,7 +322,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 			/* vreg-name */
 			rc = of_property_read_string(supply_node,
 				"qcom,supply-name", &st);
-#if defined(CONFIG_MACH_MSM8974_G3) || defined(CONFIG_MACH_MSM8974_DZNY)
+#if defined(CONFIG_MACH_MSM8974_G3)
 			if (lge_get_board_revno() >= HW_REV_B)
 				if (!strcmp(st, "vdd")) {
 					pr_info("%s : skip L10\n", __func__);
@@ -482,7 +488,7 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 	pr_info("%s+: ctrl=%p ndx=%d\n", __func__,
 				ctrl_pdata, ctrl_pdata->ndx);
 
-#if defined(CONFIG_MACH_MSM8974_G3) || defined(CONFIG_MACH_MSM8974_DZNY)
+#if defined(CONFIG_MACH_MSM8974_G3)
 	ret = mdss_dsi_panel_reset(pdata, 0);
 	if (ret) {
 		mutex_unlock(&ctrl_pdata->mutex);
@@ -502,8 +508,7 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
 
-#if defined(CONFIG_MACH_MSM8974_G3) 
-
+#if defined(CONFIG_MACH_MSM8974_G3)
 	mdelay(5);
 	mdss_dsi_panel_io(pdata, 0);
 	ret = msm_dss_enable_vreg(ctrl_pdata->power_data.vreg_config,
@@ -862,9 +867,8 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	mipi = &pdata->panel_info.mipi;
 
 #ifdef CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
-        if(touch_driver_registered){
-            touch_notifier_call_chain(LCD_EVENT_TOUCH_LPWG_OFF, NULL);
-        }
+	if (touch_driver_registered)
+		touch_notifier_call_chain(LCD_EVENT_TOUCH_LPWG_OFF, NULL);
 #endif
 
 	ret = mdss_dsi_panel_power_on(pdata, 1);
@@ -915,13 +919,12 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	 */
 #ifdef CONFIG_MACH_LGE
 	if (mipi->lp11_init) {
-		if(mdss_dsi_broadcast_mode_enabled()){
+		if (mdss_dsi_broadcast_mode_enabled()) {
 			if (mdss_dsi_is_slave_ctrl(ctrl_pdata)) {
 				mdelay(10);
 				mdss_dsi_panel_reset(pdata, 1);
 			}
-		}
-		else
+		} else
 			mdss_dsi_panel_reset(pdata, 1);
 		pdata->panel_info.panel_power_on = 1;
 	}
@@ -933,10 +936,19 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	if (mipi->init_delay)
 		usleep(mipi->init_delay);
 
+#if defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
+	mdelay(10);
+	if (mipi->force_clk_lane_hs) {
+		u32 tmp;
+		tmp = MIPI_INP((ctrl_pdata->ctrl_base) + 0xac);
+		tmp |= (1<<28);
+		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
+		wmb();
+	}
+#endif
 #ifndef CONFIG_MACH_LGE
 	if (mipi->force_clk_lane_hs) {
 		u32 tmp;
-
 		tmp = MIPI_INP((ctrl_pdata->ctrl_base) + 0xac);
 		tmp |= (1<<28);
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
@@ -970,7 +982,9 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 #ifdef CONFIG_MACH_LGE
+#if !defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
 	struct mdss_dsi_ctrl_pdata *mctrl = NULL;
+#endif
 #endif
 	pr_info("%s+:\n", __func__);
 
@@ -1003,6 +1017,7 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	}
 
 #ifdef CONFIG_MACH_LGE
+#if !defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
 	if (mipi->force_clk_lane_hs) {
 		if (mdss_dsi_broadcast_mode_enabled()) {
 			mctrl = mdss_dsi_get_master_ctrl();
@@ -1031,6 +1046,7 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 			MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
 		}
 	}
+#endif
 #endif
 	pr_info("%s-:\n", __func__);
 
@@ -1337,17 +1353,17 @@ int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
 #if defined(CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL)
 static int lcd_notifier_callback(struct notifier_block *this, unsigned long event, void *data)
 {
-	switch(event) {
-		case TOUCH_EVENT_RESET_START:
-			pr_err("%s: TOUCH_EVENT_RESET_START received\n ",__func__);
-			break;
-		case TOUCH_EVENT_REGISTER_DONE:
-            touch_driver_registered = true;
-			pr_err("%s: TOUCH_EVENT_REGISTER_DONE received\n ",__func__);
-			break;
-		default:
-			pr_err("%s:no event called\n",__func__);
-			break;
+	switch (event) {
+	case TOUCH_EVENT_RESET_START:
+		pr_err("%s: TOUCH_EVENT_RESET_START received\n ", __func__);
+		break;
+	case TOUCH_EVENT_REGISTER_DONE:
+		touch_driver_registered = true;
+		pr_err("%s: TOUCH_EVENT_REGISTER_DONE received\n ", __func__);
+		break;
+	default:
+		pr_err("%s:no event called\n", __func__);
+		break;
 	}
 	return 0;
 }
@@ -1400,9 +1416,8 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 			rc = mdss_dsi_blank(pdata);
 		rc = mdss_dsi_off(pdata);
 #if defined(CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL)
-        if(touch_driver_registered){
-            touch_notifier_call_chain(LCD_EVENT_TOUCH_LPWG_ON, NULL);
-        }
+		if (touch_driver_registered)
+			touch_notifier_call_chain(LCD_EVENT_TOUCH_LPWG_ON, NULL);
 #endif
 		break;
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
@@ -1646,12 +1661,11 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	}
 
 #if defined(CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL)
-    touch_driver_registered = false;
+	touch_driver_registered = false;
 	ctrl_pdata->notif.notifier_call = lcd_notifier_callback;
 
-	if(touch_register_client(&ctrl_pdata->notif) != 0) {
+	if (touch_register_client(&ctrl_pdata->notif) != 0)
 		pr_err("Failed to register callback\n");
-	}
 #endif
 
 	pr_debug("%s: Dsi Ctrl->%d initialized\n", __func__, index);
@@ -1761,7 +1775,6 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	int rc, i, len;
 	struct device_node *dsi_ctrl_np = NULL;
 	struct platform_device *ctrl_pdev = NULL;
-	bool dynamic_fps;
 	const char *data;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 
@@ -1842,49 +1855,6 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	ctrl_pdata->shared_pdata.broadcast_enable = of_property_read_bool(
 		pan_node, "qcom,mdss-dsi-panel-broadcast-mode");
 
-	dynamic_fps = of_property_read_bool(pan_node,
-					  "qcom,mdss-dsi-pan-enable-dynamic-fps");
-	if (dynamic_fps) {
-		pinfo->dynamic_fps = true;
-		data = of_get_property(pan_node,
-					  "qcom,mdss-dsi-pan-fps-update", NULL);
-		if (data) {
-			if (!strcmp(data, "dfps_suspend_resume_mode")) {
-				pinfo->dfps_update =
-						DFPS_SUSPEND_RESUME_MODE;
-				pr_debug("%s: dfps mode: suspend/resume\n",
-								__func__);
-			} else if (!strcmp(data,
-					    "dfps_immediate_clk_mode")) {
-				pinfo->dfps_update =
-						DFPS_IMMEDIATE_CLK_UPDATE_MODE;
-				pr_debug("%s: dfps mode: Immediate clk\n",
-								__func__);
-			} else if (!strcmp(data,
-					    "dfps_immediate_porch_mode")) {
-				pinfo->dfps_update =
-					DFPS_IMMEDIATE_PORCH_UPDATE_MODE;
-				pr_debug("%s: dfps mode: Immediate porch\n",
-								__func__);
-			} else {
-				pr_debug("%s: dfps to default mode\n",
-								__func__);
-				pinfo->dfps_update =
-						DFPS_SUSPEND_RESUME_MODE;
-				pr_debug("%s: dfps mode: suspend/resume\n",
-								__func__);
-			}
-		} else {
-			pr_debug("%s: dfps update mode not configured\n",
-								__func__);
-				pinfo->dynamic_fps =
-								false;
-				pr_debug("%s: dynamic FPS disabled\n",
-								__func__);
-		}
-		pinfo->new_fps = pinfo->mipi.frame_rate;
-	}
-
 	pinfo->panel_max_fps = mdss_panel_get_framerate(pinfo);
 	pinfo->panel_max_vtotal = mdss_panel_get_vtotal(pinfo);
 
@@ -1898,20 +1868,20 @@ int dsi_panel_device_register(struct device_node *pan_node,
 			pr_err("Error from prop num-of-dsv-enable-gpio : u32 array read\n");
 				return -EINVAL;
 	}
-    ctrl_pdata->disp_en_gpio = -1;
+	ctrl_pdata->disp_en_gpio = -1;
 
-//	ctrl_pdata->dsv_manufacturer = dsv_array[lge_get_board_revno()];
-    ctrl_pdata->dsv_manufacturer = DSV_DW8768; // DSV_SM5107
+	/* ctrl_pdata->dsv_manufacturer = dsv_array[lge_get_board_revno()]; */
+	ctrl_pdata->dsv_manufacturer = DSV_DW8768; /* DSV_SM5107 */
 
 	ctrl_pdata->dsv_ena = of_get_named_gpio(ctrl_pdev->dev.of_node, "qcom,platform-avdd-gpio", 0);
 
-	pr_err("%s:%d, dsv_ena gpio(%d) \n", __func__, __LINE__, ctrl_pdata->dsv_ena);
+	pr_err("%s:%d, dsv_ena gpio(%d)\n", __func__, __LINE__, ctrl_pdata->dsv_ena);
 
 	if (!gpio_is_valid(ctrl_pdata->dsv_ena))
 		pr_err("%s:%d, dsv_ena gpio(%d) not specified\n",
 						__func__, __LINE__, ctrl_pdata->dsv_ena);
 
-	if( ctrl_pdata->dsv_manufacturer == DSV_DW8768) {
+	if (ctrl_pdata->dsv_manufacturer == DSV_DW8768) {
 		ctrl_pdata->dsv_enb = of_get_named_gpio(ctrl_pdev->dev.of_node,
 				"qcom,platform-avee-gpio", 0);
 
@@ -1922,7 +1892,7 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	pr_err("%s: dsv_ena = %d , dsv_enb = %d, dsv_manufacturer = %d\n",
 		__func__ , ctrl_pdata->dsv_ena, ctrl_pdata->dsv_enb, ctrl_pdata->dsv_manufacturer);
 
-    if (!gpio_is_valid(ctrl_pdata->dsv_ena)) {
+	if (!gpio_is_valid(ctrl_pdata->dsv_ena)) {
 		pr_err("%s:%d, Disp_en gpio not specified\n",
 						__func__, __LINE__);
 	} else {
@@ -1933,25 +1903,22 @@ int dsi_panel_device_register(struct device_node *pan_node,
 					GPIO_CFG_2MA),
 				GPIO_CFG_ENABLE);
 
-        rc = gpio_request(ctrl_pdata->dsv_ena,
-					"disp_enable");
+		rc = gpio_request(ctrl_pdata->dsv_ena, "disp_enable");
 		if (rc) {
-			pr_err("request disp_en gpio failed, rc=%d\n",
-						rc);
-                gpio_free(ctrl_pdata->dsv_ena);
-            
-				return -ENODEV;
+			pr_err("request disp_en gpio failed, rc=%d\n", rc);
+			gpio_free(ctrl_pdata->dsv_ena);
+			return -ENODEV;
 		}
-        
-		//gpio_direction_output(ctrl_pdata->dsv_ena, 1);
-        gpio_set_value(ctrl_pdata->dsv_ena, 1);
+
+		/* gpio_direction_output(ctrl_pdata->dsv_ena, 1); */
+		gpio_set_value(ctrl_pdata->dsv_ena, 1);
 	}
 }
-#else // else : CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
+#else /* CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL */
 
 #if defined(CONFIG_MACH_MSM8974_G3) || defined(CONFIG_MACH_MSM8974_DZNY)
 {
-    u32 enable_array[13];
+	u32 enable_array[13];
 
 	rc = of_property_read_u32_array(ctrl_pdev->dev.of_node, "lge,num-of-dsv-enable-gpio", enable_array, 13);
 	if (rc) {
@@ -1959,18 +1926,20 @@ int dsi_panel_device_register(struct device_node *pan_node,
 			return -EINVAL;
 	}
 	ctrl_pdata->num_of_dsv_enable_pin = enable_array[lge_get_board_revno()];
-    ctrl_pdata->disp_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node, "qcom,platform-enable-gpio", lge_get_board_revno());
+	ctrl_pdata->disp_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			"qcom,platform-enable-gpio", lge_get_board_revno());
 
 	if (ctrl_pdata->num_of_dsv_enable_pin > 1)
 		ctrl_pdata->disp_en_gpio2 = of_get_named_gpio(ctrl_pdev->dev.of_node, "lge,platform-enable-gpio2", 0);
-	pr_info("%s: revno:%d, num_gpio:%d, en_gpio:%d, en_gpio2:%d\n", __func__, lge_get_board_revno(), ctrl_pdata->num_of_dsv_enable_pin, ctrl_pdata->disp_en_gpio, ctrl_pdata->disp_en_gpio2);
-
+	pr_info("%s: revno:%d, num_gpio:%d, en_gpio:%d, en_gpio2:%d\n", __func__,
+			lge_get_board_revno(), ctrl_pdata->num_of_dsv_enable_pin,
+			ctrl_pdata->disp_en_gpio, ctrl_pdata->disp_en_gpio2);
 }
 #else
-    ctrl_pdata->disp_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+	ctrl_pdata->disp_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			"qcom,platform-enable-gpio", 0);
 #endif
-#endif //CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL
+#endif /* CONFIG_LGE_MIPI_DZNY_JDI_INCELL_FHD_VIDEO_PANEL */
 
 #ifdef CONFIG_MACH_LGE
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
@@ -2116,7 +2085,7 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	} else {
 		ctrl_pdata->mode_gpio = -EINVAL;
 	}
-#if defined(CONFIG_MACH_MSM8974_G3) || defined(CONFIG_MACH_MSM8974_DZNY)
+#if defined(CONFIG_MACH_MSM8974_G3)
 	if (lge_get_board_revno() >= HW_REV_A)
 		ctrl_pdata->io_gpio = -EINVAL;
 	else

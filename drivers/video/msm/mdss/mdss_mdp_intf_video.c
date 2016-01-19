@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -199,7 +199,7 @@ static int mdss_mdp_video_timegen_setup(struct mdss_mdp_ctl *ctl,
 		       (vsync_polarity << 1) | /* VSYNC Polarity */
 		       (hsync_polarity << 0);  /* HSYNC Polarity */
 
-#if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
+#if defined(CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 	if (lge_get_boot_mode() == LGE_BOOT_MODE_FACTORY) {
 		if (MDSS_INTF_HDMI == ctx->intf_type) {
 			pr_info("[minios] Enable HDMI Grayscale Ramp pattern");
@@ -774,8 +774,11 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 
 		pr_debug("enabling timing gen for intf=%d\n", ctl->intf_num);
 
-		if (pdata->panel_info.cont_splash_enabled &&
-			!ctl->mfd->splash_info.splash_logo_enabled) {
+		if ((pdata->panel_info.cont_splash_enabled &&
+			!ctl->mfd->splash_info.splash_logo_enabled)
+			|| (ctl->mfd->splash_info.splash_logo_enabled
+			&& ctl->mfd->splash_info.splash_thread
+			&& !is_mdss_iommu_attached())) {
 			rc = wait_for_completion_timeout(&ctx->vsync_comp,
 					usecs_to_jiffies(VSYNC_TIMEOUT_US));
 		}

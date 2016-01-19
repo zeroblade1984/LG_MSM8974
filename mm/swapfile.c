@@ -71,6 +71,26 @@ static inline unsigned char swap_count(unsigned char ent)
 	return ent & ~SWAP_HAS_CACHE;	/* may include SWAP_HAS_CONT flag */
 }
 
+bool is_swap_fast(swp_entry_t entry)
+{
+	struct swap_info_struct *p;
+	unsigned long type;
+
+	if (non_swap_entry(entry))
+		return false;
+
+	type = swp_type(entry);
+	if (type >= nr_swapfiles)
+		return false;
+
+	p = swap_info[type];
+
+	if (p->flags & SWP_FAST)
+		return true;
+
+	return false;
+}
+
 /* returns 1 if swap entry is freed */
 static int
 __try_to_reclaim_swap(struct swap_info_struct *si, unsigned long offset)
@@ -291,7 +311,7 @@ checks:
 		scan_base = offset = si->lowest_bit;
 
 	/* reuse swap entry of cache-only swap if not busy. */
-	if (vm_swap_full() && si->swap_map[offset] == SWAP_HAS_CACHE) {
+	if (vm_swap_full(si) && si->swap_map[offset] == SWAP_HAS_CACHE) {
 		int swap_was_freed;
 		spin_unlock(&si->lock);
 		swap_was_freed = __try_to_reclaim_swap(si, offset);
@@ -380,7 +400,8 @@ scan:
 			spin_lock(&si->lock);
 			goto checks;
 		}
-		if (vm_swap_full() && si->swap_map[offset] == SWAP_HAS_CACHE) {
+		if (vm_swap_full(si) &&
+			si->swap_map[offset] == SWAP_HAS_CACHE) {
 			spin_lock(&si->lock);
 			goto checks;
 		}
@@ -395,7 +416,8 @@ scan:
 			spin_lock(&si->lock);
 			goto checks;
 		}
-		if (vm_swap_full() && si->swap_map[offset] == SWAP_HAS_CACHE) {
+		if (vm_swap_full(si) &&
+			si->swap_map[offset] == SWAP_HAS_CACHE) {
 			spin_lock(&si->lock);
 			goto checks;
 		}
@@ -480,6 +502,78 @@ noswap:
 	spin_unlock(&swap_lock);
 	return (swp_entry_t) {0};
 }
+
+#ifdef CONFIG_HSWAP
+swp_entry_t get_lowest_prio_swap_page(void)
+{
+	int i;
+	int lp_prio;
+	int lp_index;
+	struct swap_info_struct *si;
+	pgoff_t offset;
+	int type, next;
+	int wrapped = 0;
+
+	spin_lock(&swap_lock);
+	if (atomic_long_read(&nr_swap_pages) <= 0)
+		goto noswap;
+	atomic_long_dec(&nr_swap_pages);
+
+	lp_prio = SHRT_MAX + 1;
+	lp_index = -1;
+
+	for (i = 0; i < nr_swapfiles; ++i) {
+		if ((swap_info[i]->flags & SWP_WRITEOK) &&
+			(swap_info[i]->prio < lp_prio)) {
+			lp_prio = swap_info[i]->prio;
+			lp_index = i;
+		}
+	}
+
+	for (type = swap_list.next; type >= 0 && wrapped < 2; type = next) {
+		if (lp_index != -1 && lp_index != type &&
+		    swap_info[type]->prio > swap_info[lp_index]->prio &&
+		    (swap_info[lp_index]->flags & SWP_WRITEOK)) {
+			type = lp_index;
+			swap_list.next = type;
+		}
+
+		si = swap_info[type];
+		next = si->next;
+		if (next < 0 ||
+		    (!wrapped && si->prio != swap_info[next]->prio)) {
+			next = swap_list.head;
+			wrapped++;
+		}
+
+		spin_lock(&si->lock);
+		if (!si->highest_bit) {
+			spin_unlock(&si->lock);
+			continue;
+		}
+		if (!(si->flags & SWP_WRITEOK)) {
+			spin_unlock(&si->lock);
+			continue;
+		}
+
+		swap_list.next = next;
+
+		spin_unlock(&swap_lock);
+		/* This is called for allocating swap entry for cache */
+		offset = scan_swap_map(si, SWAP_HAS_CACHE);
+		spin_unlock(&si->lock);
+		if (offset)
+			return swp_entry(type, offset);
+		spin_lock(&swap_lock);
+		next = swap_list.next;
+	}
+
+	atomic_long_inc(&nr_swap_pages);
+noswap:
+	spin_unlock(&swap_lock);
+	return (swp_entry_t) {0};
+}
+#endif
 
 /* The only caller of this function is now susupend routine */
 swp_entry_t get_swap_page_of_type(int type)
@@ -757,7 +851,8 @@ int free_swap_and_cache(swp_entry_t entry)
 		 * Also recheck PageSwapCache now page is locked (above).
 		 */
 		if (PageSwapCache(page) && !PageWriteback(page) &&
-				(!page_mapped(page) || vm_swap_full())) {
+				(!page_mapped(page) ||
+				vm_swap_full(page_swap_info(page)))) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
@@ -2169,6 +2264,8 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		}
 		if ((swap_flags & SWAP_FLAG_DISCARD) && discard_swap(p) == 0)
 			p->flags |= SWP_DISCARDABLE;
+		if (blk_queue_fast(bdev_get_queue(p->bdev)))
+			p->flags |= SWP_FAST;
 	}
 
 	mutex_lock(&swapon_mutex);

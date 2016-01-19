@@ -275,7 +275,7 @@ struct smb349_struct {
 	int		en_n_gpio;
 	int		chg_susp_gpio;
 	int		stat_gpio;
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 	int		otg_en_gpio;
 #endif
 #ifdef CONFIG_LGE_PM
@@ -2541,7 +2541,6 @@ static enum power_supply_property pm_power_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_CHARGING_COMPLETE,
-	POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER,
 };
 
 static enum power_supply_property smb349_batt_power_props[] = {
@@ -2560,6 +2559,7 @@ static enum power_supply_property smb349_batt_power_props[] = {
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_PSEUDO_BATT,
 	POWER_SUPPLY_PROP_EXT_PWR_CHECK,
+	POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER,
 #ifdef CONFIG_MAX17050_FUELGAUGE
 	POWER_SUPPLY_PROP_BATTERY_CONDITION,
 	POWER_SUPPLY_PROP_BATTERY_AGE,
@@ -2602,19 +2602,6 @@ static int pm_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		val->intval = smb349_get_prop_charge_type(smb349_chg);
-		break;
-	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
-	{
-		int ret;
-		u8 value = 0;
-		ret = smb349_read_reg(smb349_chg->client, STAT_TIMER_REG, &value);
-		if (ret) {
-			pr_err("failed to read STATUS_IRQ_REG ret=%d\n", ret);
-			return -EINVAL;
-		}
-		val->intval = ((value & COMPETE_CHG_TIMEOUT_BIT) == 0xc) ? false : true;
-		pr_info("get charger_timeout : %d[D]\n", val->intval);
-	}
 		break;
 	case POWER_SUPPLY_PROP_CHARGING_COMPLETE:
 		if (smb349_get_prop_batt_capacity(smb349_chg) == 100)
@@ -3546,8 +3533,8 @@ static void smb349_batt_external_power_changed(struct power_supply *psy)
 				&& !smb349_chg_is_otg_active(smb349_chg)) {
 			smb349_switch_usb_to_host_mode(smb349_chg);
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 			if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 			if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -3563,8 +3550,8 @@ static void smb349_batt_external_power_changed(struct power_supply *psy)
 				&& smb349_chg_is_otg_active(smb349_chg)) {
 			smb349_switch_usb_to_charge_mode(smb349_chg);
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 			if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 			if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -3775,7 +3762,7 @@ static int smb349_batt_power_get_property(struct power_supply *psy,
 		val->intval = smb349_get_prop_batt_present(smb349_chg);
 		break;
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 #else
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LIPO;
@@ -3836,6 +3823,19 @@ static int smb349_batt_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_EXT_PWR_CHECK:
 		val->intval = lge_pm_get_cable_type();
+		break;
+	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
+	{
+		int ret;
+		u8 value = 0;
+		ret = smb349_read_reg(smb349_chg->client, STAT_TIMER_REG, &value);
+		if (ret) {
+			pr_err("failed to read STATUS_IRQ_REG ret=%d\n", ret);
+			return -EINVAL;
+		}
+		val->intval = ((value & COMPETE_CHG_TIMEOUT_BIT) == 0xc) ? false : true;
+		pr_info("get charger_timeout : %d[D]\n", val->intval);
+	}
 		break;
 #ifdef CONFIG_MAX17050_FUELGAUGE
 	case POWER_SUPPLY_PROP_BATTERY_CONDITION:
@@ -3966,6 +3966,10 @@ static int smb349_batt_power_set_property(struct power_supply *psy,
 		 * it is good interface to use LG mitigation level.
 		 */
 		break;
+	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
+		smb349_chg_timer_set(smb349_chg, ((val->intval == 0) ? false : true));
+		pr_info("charger_timeout : %d[D]\n", val->intval);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -3981,6 +3985,7 @@ smb349_batt_power_property_is_writeable(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
+	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
 		return 1;
 	default:
 		break;
@@ -4008,10 +4013,6 @@ static int pm_power_set_property(struct power_supply *psy,
 		/* SMB329 does not use cable detect current */
 		//smb349_chg->chg_current_ma = val->intval;
 		break;
-	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
-		smb349_chg_timer_set(smb349_chg, ((val->intval == 0) ? false : true));
-		pr_info("charger_timeout : %d[D]\n", val->intval);
-		break;
 	default:
 		return -EINVAL;
 	}
@@ -4027,7 +4028,6 @@ smb349_pm_power_property_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_ONLINE:
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-	case POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER:
 		return 1;
 	default:
 		break;
@@ -4420,8 +4420,8 @@ static int __devinit smb349_probe(struct i2c_client *client,
 		}
 
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 		if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 		if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -4502,7 +4502,7 @@ static int __devinit smb349_probe(struct i2c_client *client,
 
 		smb349_chg->stat_gpio = pdata->stat_gpio;
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 		smb349_chg->otg_en_gpio = pdata->otg_en_gpio;
 #endif
 #ifndef CONFIG_LGE_PM
@@ -4523,8 +4523,8 @@ static int __devinit smb349_probe(struct i2c_client *client,
 	pr_debug("stat_gpio irq#=%d.\n", smb349_chg->irq);
 
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 	if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 	if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -4842,8 +4842,8 @@ chg_susp_gpio_fail:
 	if (smb349_chg->stat_gpio)
 		gpio_free(smb349_chg->stat_gpio);
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 	if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 	if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -4877,8 +4877,8 @@ static int __devexit smb349_remove(struct i2c_client *client)
 	if (smb349_chg->stat_gpio)
 		gpio_free(smb349_chg->stat_gpio);
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 	if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 	if(lge_get_board_revno() >= HW_REV_EVB2)
@@ -4960,8 +4960,8 @@ static void smb349_shutdown(struct i2c_client *client)
 	if (smb349_chg_is_otg_active(smb349_chg)) {
 		smb349_switch_usb_to_charge_mode(smb349_chg);
 #if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_VU3_KR) || \
-	defined(CONFIG_MACH_MSM8974_TIGERS)
-#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS)
+	defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+#if defined(CONFIG_MACH_MSM8974_G2_KR) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 		if(lge_get_board_revno() >= HW_REV_C)
 #elif defined(CONFIG_MACH_MSM8974_VU3_KR)
 		if(lge_get_board_revno() >= HW_REV_EVB2)

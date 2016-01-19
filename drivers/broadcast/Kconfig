@@ -10,19 +10,19 @@ menu "LGE Broadcast Device Support"
 #    help
 #      Select this if you want to use Japanese 1Seg mobile broadcast service
 
-#config LGE_BROADCAST_JFULLSEG
-#    bool "Japan full-seg Broadcast service"
-#    depends on (MACH_MSM8974_Z_KDDI) || (MACH_MSM8974_G3_KDDI_EVB) || (MACH_MSM8974_G3_KDDI)
-#    default y
-#    help
-#      Select this if you want to use Japanese FullSeg mobile broadcast service
-
 config LGE_BROADCAST_ISDBT_JAPAN
 	bool "Japan full-seg Broadcast service"
-	depends on (MACH_MSM8994_G4_KDDI_JP) || (MACH_MSM8974_DZNY_DCM)
+	depends on (MACH_MSM8994_G4_KDDI_JP) || (MACH_MSM8974_DZNY_DCM) || (MACH_MSM8974_G3_KDDI)
 	default y
 	help
 	  Select this if you want to use Japanese FullSeg mobile broadcast service
+
+config LGE_BROADCAST_ISDBT_JAPAN_TCC3535_SDRAM
+	bool "Japan full-seg Broadcast service for nozomi"
+	depends on (MACH_MSM8974_G3_KDDI)
+	default n
+	help
+	  Select this if you want to use Japanese FullSeg mobile broadcast service for nozomi
 
 config LGE_BROADCAST_TDMB
     bool "LGE broadcast TDMB device Driver"

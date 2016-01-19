@@ -16,8 +16,14 @@
 			status =  "ok";
 			revision = "rev_a...";
 			max17048,full_design = <2610>;
+			max17048,rcomp_lgc = <96>;
+			max17048,temp_co_hot_lgc= <25>;
+			max17048,temp_co_cold_lgc = <7400>;
 			max17048,empty_lgc = <110>;	/*3.2 Cut-off 1.1%*/
-			max17048,empty_tocad = <268>;	/*3.2 Cut-off 2.68%*/
+			max17048,rcomp_tcd = <44>;
+			max17048,temp_co_hot_tcd= <0xFFFFFFFFFFFFFEED>;
+			max17048,temp_co_cold_tcd = <5275>;
+			max17048,empty_tcd = <268>;	/*3.2 Cut-off 2.68%*/
 		};
 
 		smb349@2d {
@@ -54,6 +60,14 @@
 	qcom,pm8941@0 {
 		qcom,power-on@800 {
 			qcom,s3-debounce = <128>;
+			qcom,pon_1 {
+				status = "ok";
+				qcom,support-reset = <0>;
+			};
+			qcom,pon_3 {
+				status = "ok";
+				qcom,support-reset = <0>;
+			};
 		};
 
 		qcom,temp-alarm@2400 {

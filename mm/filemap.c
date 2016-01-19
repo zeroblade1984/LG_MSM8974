@@ -1603,7 +1603,12 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	/*
 	 * mmap read-around
 	 */
+
+#ifdef CONFIG_READAHEAD_MMAP_SIZE_ENABLE
+	ra_pages = CONFIG_READAHEAD_MMAP_PAGE_CNT;
+#else
 	ra_pages = max_sane_readahead(ra->ra_pages);
+#endif
 	ra->start = max_t(long, 0, offset - ra_pages / 2);
 	ra->size = ra_pages;
 	ra->async_size = ra_pages / 4;

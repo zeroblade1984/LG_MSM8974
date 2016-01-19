@@ -12,8 +12,8 @@
 #include "tcc353x_user_defines.h"
 
 #include "broadcast_tcc353x.h"
-#include "broadcast_dmb_typedef.h"
-#include "broadcast_dmb_drv_ifdef.h"
+#include "../broadcast_dmb_typedef.h"
+#include "../broadcast_dmb_drv_ifdef.h"
 
 #define GPIO_MMBI_ELNA_EN		8
 #define GPIO_LNA_PON			11
@@ -22,6 +22,20 @@
 /*#define _USE_ONSEG_SIGINFO_MODIFIED_MODE_*/
 #define _USE_MONITORING_TIME_GAP_
 #define _USE_SEND_GOOD_SIGNAL_INFO_CHANGING_
+
+#define ONESEG_ANTENNA_LEVLE1 5
+#define ONESEG_ANTENNA_LEVLE2 20
+#define ONESEG_ANTENNA_LEVLE3 65
+
+#define FULLSEG_ANTENNA_LEVLE1 15
+#define FULLSEG_ANTENNA_LEVLE2 30
+#define FULLSEG_ANTENNA_LEVLE3 70
+
+static int full_seg_signal_strength_indicator = 0;
+static int one_seg_signal_strength_indicator = 0;
+static int oneseg_to_fullseg_value = 300;
+static int fullseg_to_oneseg_value = 450;
+
 
 typedef enum {
 	TMM_13SEG = 0,
@@ -83,6 +97,7 @@ static unsigned char InterleavingLen[24] =  {
 };
 
 I32S OnAir = 0;
+static I32S IsOnesegOnlyMode = 0;
 
 #if defined (_USE_MONITORING_TIME_GAP_)
 #define _MON_TIME_INTERVAL_ 	500
@@ -97,8 +112,140 @@ static TcpalTime_t Time_channel_tune = 0;
 static int Need_send_good_signal = 0;
 #endif
 
+
+/*=======================================================
+      Function          : broadcast_tcc353x_drv_get_antenna_level
+      Description     : calurate next antenna level
+      Parameter     : mode(1,13) Current cn, ber, antenna level
+      Return Value     : int next_antenna_level
+
+      when              model           who         edit history
+  -------------------------------------------------------
+      Aug.04.2013  1seg      taew00k.kang   created
+======================================================== */
+
+int broadcast_tcc353x_drv_get_antenna_level(const int segment, const int current_antenna_level, const int cn, const int ber)
+{
+
+    int         next_antenna_level = 0; //next_antenna_level
+
+    next_antenna_level = current_antenna_level;
+
+/* TCC 3535 Antanna level tune value 2013-10-24 [START] */
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_3_TO_2    ((ber > 320) || (cn < 1950 && ber > 300))
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_1    (ber >= 450)
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_3 ((ber <= 290 &&  cn >= 2000) || (ber < 250 && cn >= 1800))
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_0    (ber >= 2000 && cn <= 1745)
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_2 (ber < 380)
+#define FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_0_TO_1 (ber < 2000 && cn > 1750)
+
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_3_TO_2    (ber > 50) || (600 > cn)
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_1    (ber >= 200)
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_3    (ber <= 20 && 660 <= cn)
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_0    (ber >= 1950 && cn <= 300)
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_2    (ber < 100)
+#define ONESEG_ANTENNA_LEVEL_CONDITION_FROM_0_TO_1    (ber < 1950 && cn > 300)
+/* TCC 3535 Antanna level tune value 2013-10-24 [END] */
+
+    if(segment==13)
+    {
+        /* CN - histerysis curve */
+        if ( current_antenna_level == 3 )
+        {
+            if ( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_3_TO_2 )
+            {
+                TcpalPrintStatus((I08S *)"[bhj][fulseg][3_2]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 2;
+            }
+        }
+        else if ( current_antenna_level == 2 )
+        {
+            if ( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_1 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][fulseg][2_1]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 1;
+            }
+            if ( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_3 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][fulseg][2_3]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 3;
+            }
+        }
+        else if ( current_antenna_level == 1 )
+        {
+            if( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_0 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][fulseg][1_0]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 0;
+            }
+            if ( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_2 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][fulseg][1_2]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 2;
+            }
+        }
+        else //current_antenna_level == 0
+        {
+            if ( FULLSEG_ANTENNA_LEVEL_CONDITION_FROM_0_TO_1 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][fulseg][0_1]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 1;
+            }
+        }
+    }
+    else if(segment==1)
+    {
+        /* CN - histerysis curve */
+        if ( current_antenna_level == 3 )
+        {
+            if ( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_3_TO_2 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][3_2]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 2;
+            }
+        }
+        else if ( current_antenna_level == 2 )
+        {
+            if ( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_1 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][2_1]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 1;
+            }
+            if ( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_2_TO_3 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][2_3]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 3;
+            }
+        }
+        else if ( current_antenna_level == 1 )
+        {
+            if( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_0 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][1_0]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 0;
+            }
+            if ( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_1_TO_2 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][1_2]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 2;
+            }
+        }
+        else
+        {
+            if ( ONESEG_ANTENNA_LEVEL_CONDITION_FROM_0_TO_1 )
+            {
+                            TcpalPrintStatus((I08S *)"[bhj][1seg][0_1]ber(%d),cn(%d)\n", ber, cn);
+                next_antenna_level = 1;
+            }
+        }
+    }
+
+    return next_antenna_level;
+
+}
+
 /* Body of Internel function */
-int	broadcast_drv_start(void)
+int	broadcast_tcc353x_drv_start(void)
 {
 	int rc;
 	rc = OK;
@@ -106,7 +253,7 @@ int	broadcast_drv_start(void)
 	return rc;
 }
 
-int	broadcast_get_stop_mode(void)
+int	broadcast_tcc353x_get_stop_mode(void)
 {
 	int rc;
 	rc = OK;
@@ -114,7 +261,7 @@ int	broadcast_get_stop_mode(void)
 	return rc;
 }
 
-int	broadcast_drv_if_power_on(void)
+int	broadcast_tcc353x_drv_if_power_on(void)
 {
 	int rc = ERROR;
 	
@@ -124,7 +271,7 @@ int	broadcast_drv_if_power_on(void)
 	return rc;
 }
 
-int	broadcast_drv_if_power_off(void)
+int	broadcast_tcc353x_drv_if_power_off(void)
 {
 	int rc = ERROR;
 	TcpalPrintStatus((I08S *)"[1seg]broadcast_drv_if_power_off\n");
@@ -149,10 +296,10 @@ static void Tcc353xWrapperSafeClose (void)
 	
 	Tcc353xApiClose(0);
 	Tcc353xI2cClose(0);
-	broadcast_drv_if_power_off();
+	broadcast_tcc353x_drv_if_power_off();
 }
 
-int	broadcast_drv_if_open(void)
+int	broadcast_tcc353x_drv_if_open(void)
 {
 	int rc = ERROR;
 	
@@ -174,7 +321,7 @@ int	broadcast_drv_if_open(void)
 		Tcc353xWrapperSafeClose ();
 
 		/* re-open driver & power ctrl*/
-		broadcast_drv_if_power_on();
+		broadcast_tcc353x_drv_if_power_on();
 		Tcc353xI2cOpen(0);
 		ret = Tcc353xApiOpen(0, &Tcc353xOptionSingle, sizeof(Tcc353xOption_t));
 		if (ret != TCC353X_RETURN_SUCCESS) {
@@ -209,7 +356,7 @@ int	broadcast_drv_if_open(void)
 	return rc;
 }
 
-int	broadcast_drv_if_close(void)
+int	broadcast_tcc353x_drv_if_close(void)
 {
 	int rc = ERROR;	
 	int ret = 0;
@@ -233,7 +380,7 @@ int	broadcast_drv_if_close(void)
 	return rc;
 }
 
-int	broadcast_drv_if_set_channel(struct broadcast_dmb_set_ch_info *udata)
+int	broadcast_tcc353x_drv_if_set_channel(struct broadcast_dmb_set_ch_info *udata)
 {	
 	Tcc353xTuneOptions tuneOption;
 	signed long frequency = 214714; /*tmm*/
@@ -300,7 +447,7 @@ int	broadcast_drv_if_set_channel(struct broadcast_dmb_set_ch_info *udata)
 	return OK;
 }
 
-int	broadcast_drv_if_resync(void)
+int	broadcast_tcc353x_drv_if_resync(void)
 {
 	int rc;
 	/*
@@ -310,7 +457,7 @@ int	broadcast_drv_if_resync(void)
 	return rc;
 }
 
-int	broadcast_drv_if_detect_sync(struct broadcast_dmb_sync_info *udata)
+int	broadcast_tcc353x_drv_if_detect_sync(struct broadcast_dmb_sync_info *udata)
 {
 	IsdbLock_t lock;
 	I08U reg;
@@ -476,7 +623,7 @@ char *cGI[8] = {"1/32","1/16","1/8","1/4","reserved","reserved","reserved","rese
 Tcc353xStatus_t SignalInfo;
 #endif
 
-static void broadcast_drv_if_get_oneseg_sig_info(Tcc353xStatus_t *pst, struct broadcast_dmb_control_info *pInfo)
+static void broadcast_tcc353x_drv_if_get_oneseg_sig_info(Tcc353xStatus_t *pst, struct broadcast_dmb_control_info *pInfo)
 {
 	pInfo->sig_info.info.oneseg_info.lock = pst->status.isdbLock.TMCC;
 	pInfo->sig_info.info.oneseg_info.cn = pst->status.snr.currentValue;
@@ -548,7 +695,7 @@ static void broadcast_drv_if_get_oneseg_sig_info(Tcc353xStatus_t *pst, struct br
 #endif
 }
 
-int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
+int	broadcast_tcc353x_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 {	
 	int ret = 0;
 	Tcc353xStatus_t st;
@@ -557,6 +704,9 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	TcpalTime_t tempTime = 0;
 	unsigned int timeGap = 0;
 #endif
+
+	pInfo->sig_info.info.mmb_info.oneseg_to_fullseg_value = oneseg_to_fullseg_value;
+	pInfo->sig_info.info.mmb_info.fullseg_to_oneseg_value = fullseg_to_oneseg_value;
 
 	TcpalSemaphoreLock(&Tcc353xDrvSem);
 	if(OnAir == 0 || pInfo==NULL) {
@@ -611,15 +761,15 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 				TcpalPrintStatus((I08S *)"[1seg][monitor] Force good ber,per value [pktcnt(%d)]\n",st.opstat.ARsCnt);
 
 				/* set good ber, per for full-segment */
-			    	st.opstat.ARsCnt = 1;	/* indication of modified value & avoid max ber, per */
-			    	st.opstat.BRsCnt = 1;	/* indication of modified value & avoid max ber, per */
-			    	st.opstat.CRsCnt = 1;	/* indication of modified value & avoid max ber, per */
-			    	st.opstat.ARsErrorCnt = 0;
-			    	st.opstat.BRsErrorCnt = 0;
-			    	st.opstat.CRsErrorCnt = 0;
-			    	st.opstat.ARsOverCnt = 0;
-			    	st.opstat.BRsOverCnt = 0;
-			    	st.opstat.CRsOverCnt = 0;
+				st.opstat.ARsCnt = 1;	/* indication of modified value & avoid max ber, per */
+				st.opstat.BRsCnt = 1;	/* indication of modified value & avoid max ber, per */
+				st.opstat.CRsCnt = 1;	/* indication of modified value & avoid max ber, per */
+				st.opstat.ARsErrorCnt = 0;
+				st.opstat.BRsErrorCnt = 0;
+				st.opstat.CRsErrorCnt = 0;
+				st.opstat.ARsOverCnt = 0;
+				st.opstat.BRsOverCnt = 0;
+				st.opstat.CRsOverCnt = 0;
 
 				/* set good ber, per for one-segment */
 				st.status.viterbiber[0].currentValue = 0;
@@ -639,76 +789,255 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	{
 	case ENUM_GET_ALL:
 		pInfo->sig_info.info.mmb_info.cn = 
-		    st.status.snr.currentValue;
+			st.status.snr.currentValue;
 
 		if(layer==0) {
-			pInfo->sig_info.info.mmb_info.ber_a =
-			    st.opstat.ARsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_a =
-			    st.opstat.ARsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
-			    st.opstat.ARsCnt;
-			pInfo->sig_info.info.mmb_info.layerinfo_a =
+			pInfo->sig_info.info.mmb_info.ber_a = 
+				//st.opstat.ARsErrorCnt;
+				st.status.viterbiber[0].currentValue;
+			pInfo->sig_info.info.mmb_info.per_a = 
+				//st.opstat.ARsOverCnt;
+				st.status.tsper[0].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
+				st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_a =  
 				Tcc353xWrapperGetLayerInfo(0, &st);
 		} else if(layer==1) {
-			pInfo->sig_info.info.mmb_info.ber_b =
-			    st.opstat.BRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_b =
-			    st.opstat.BRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
-			    st.opstat.BRsCnt;
-			pInfo->sig_info.info.mmb_info.layerinfo_b =
+			pInfo->sig_info.info.mmb_info.ber_b = 
+				//st.opstat.BRsErrorCnt;
+				st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.per_b = 
+				//st.opstat.BRsOverCnt;
+				st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
+				st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_b =  
 				Tcc353xWrapperGetLayerInfo(1, &st);
 		} else if(layer==2) {
-			pInfo->sig_info.info.mmb_info.ber_c =
-			    st.opstat.CRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_c =
-			    st.opstat.CRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
-			    st.opstat.CRsCnt;
-			pInfo->sig_info.info.mmb_info.layerinfo_c =
+			pInfo->sig_info.info.mmb_info.ber_c = 
+				//st.opstat.CRsErrorCnt;
+				st.status.viterbiber[2].currentValue;
+			pInfo->sig_info.info.mmb_info.per_c = 
+				//st.opstat.CRsOverCnt;
+				st.status.tsper[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
+				st.opstat.CRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_c =  
 				Tcc353xWrapperGetLayerInfo(2, &st);
 		} else {
-			pInfo->sig_info.info.mmb_info.ber_a =
-			    st.opstat.ARsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_a =
-			    st.opstat.ARsOverCnt;
-			pInfo->sig_info.info.mmb_info.ber_b =
-			    st.opstat.BRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_b =
-			    st.opstat.BRsOverCnt;
-			pInfo->sig_info.info.mmb_info.ber_c =
-			    st.opstat.CRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.per_c =
-			    st.opstat.CRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
-			    st.opstat.ARsCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
-			    st.opstat.BRsCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
-			    st.opstat.CRsCnt;
-			pInfo->sig_info.info.mmb_info.layerinfo_a =
+			pInfo->sig_info.info.mmb_info.ber_a = 
+				//st.opstat.ARsErrorCnt;
+				st.status.viterbiber[0].currentValue;
+			pInfo->sig_info.info.mmb_info.per_a = 
+				//st.opstat.ARsOverCnt;
+				st.status.tsper[0].currentValue;
+			pInfo->sig_info.info.mmb_info.ber_b = 
+				//st.opstat.BRsErrorCnt;
+				st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.per_b = 
+				//st.opstat.BRsOverCnt;
+				st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.ber_c = 
+				//st.opstat.CRsErrorCnt;
+				st.status.viterbiber[2].currentValue;
+			pInfo->sig_info.info.mmb_info.per_c = 
+				//st.opstat.CRsOverCnt;
+				st.status.tsper[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
+				st.opstat.ARsCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
+				st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
+				st.opstat.CRsCnt;
+			pInfo->sig_info.info.mmb_info.layerinfo_a =  
 				Tcc353xWrapperGetLayerInfo(0, &st);
-			pInfo->sig_info.info.mmb_info.layerinfo_b =
+			pInfo->sig_info.info.mmb_info.layerinfo_b =  
 				Tcc353xWrapperGetLayerInfo(1, &st);
-			pInfo->sig_info.info.mmb_info.layerinfo_c =
+			pInfo->sig_info.info.mmb_info.layerinfo_c =  
 				Tcc353xWrapperGetLayerInfo(2, &st);
 		}
 
-		pInfo->sig_info.info.mmb_info.tmccinfo =
+		pInfo->sig_info.info.mmb_info.tmccinfo = 
 			Tcc353xWrapperGetTmccInfo(&st);
-		
-		pInfo->sig_info.info.mmb_info.receive_status =
-				Tcc353xWrapperGetReceiveStat(&st);
-				
-		pInfo->sig_info.info.mmb_info.rssi =
+
+		pInfo->sig_info.info.mmb_info.receive_status = 
+			Tcc353xWrapperGetReceiveStat(&st);
+
+		pInfo->sig_info.info.mmb_info.rssi = 
 			(st.status.rssi.currentValue);
-			
+
 		pInfo->sig_info.info.mmb_info.scan_status =
 			Tcc353xWrapperGetScanStat(&st);
 
 		pInfo->sig_info.info.mmb_info.sysinfo =
 			Tcc353xWrapperGetSysInfo(&st);
+		if(IsOnesegOnlyMode)
+		{
+			pInfo->sig_info.info.mmb_info.layerinfo_b = 0xFFFF;
+			pInfo->sig_info.info.mmb_info.layerinfo_c = 0xFFFF;
+			TcpalPrintStatus((I08S *)"[dtv][tcc3536][monitor][fullseg] (1) 1seg only mode : set layer info B,C as a default\n");
+		}
+
+
+		pInfo->sig_info.info.mmb_info.agc = st.rfLoopGain;
+
+/*		if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE3)
+			pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 3;
+		else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE2)
+			pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 2;
+		else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE1)
+			pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 1;
+		else 
+			pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 0;*/
+
+		pInfo->sig_info.info.mmb_info.ber_1seg = st.status.viterbiber[0].currentValue;
+		pInfo->sig_info.info.mmb_info.per_1seg = st.status.tsper[0].currentValue;
+		pInfo->sig_info.info.mmb_info.total_tsp_1seg = st.opstat.ARsCnt;
+		pInfo->sig_info.info.mmb_info.err_tsp_1seg = st.opstat.ARsOverCnt;
+		one_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(1, one_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+		pInfo->sig_info.info.mmb_info.antenna_level_oneseg = one_seg_signal_strength_indicator;
+		TcpalPrintStatus((I08S *)"[bhj][tcc3536][monitor][1seg] cn(%d), ber(%d)\n", pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+
+#if 1
+		if((st.opstat.CSegNo>0) && (st.opstat.CSegNo != 0x0F)){
+			pInfo->sig_info.info.mmb_info.ber_fullseg = st.status.viterbiber[2].currentValue;
+			pInfo->sig_info.info.mmb_info.per_fullseg = st.status.tsper[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_fullseg = st.opstat.CRsCnt;
+			pInfo->sig_info.info.mmb_info.err_tsp_fullseg = st.opstat.CRsOverCnt;
+			full_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(13, full_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+			pInfo->sig_info.info.mmb_info.antenna_level_fullseg = full_seg_signal_strength_indicator;
+			TcpalPrintStatus((I08S *)"[bhj][tcc3536][monitor][fullseg] cn(%d), ber(%d)\n", pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+		
+			/* wich layer is oneseg? */
+			if(st.opstat.BSegNo==1 && st.opstat.ASegNo!=1) {
+				pInfo->sig_info.info.mmb_info.ber_1seg = st.status.viterbiber[1].currentValue;
+				pInfo->sig_info.info.mmb_info.per_1seg = st.status.tsper[1].currentValue;
+				pInfo->sig_info.info.mmb_info.total_tsp_1seg = st.opstat.BRsCnt;
+				pInfo->sig_info.info.mmb_info.err_tsp_1seg = st.opstat.BRsOverCnt;
+				one_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(1, one_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = one_seg_signal_strength_indicator;
+				TcpalPrintStatus((I08S *)"[bhj][tcc3536][monitor][1seg] cn(%d), ber(%d)\n", pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+			} else {
+				/* same as old values */
+			}
+		} else if((st.opstat.BSegNo > 0) && (st.opstat.BSegNo != 0x0F)){/*
+			if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 3;
+			else if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 2;
+			else if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 1;
+			else 
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 0;
+			*/
+			pInfo->sig_info.info.mmb_info.ber_fullseg = st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.per_fullseg = st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_fullseg = st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.err_tsp_fullseg = st.opstat.BRsOverCnt;
+			full_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(13, full_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+			pInfo->sig_info.info.mmb_info.antenna_level_fullseg = full_seg_signal_strength_indicator;
+		TcpalPrintStatus((I08S *)"[bhj][tcc3536][monitor][fullseg] cn(%d), ber(%d)\n", pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+
+		} else {
+		/*
+			if(st.antennaPercent[0] >= ONESEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 3;
+			else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 2;
+			else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 1;
+			else
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 0;
+
+			if(st.antennaPercent[0] >= FULLSEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 3;
+			else if(st.antennaPercent[0]>=FULLSEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 2;
+			else if(st.antennaPercent[0]>=FULLSEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 1;
+			else
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 0;*/
+
+			pInfo->sig_info.info.mmb_info.ber_fullseg = 
+				pInfo->sig_info.info.mmb_info.ber_1seg;
+			pInfo->sig_info.info.mmb_info.per_fullseg = 
+				pInfo->sig_info.info.mmb_info.per_1seg;
+			pInfo->sig_info.info.mmb_info.total_tsp_fullseg = 
+				pInfo->sig_info.info.mmb_info.total_tsp_1seg;
+			pInfo->sig_info.info.mmb_info.err_tsp_fullseg = 
+				pInfo->sig_info.info.mmb_info.err_tsp_fullseg;
+			full_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(13, full_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = full_seg_signal_strength_indicator;
+			one_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(1, one_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = one_seg_signal_strength_indicator;
+		}
+#else
+		if((st.opstat.BSegNo > 0) && (st.opstat.BSegNo != 0x0F)){/*
+			if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 3;
+			else if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 2;
+			else if(st.antennaPercent[1]>=FULLSEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 1;
+			else 
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 0;
+			*/
+			pInfo->sig_info.info.mmb_info.ber_fullseg = st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.per_fullseg = st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_fullseg = st.opstat.BRsCnt;
+			pInfo->sig_info.info.mmb_info.err_tsp_fullseg = st.opstat.BRsOverCnt;
+			full_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(13, full_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+			pInfo->sig_info.info.mmb_info.antenna_level_fullseg = full_seg_signal_strength_indicator;
+		TcpalPrintStatus((I08S *)"[bhj][tcc3536][monitor][fullseg] cn(%d), ber(%d)\n", pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+
+		} else {
+		/*
+			if(st.antennaPercent[0] >= ONESEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 3;
+			else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 2;
+			else if(st.antennaPercent[0]>=ONESEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 1;
+			else
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = 0;
+
+			if(st.antennaPercent[0] >= FULLSEG_ANTENNA_LEVLE3)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 3;
+			else if(st.antennaPercent[0]>=FULLSEG_ANTENNA_LEVLE2)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 2;
+			else if(st.antennaPercent[0]>=FULLSEG_ANTENNA_LEVLE1)
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 1;
+			else
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = 0;*/
+
+			pInfo->sig_info.info.mmb_info.ber_fullseg = 
+				pInfo->sig_info.info.mmb_info.ber_1seg;
+			pInfo->sig_info.info.mmb_info.per_fullseg = 
+				pInfo->sig_info.info.mmb_info.per_1seg;
+			pInfo->sig_info.info.mmb_info.total_tsp_fullseg = 
+				pInfo->sig_info.info.mmb_info.total_tsp_1seg;
+			pInfo->sig_info.info.mmb_info.err_tsp_fullseg = 
+				pInfo->sig_info.info.mmb_info.err_tsp_fullseg;
+			full_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(13, full_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_fullseg);
+				pInfo->sig_info.info.mmb_info.antenna_level_fullseg = full_seg_signal_strength_indicator;
+			one_seg_signal_strength_indicator = broadcast_tcc353x_drv_get_antenna_level(1, one_seg_signal_strength_indicator, pInfo->sig_info.info.mmb_info.cn, pInfo->sig_info.info.mmb_info.ber_1seg);
+				pInfo->sig_info.info.mmb_info.antenna_level_oneseg = one_seg_signal_strength_indicator;
+		}
+
+#endif
+		
+		/*
+		TcpalPrintLog((I08S *)"OAnt(%d), FAnt(%d), Vber(%d), AntP(%d), Pber(%d), Rssi(%d), TMCC(%d), CTCF(%d,%d)\n",
+			pInfo->sig_info.info.mmb_info.antenna_level_oneseg,
+			pInfo->sig_info.info.mmb_info.antenna_level_fullseg,
+			st.status.viterbiber[0].avgValue,
+			st.antennaPercent[0],
+			st.status.pcber[0].avgValue,
+			st.status.rssi.currentValue,
+			st.status.isdbLock.TMCC & 0x01,
+			st.status.isdbLock.CTO,
+			st.status.isdbLock.CFO);
+		*/
 
 #ifdef _DISPLAY_MONITOR_DBG_LOG_
 		{
@@ -810,32 +1139,38 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 
 	case ENUM_GET_BER:
 		if(layer==0) {
-			pInfo->sig_info.info.mmb_info.ber_a =
-					st.opstat.ARsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			pInfo->sig_info.info.mmb_info.ber_a = 
+					//st.opstat.ARsErrorCnt;
+					st.status.viterbiber[0].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
 					st.opstat.ARsCnt;
 		} else if(layer==1) {
-			pInfo->sig_info.info.mmb_info.ber_b =
-					st.opstat.BRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			pInfo->sig_info.info.mmb_info.ber_b = 
+					//st.opstat.BRsErrorCnt;
+					st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
 					st.opstat.BRsCnt;
 		} else if(layer==2) {
-			pInfo->sig_info.info.mmb_info.ber_c =
-					st.opstat.CRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			pInfo->sig_info.info.mmb_info.ber_c = 
+					//st.opstat.CRsErrorCnt;
+					st.status.viterbiber[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
 					st.opstat.CRsCnt;
 		} else {
-			pInfo->sig_info.info.mmb_info.ber_a =
-					st.opstat.ARsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			pInfo->sig_info.info.mmb_info.ber_a = 
+					//st.opstat.ARsErrorCnt;
+					st.status.viterbiber[0].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
 					st.opstat.ARsCnt;
-			pInfo->sig_info.info.mmb_info.ber_b =
-					st.opstat.BRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			pInfo->sig_info.info.mmb_info.ber_b = 
+					//st.opstat.BRsErrorCnt;
+					st.status.viterbiber[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
 					st.opstat.BRsCnt;
-			pInfo->sig_info.info.mmb_info.ber_c =
-					st.opstat.CRsErrorCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			pInfo->sig_info.info.mmb_info.ber_c = 
+					//st.opstat.CRsErrorCnt;
+					st.status.viterbiber[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
 					st.opstat.CRsCnt;
 		}
 
@@ -861,32 +1196,38 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 
 	case ENUM_GET_PER:
 		if(layer==0) {
-			pInfo->sig_info.info.mmb_info.per_a =
-					st.opstat.ARsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			pInfo->sig_info.info.mmb_info.per_a = 
+					//st.opstat.ARsOverCnt;
+					st.status.tsper[0].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
 					st.opstat.ARsCnt;
 		} else if(layer==1) {
-			pInfo->sig_info.info.mmb_info.per_b =
-					st.opstat.BRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			pInfo->sig_info.info.mmb_info.per_b = 
+					//st.opstat.BRsOverCnt;
+					st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
 					st.opstat.BRsCnt;
 		} else if(layer==2) {
-			pInfo->sig_info.info.mmb_info.per_c =
-					st.opstat.CRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			pInfo->sig_info.info.mmb_info.per_c = 
+					//st.opstat.CRsOverCnt;
+					st.status.tsper[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
 					st.opstat.CRsCnt;
 		} else {
-			pInfo->sig_info.info.mmb_info.per_a =
-					st.opstat.ARsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_a =
+			pInfo->sig_info.info.mmb_info.per_a = 
+					//st.opstat.ARsOverCnt;
+					st.status.tsper[0].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_a = 
 					st.opstat.ARsCnt;
-			pInfo->sig_info.info.mmb_info.per_b =
-					st.opstat.BRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_b =
+			pInfo->sig_info.info.mmb_info.per_b = 
+					//st.opstat.BRsOverCnt;
+					st.status.tsper[1].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_b = 
 					st.opstat.BRsCnt;
-			pInfo->sig_info.info.mmb_info.per_c =
-					st.opstat.CRsOverCnt;
-			pInfo->sig_info.info.mmb_info.total_tsp_c =
+			pInfo->sig_info.info.mmb_info.per_c = 
+					//st.opstat.CRsOverCnt;
+					st.status.tsper[2].currentValue;
+			pInfo->sig_info.info.mmb_info.total_tsp_c = 
 					st.opstat.CRsCnt;
 		}
 #ifdef _DISPLAY_MONITOR_DBG_LOG_
@@ -1064,7 +1405,7 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	break;
 
 	case ENUM_GET_ONESEG_SIG_INFO:
-		broadcast_drv_if_get_oneseg_sig_info(&st, pInfo);
+		broadcast_tcc353x_drv_if_get_oneseg_sig_info(&st, pInfo);
 	break;
 
 	default:
@@ -1079,7 +1420,7 @@ int	broadcast_drv_if_get_sig_info(struct broadcast_dmb_control_info *pInfo)
 	return OK;
 }
 
-int	broadcast_drv_if_get_ch_info(struct broadcast_dmb_ch_info *ch_info)
+int	broadcast_tcc353x_drv_if_get_ch_info(struct broadcast_dmb_ch_info *ch_info)
 {
 	int rc = ERROR;
 
@@ -1095,7 +1436,7 @@ int	broadcast_drv_if_get_ch_info(struct broadcast_dmb_ch_info *ch_info)
 	return rc;
 }
 
-int	broadcast_drv_if_get_dmb_data(struct broadcast_dmb_data_info *pdmb_data)
+int	broadcast_tcc353x_drv_if_get_dmb_data(struct broadcast_dmb_data_info *pdmb_data)
 {
 	if(OnAir == 0 || pdmb_data==NULL) {
 		return ERROR;
@@ -1116,7 +1457,7 @@ int	broadcast_drv_if_get_dmb_data(struct broadcast_dmb_data_info *pdmb_data)
 	return OK;
 }
 
-int	broadcast_drv_if_reset_ch(void)
+int	broadcast_tcc353x_drv_if_reset_ch(void)
 {
 	int ret = 0;
 	int rc = ERROR;
@@ -1141,7 +1482,7 @@ int	broadcast_drv_if_reset_ch(void)
 	return rc;
 }
 
-int	broadcast_drv_if_user_stop(int mode)
+int	broadcast_tcc353x_drv_if_user_stop(int mode)
 {
 	int rc;
 	rc = OK;
@@ -1155,7 +1496,7 @@ int	broadcast_drv_if_user_stop(int mode)
 	return rc;
 }
 
-int	broadcast_drv_if_select_antenna(unsigned int sel)
+int	broadcast_tcc353x_drv_if_select_antenna(unsigned int sel)
 {
 	int rc;
 	rc = OK;
@@ -1166,7 +1507,7 @@ int	broadcast_drv_if_select_antenna(unsigned int sel)
 	return rc;
 }
 
-int	broadcast_drv_if_isr(void)
+int	broadcast_tcc353x_drv_if_isr(void)
 {
 	int rc;
 	rc = OK;
@@ -1177,12 +1518,12 @@ int	broadcast_drv_if_isr(void)
 	return rc;
 }
 
-int	broadcast_drv_if_read_control(char *buf, unsigned int size)
+int	broadcast_tcc353x_drv_if_read_control(char *buf, unsigned int size)
 {
 	return 0;
 }
 
-int	broadcast_drv_if_get_mode (unsigned short *mode)
+int	broadcast_tcc353x_drv_if_get_mode (unsigned short *mode)
 {
 	int rc = ERROR;
 

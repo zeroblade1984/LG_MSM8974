@@ -110,6 +110,9 @@ enum sdc_mpm_pin_state {
 #define CORE_VENDOR_SPEC_ADMA_ERR_ADDR0	0x114
 #define CORE_VENDOR_SPEC_ADMA_ERR_ADDR1	0x118
 
+#define CORE_VENDOR_SPEC_FUNC2 0x110
+#define CORE_ONE_MID_EN     (1 << 25)
+
 #define CORE_CSR_CDC_CTLR_CFG0		0x130
 #define CORE_SW_TRIG_FULL_CALIB		(1 << 16)
 #define CORE_HW_AUTOCAL_ENA		(1 << 17)
@@ -151,6 +154,9 @@ enum sdc_mpm_pin_state {
 
 #define CORE_MCI_VERSION	0x050
 #define CORE_VERSION_310	0x10000011
+#define CORE_VERSION_MAJOR_MASK		0xF0000000
+#define CORE_VERSION_MAJOR_SHIFT	28
+#define CORE_VERSION_TARGET_MASK	0x000000FF
 
 /*
  * Waiting until end of potential AHB access for data:
@@ -2805,6 +2811,32 @@ static int sdhci_msm_cfg_mpm_pin_wakeup(struct sdhci_host *host, unsigned mode)
 	return ret;
 }
 
+#ifdef CONFIG_MACH_LGE
+/*
+ * Enable one MID mode for SDCC5 (major 1) on 8974 (minor 0x11), on 8916/8939 (minor 0x2e) and
+ * on 8992 (minor 0x3e) as a workaround to reset for data stuck issue.
+ */
+static void sdhci_enable_one_MID_mode(struct sdhci_msm_host *msm_host, struct sdhci_host *host)
+{
+	u32 version;
+	u16 minor;
+	u8 major;
+	u32 val;
+
+	version = readl_relaxed(msm_host->core_mem + CORE_MCI_VERSION);
+	major = (version & CORE_VERSION_MAJOR_MASK) >>
+			CORE_VERSION_MAJOR_SHIFT;
+	minor = version & CORE_VERSION_TARGET_MASK;
+
+	if (major == 1 && (minor == 0x11 || minor == 0x2e || minor == 0x3e)) {
+		host->quirks2 |= SDHCI_QUIRK2_USE_RESET_WORKAROUND;
+		val = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+		writel_relaxed((val | CORE_ONE_MID_EN),
+			host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+	}
+}
+#endif
+
 static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -2977,6 +3009,10 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	writel_relaxed(readl_relaxed(msm_host->core_mem + CORE_HC_MODE) |
 			FF_CLK_SW_RST_DIS, msm_host->core_mem + CORE_HC_MODE);
 
+#ifdef CONFIG_MACH_LGE
+	sdhci_enable_one_MID_mode(msm_host, host);
+#endif
+
 	/*
 	 * CORE_SW_RST above may trigger power irq if previous status of PWRCTL
 	 * was either BUS_ON or IO_HIGH_V. So before we enable the power irq
@@ -3085,7 +3121,9 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
 	msm_host->mmc->caps2 |= MMC_CAP2_CACHE_CTRL;
 	msm_host->mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
+#ifndef CONFIG_MACH_LGE
 	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+#endif
 	msm_host->mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
 	msm_host->mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_PM;

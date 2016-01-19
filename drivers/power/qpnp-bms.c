@@ -27,7 +27,9 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/qpnp/power-on.h>
 #include <linux/of_batterydata.h>
-
+#ifdef CONFIG_MACH_LGE
+#include <mach/board_lge.h>
+#endif
 /* BMS Register Offsets */
 #define REVISION1			0x0
 #define REVISION2			0x1
@@ -133,7 +135,9 @@ struct fcc_sample {
 struct bms_irq {
 	unsigned int	irq;
 	unsigned long	disabled;
+	unsigned long	wake_enabled;
 	bool		ready;
+	bool		is_wake;
 };
 
 struct bms_wakeup_source {
@@ -408,6 +412,9 @@ static void enable_bms_irq(struct bms_irq *irq)
 	if (irq->ready && __test_and_clear_bit(0, &irq->disabled)) {
 		enable_irq(irq->irq);
 		pr_debug("enabled irq %d\n", irq->irq);
+		if ((irq->is_wake) &&
+				!__test_and_set_bit(0, &irq->wake_enabled))
+			enable_irq_wake(irq->irq);
 	}
 }
 
@@ -416,6 +423,9 @@ static void disable_bms_irq(struct bms_irq *irq)
 	if (irq->ready && !__test_and_set_bit(0, &irq->disabled)) {
 		disable_irq(irq->irq);
 		pr_debug("disabled irq %d\n", irq->irq);
+		if ((irq->is_wake) &&
+				__test_and_clear_bit(0, &irq->wake_enabled))
+			disable_irq_wake(irq->irq);
 	}
 }
 
@@ -424,6 +434,9 @@ static void disable_bms_irq_nosync(struct bms_irq *irq)
 	if (irq->ready && !__test_and_set_bit(0, &irq->disabled)) {
 		disable_irq_nosync(irq->irq);
 		pr_debug("disabled irq %d\n", irq->irq);
+		if ((irq->is_wake) &&
+				__test_and_clear_bit(0, &irq->wake_enabled))
+			disable_irq_wake(irq->irq);
 	}
 }
 #endif
@@ -3862,7 +3875,9 @@ do {									\
 static inline int bms_read_properties(struct qpnp_bms_chip *chip)
 {
 	int rc = 0;
-
+#if	defined (CONFIG_MACH_MSM8974_DZNY_DCM)
+	hw_rev_type rev;
+#endif
 	SPMI_PROP_READ(r_sense_uohm, "r-sense-uohm", rc);
 	SPMI_PROP_READ(v_cutoff_uv, "v-cutoff-uv", rc);
 	SPMI_PROP_READ(max_voltage_uv, "max-voltage-uv", rc);
@@ -3896,6 +3911,14 @@ static inline int bms_read_properties(struct qpnp_bms_chip *chip)
 	chip->use_external_rsense = of_property_read_bool(
 			chip->spmi->dev.of_node,
 			"qcom,use-external-rsense");
+#if	defined (CONFIG_MACH_MSM8974_DZNY_DCM)
+	rev = lge_get_board_revno();
+	if (rev < HW_REV_B)
+	{
+		chip->use_external_rsense = false;
+	}
+#endif
+
 	chip->ignore_shutdown_soc = of_property_read_bool(
 			chip->spmi->dev.of_node,
 			"qcom,ignore-shutdown-soc");
@@ -4003,11 +4026,11 @@ static int bms_request_irqs(struct qpnp_bms_chip *chip)
 	int rc;
 
 	SPMI_REQUEST_IRQ(chip, rc, sw_cc_thr);
+	chip->sw_cc_thr_irq.is_wake = true;
 	disable_bms_irq(&chip->sw_cc_thr_irq);
-	enable_irq_wake(chip->sw_cc_thr_irq.irq);
 	SPMI_REQUEST_IRQ(chip, rc, ocv_thr);
+	chip->ocv_thr_irq.is_wake = true;
 	disable_bms_irq(&chip->ocv_thr_irq);
-	enable_irq_wake(chip->ocv_thr_irq.irq);
 	return 0;
 }
 #endif

@@ -2,7 +2,7 @@
  * Core MDSS framebuffer driver.
  *
  * Copyright (C) 2007 Google Incorporated
- * Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2008-2015, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -78,7 +78,7 @@ static u32 mdss_fb_pseudo_palette[16] = {
 	0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
 };
 
-#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_JFULLSEG)
+#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 extern struct mdp_csc_cfg dmb_csc_convert;
 extern int pp_set_dmb_status(int flag);
 #endif /* LGE_BROADCAST */
@@ -166,13 +166,31 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 	if (notify > NOTIFY_UPDATE_POWER_OFF)
 		return -EINVAL;
 
-	if (mfd->update.is_suspend) {
+	if (notify == NOTIFY_UPDATE_INIT) {
+		mutex_lock(&mfd->update.lock);
+		mfd->update.init_done = true;
+		mutex_unlock(&mfd->update.lock);
+		ret = 1;
+	} else if (notify == NOTIFY_UPDATE_DEINIT) {
+		mutex_lock(&mfd->update.lock);
+		mfd->update.init_done = false;
+		mutex_unlock(&mfd->update.lock);
+		complete(&mfd->update.comp);
+		complete(&mfd->no_update.comp);
+		ret = 1;
+	} else if (mfd->update.is_suspend) {
 		to_user = NOTIFY_TYPE_SUSPEND;
 		mfd->update.is_suspend = 0;
 		ret = 1;
 	} else if (notify == NOTIFY_UPDATE_START) {
-		INIT_COMPLETION(mfd->update.comp);
 		mutex_lock(&mfd->update.lock);
+		if (mfd->update.init_done)
+			INIT_COMPLETION(mfd->update.comp);
+		else {
+			mutex_unlock(&mfd->update.lock);
+			pr_err("notify update start called without init\n");
+			return -EINVAL;
+		}
 		mfd->update.ref_count++;
 		mutex_unlock(&mfd->update.lock);
 		ret = wait_for_completion_interruptible_timeout(
@@ -186,7 +204,15 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 			ret = 1;
 		}
 	} else if (notify == NOTIFY_UPDATE_STOP) {
-		INIT_COMPLETION(mfd->no_update.comp);
+		mutex_lock(&mfd->update.lock);
+		if (mfd->update.init_done)
+			INIT_COMPLETION(mfd->no_update.comp);
+		else {
+			mutex_unlock(&mfd->update.lock);
+			pr_err("notify update stop called without init\n");
+			return -EINVAL;
+		}
+		mutex_unlock(&mfd->update.lock);
 		mutex_lock(&mfd->no_update.lock);
 		mfd->no_update.ref_count++;
 		mutex_unlock(&mfd->no_update.lock);
@@ -223,9 +249,9 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 		value = mfd->panel_info->brightness_max;
 
 #ifdef CONFIG_LGE_LCD_OFF_DIMMING
-	if (((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561))
-		&& !fb_blank_called) {
-		pr_info("%s : lcd dimming mode! minimum brightness.\n",__func__);
+	if (((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561)
+		|| (lge_get_bootreason() == 0x77665562)) && !fb_blank_called) {
+		pr_info("%s : lcd dimming mode! minimum brightness.\n", __func__);
 		value = 50;
 	}
 #endif
@@ -414,11 +440,13 @@ static ssize_t mdss_fb_get_panel_info(struct device *dev,
 
 	ret = scnprintf(buf, PAGE_SIZE,
 			"pu_en=%d\nxstart=%d\nwalign=%d\nystart=%d\nhalign=%d\n"
-			"min_w=%d\nmin_h=%d",
+			"min_w=%d\nmin_h=%d\ndyn_fps_en=%d\nmin_fps=%d\n"
+			"max_fps=%d\n",
 			pinfo->partial_update_enabled, pinfo->xstart_pix_align,
 			pinfo->width_pix_align, pinfo->ystart_pix_align,
 			pinfo->height_pix_align, pinfo->min_width,
-			pinfo->min_height);
+			pinfo->min_height, pinfo->dynamic_fps,
+			pinfo->min_fps, pinfo->max_fps);
 
 	return ret;
 }
@@ -508,6 +536,29 @@ static int mdss_fb_lpm_enable(struct msm_fb_data_type *mfd, int mode)
 	return 0;
 }
 
+#if defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
+static ssize_t mdss_fb_get_panel_type(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int ret = 0;
+	struct mdss_panel_info *pinfo = NULL;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+
+	if (!mfd || !mfd->panel_info)
+		return -EINVAL;
+
+	pinfo = mfd->panel_info;
+
+	if (pinfo->panel_type == TOVIS_NT51021_VIDEO_PANEL)
+		ret = snprintf(buf, PAGE_SIZE, "Tovis - Novatek\n");
+	else
+		ret = snprintf(buf, PAGE_SIZE, "no panel type\n");
+
+	return ret;
+}
+#endif
+
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
 static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
@@ -515,6 +566,10 @@ static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
 static DEVICE_ATTR(msm_fb_panel_info, S_IRUGO, mdss_fb_get_panel_info, NULL);
+#if defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
+static DEVICE_ATTR(panel_type, S_IRUGO | S_IWUSR,
+	mdss_fb_get_panel_type, NULL);
+#endif
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
@@ -523,6 +578,9 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
 	&dev_attr_msm_fb_panel_info.attr,
+#if defined(CONFIG_T1_TOVIS_NT51021_WUXGA_VIDEO_PANEL)
+	&dev_attr_panel_type.attr,
+#endif
 	NULL,
 };
 
@@ -596,6 +654,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	mfd->bl_level_prev_scaled = 0;
 	mfd->bl_scale = 1024;
 	mfd->bl_min_lvl = 30;
+	mfd->ad_bl_level = 0;
 	mfd->fb_imgType = MDP_RGBA_8888;
 
 	mfd->pdev = pdev;
@@ -919,13 +978,12 @@ static void mdss_fb_scale_bl(struct msm_fb_data_type *mfd, u32 *bl_lvl)
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 {
 	struct mdss_panel_data *pdata;
-	int (*update_ad_input)(struct msm_fb_data_type *mfd);
 	u32 temp = bkl_lvl;
-	int ret = -EINVAL;
-	bool is_bl_changed = (bkl_lvl != mfd->bl_level);
+	bool bl_notify_needed = false;
 
-	if (((!mfd->panel_power_on && mfd->dcm_state != DCM_ENTER)
-		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) {
+	if ((((!mfd->panel_power_on && mfd->dcm_state != DCM_ENTER)
+		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
+		mfd->panel_info->cont_splash_enabled) {
 		mfd->unset_bl_level = bkl_lvl;
 		return;
 	} else {
@@ -935,11 +993,11 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 
 	if ((pdata) && (pdata->set_backlight)) {
-		if (mfd->mdp.ad_attenuate_bl) {
-			ret = (*mfd->mdp.ad_attenuate_bl)(bkl_lvl, &temp, mfd);
-			if (ret)
-				pr_err("Failed to attenuate BL\n");
-		}
+		if (mfd->mdp.ad_calc_bl)
+			(*mfd->mdp.ad_calc_bl)(mfd, temp, &temp,
+					&bl_notify_needed);
+		if (bl_notify_needed)
+			mdss_fb_bl_update_notify(mfd);
 
 		mfd->bl_level_prev_scaled = mfd->bl_level_scaled;
 		if (!IS_CALIB_MODE_BL(mfd))
@@ -952,56 +1010,50 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		 * as well as setting bl_level to bkl_lvl even though the
 		 * backlight has been set to the scaled value.
 		 */
-
 		if (mfd->bl_level_scaled == temp) {
 			mfd->bl_level = bkl_lvl;
-#ifdef CONFIG_MACH_MSM8974_G2
-			if (mfd->bl_level != 0)
+#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
+			if (mfd->bl_level == 0) {
+				pr_debug("backlight sent to panel :%d\n", temp);
+				pdata->set_backlight(pdata, temp);
+				mfd->bl_level = bkl_lvl;
+				mfd->bl_level_scaled = temp;
+			}
 #endif
-				return;
+		} else {
+			pr_debug("backlight sent to panel :%d\n", temp);
+			pdata->set_backlight(pdata, temp);
+			mfd->bl_level = bkl_lvl;
+			mfd->bl_level_scaled = temp;
 		}
-		pr_debug("backlight sent to panel :%d\n", temp);
-
-		pdata->set_backlight(pdata, temp);
-		mfd->bl_level = bkl_lvl;
-		mfd->bl_level_scaled = temp;
-
-		if (mfd->mdp.update_ad_input && is_bl_changed) {
-			update_ad_input = mfd->mdp.update_ad_input;
-			mutex_unlock(&mfd->bl_lock);
-			/* Will trigger ad_setup which will grab bl_lock */
-			update_ad_input(mfd);
-			mutex_lock(&mfd->bl_lock);
-		}
-		mdss_fb_bl_update_notify(mfd);
 	}
 }
 
 void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 {
 	struct mdss_panel_data *pdata;
-	int ret = 0;
 	u32 temp;
+	bool bl_notify = false;
 
-	mutex_lock(&mfd->bl_lock);
-	if (mfd->unset_bl_level && !mfd->bl_updated) {
-		pdata = dev_get_platdata(&mfd->pdev->dev);
-		if ((pdata) && (pdata->set_backlight)) {
-			mfd->bl_level = mfd->unset_bl_level;
-			temp = mfd->bl_level;
-			if (mfd->mdp.ad_attenuate_bl) {
-				ret = (*mfd->mdp.ad_attenuate_bl)(temp,
-					&temp, mfd);
-				if (ret)
-					pr_err("Failed to attenuate BL\n");
+	if (mfd->unset_bl_level) {
+		mutex_lock(&mfd->bl_lock);
+		if (!mfd->bl_updated) {
+			pdata = dev_get_platdata(&mfd->pdev->dev);
+			if ((pdata) && (pdata->set_backlight)) {
+				mfd->bl_level = mfd->unset_bl_level;
+				temp = mfd->bl_level;
+				if (mfd->mdp.ad_calc_bl)
+					(*mfd->mdp.ad_calc_bl)(mfd, temp, &temp,
+								&bl_notify);
+				if (bl_notify)
+					mdss_fb_bl_update_notify(mfd);
+				pdata->set_backlight(pdata, temp);
+				mfd->bl_level_scaled = mfd->unset_bl_level;
+				mfd->bl_updated = 1;
 			}
-
-			pdata->set_backlight(pdata, temp);
-			mfd->bl_level_scaled = mfd->unset_bl_level;
-			mfd->bl_updated = 1;
 		}
+		mutex_unlock(&mfd->bl_lock);
 	}
-	mutex_unlock(&mfd->bl_lock);
 }
 
 static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
@@ -1038,7 +1090,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 		mutex_lock(&mfd->bl_lock);
 		if (!mfd->bl_updated) {
 			mfd->bl_updated = 1;
-#ifdef CONFIG_MACH_MSM8974_G2
+#if defined(CONFIG_MACH_MSM8974_G2) || defined(CONFIG_MACH_MSM8974_TIGERS_KR)
 			if (mfd->bl_level_prev_scaled != 0)
 #endif
 				mdss_fb_set_backlight(mfd, mfd->bl_level_prev_scaled);
@@ -1196,6 +1248,7 @@ int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd, size_t fb_size)
 		}
 	} else {
 		pr_err("No IOMMU Domain");
+		rc = -EINVAL;
 		goto fb_mmap_failed;
 
 	}
@@ -1464,8 +1517,8 @@ static int mdss_fb_alloc_fbmem_iommu(struct msm_fb_data_type *mfd, int dom)
 		 size, &phys, virt, &mfd->iova, mfd->index);
 
 #ifdef CONFIG_LGE_HANDLE_PANIC
-    /* save fb1 address for crash handler display buffer */
-    lge_set_fb1_addr((unsigned int)(phys));
+	/* save fb1 address for crash handler display buffer */
+	lge_set_fb1_addr((unsigned int)(phys));
 #endif
 	mfd->fbi->screen_base = virt;
 	mfd->fbi->fix.smem_start = phys;
@@ -1696,6 +1749,7 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	mfd->no_update.timer.data = (unsigned long)mfd;
 	mfd->update.ref_count = 0;
 	mfd->no_update.ref_count = 0;
+	mfd->update.init_done = false;
 	init_completion(&mfd->update.comp);
 	init_completion(&mfd->no_update.comp);
 	init_completion(&mfd->power_off_comp);
@@ -1731,8 +1785,9 @@ static int mdss_fb_open(struct fb_info *info, int user)
 	struct task_struct *task = current->group_leader;
 
 	if (mfd->shutdown_pending) {
-		pr_err("Shutdown pending. Aborting operation. Request from pid:%d name=%s\n",
+		pr_err_once("Shutdown pending. Aborting operation. Request from pid:%d name=%s\n",
 				pid, task->comm);
+		sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 		return -EPERM;
 	}
 
@@ -1804,14 +1859,14 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdss_fb_proc_info *pinfo = NULL, *temp_pinfo = NULL;
-	int ret = 0;
+	int ret = 0, ad_ret = 0;
 	int pid = current->tgid;
 	bool unknown_pid = true, release_needed = false;
 	struct task_struct *task = current->group_leader;
 
 	if (!mfd->ref_cnt) {
-		pr_info("try to close unopened fb %d! from %s\n", mfd->index,
-			task->comm);
+		pr_info("try to close unopened fb %d! from pid:%d name:%s\n", mfd->index,
+			pid, task->comm);
 		return -EINVAL;
 	}
 
@@ -1896,6 +1951,13 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 			if (ret)
 				pr_err("error fb%d release process %s pid=%d\n",
 					mfd->index, task->comm, pid);
+		}
+
+		if (mfd->mdp.ad_shutdown_cleanup) {
+			ad_ret = (*mfd->mdp.ad_shutdown_cleanup)(mfd);
+			if (ad_ret)
+				pr_err("AD shutdown cleanup failed ret = %d\n",
+						ad_ret);
 		}
 
 		ret = mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info,
@@ -2805,7 +2867,7 @@ static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
 #ifdef CONFIG_MACH_LGE
 	u32 dsi_panel_invert = 0;
 #endif
-#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_JFULLSEG)
+#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 	int dmb_flag = 0;
 	struct mdp_csc_cfg dmb_csc_cfg;
 #endif /* LGE_BROADCAST */
@@ -2881,7 +2943,7 @@ static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = mdss_dsi_panel_invert(dsi_panel_invert);
 		break;
 #endif
-#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_JFULLSEG)
+#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
 	case MSMFB_DMB_SET_FLAG:
 		ret = copy_from_user(&dmb_flag, argp, sizeof(int));
 		if (ret)

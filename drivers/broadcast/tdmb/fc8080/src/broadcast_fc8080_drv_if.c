@@ -253,6 +253,12 @@ int broadcast_drv_if_select_antenna(unsigned int sel)
 	return OK;
 }
 
+int broadcast_drv_if_set_nation(unsigned int nation)
+{
+    tunerbb_drv_fc8080_set_nation(nation);
+    return OK;
+}
+
 int broadcast_drv_if_isr(void)
 {
 	uint8* 	read_buffer_ptr 	= NULL;

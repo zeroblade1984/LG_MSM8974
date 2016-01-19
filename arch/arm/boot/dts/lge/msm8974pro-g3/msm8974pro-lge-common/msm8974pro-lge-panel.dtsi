@@ -153,6 +153,7 @@
 	/delete-property/ qcom,mdss-ad-off;
 	qcom,mdss-pref-prim-intf = "dsi";
 	qcom,mdss-ab-factor-limit = <1 1>;	/*  cam tuning times  */
+	qcom,mdss-ib-factor-limit = <1 1>;	/*  vt call tuning times  */
 
 	dsi_lgd_sic_1440_vid0: qcom,mdss_dsi_lgit_sic_mipi0_video {
 		compatible = "qcom,mdss-dsi-panel";

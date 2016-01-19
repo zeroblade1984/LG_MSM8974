@@ -77,6 +77,8 @@ static unsigned int frequencyTable[50] = {
 
 static int currentBroadCast = TMM_13SEG;
 static int currentSelectedChannel = -1;
+static int oneseg_to_fullseg_value = 350;
+static int fullseg_to_oneseg_value = 450;
 
 s32 OnAir = 0;
 s32 broad_type;
@@ -260,7 +262,7 @@ static void broadcast_fc8300_drv_if_get_oneseg_sig_info(struct fc8300Status_t *p
     per = pInfo->sig_info.info.oneseg_info.per = pst->per;
 
     pInfo->sig_info.info.oneseg_info.agc = pst->agc;
-    pInfo->sig_info.info.oneseg_info.rssi = pst->rssi;
+    pInfo->sig_info.info.oneseg_info.rssi = pst->rssi / (-100);
     pInfo->sig_info.info.oneseg_info.ErrTSP = pst->ErrTSP;
     pInfo->sig_info.info.oneseg_info.TotalTSP = pst->TotalTSP;
 
@@ -300,6 +302,8 @@ int    broadcast_fc8300_drv_if_get_sig_info(struct broadcast_dmb_control_info *p
     }
 
     layer = pInfo->cmd_info.layer;
+    pInfo->sig_info.info.mmb_info.oneseg_to_fullseg_value = oneseg_to_fullseg_value;
+    pInfo->sig_info.info.mmb_info.fullseg_to_oneseg_value = fullseg_to_oneseg_value;
 
     if((TimeCount_ms() - fcTimer) > 500) {
         if(before_irq_flag == irq_cnt)
@@ -608,6 +612,8 @@ int    broadcast_fc8300_drv_if_reset_ch(void)
         print_log(NULL, "[1seg] broadcast_drv_if_reset_ch error [!OnAir]\n");
         return ERROR;
     }
+
+    rc = tunerbb_drv_fc8300_reset_ch();
 
     print_log(NULL, "[1seg]broadcast_drv_if_reset_ch\n");
 

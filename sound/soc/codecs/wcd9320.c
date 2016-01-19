@@ -79,6 +79,11 @@ static int spkr_drv_wrnd_param_set(const char *val,
 				   const struct kernel_param *kp);
 static int spkr_drv_wrnd = 1;
 
+#ifdef CONFIG_MACH_LGE
+static int taiko_tx_mute = 0;
+#endif
+
+
 static struct kernel_param_ops spkr_drv_wrnd_param_ops = {
 	.set = spkr_drv_wrnd_param_set,
 	.get = param_get_int,
@@ -856,6 +861,44 @@ static int taiko_put_iir_band_audio_mixer(
 	return 0;
 }
 
+#ifdef CONFIG_MACH_LGE
+static const char *const taiko_tx_mute_text[] = {"unmute", "mute"};
+static const struct soc_enum taiko_tx_mute_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, taiko_tx_mute_text),
+};
+
+static int taiko_tx_mute_get(struct snd_kcontrol *kcontrol,
+									struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: taiko_tx_mute  = %d", __func__, taiko_tx_mute);
+	ucontrol->value.integer.value[0] = taiko_tx_mute;
+	return 0;
+}
+
+static int taiko_tx_mute_put(struct snd_kcontrol *kcontrol,
+									struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	u16 tx_vol_ctl_reg0 = TAIKO_A_CDC_TX5_VOL_CTL_CFG;
+	u16 tx_vol_ctl_reg1 = TAIKO_A_CDC_TX6_VOL_CTL_CFG;
+	switch (ucontrol->value.integer.value[0]) {
+			case 0:
+				snd_soc_update_bits(codec, tx_vol_ctl_reg0, 0x01, 0);
+				snd_soc_update_bits(codec, tx_vol_ctl_reg1, 0x01, 0);
+				break;
+			case 1:
+				snd_soc_update_bits(codec, tx_vol_ctl_reg0, 0x01, 1);
+				snd_soc_update_bits(codec, tx_vol_ctl_reg1, 0x01, 1);
+				break;
+			default:
+				break;
+	}
+	taiko_tx_mute = ucontrol->value.integer.value[0];
+	pr_debug("%s: taiko_tx_mute = %d\n", __func__, taiko_tx_mute);
+	return 0;
+}
+#endif
+
 static int taiko_get_compander(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
@@ -1389,6 +1432,11 @@ static const struct snd_kcontrol_new taiko_snd_controls[] = {
 		taiko_put_anc_slot),
 	SOC_ENUM_EXT("ANC Function", taiko_anc_func_enum, taiko_get_anc_func,
 		taiko_put_anc_func),
+
+#ifdef CONFIG_MACH_LGE
+	SOC_ENUM_EXT("TX_VOL_CTL_MUTE", taiko_tx_mute_enum[0],
+	taiko_tx_mute_get, taiko_tx_mute_put),
+#endif
 
 	SOC_ENUM("TX1 HPF cut off", cf_dec1_enum),
 	SOC_ENUM("TX2 HPF cut off", cf_dec2_enum),
@@ -3523,7 +3571,6 @@ static int taiko_codec_enable_anc(struct snd_soc_dapm_widget *w,
 			snd_soc_write(codec, reg, (old_val & ~mask) |
 				(val & mask));
 		}
-		release_firmware(fw);
 		if (!hwdep_cal)
 			release_firmware(fw);
 		break;

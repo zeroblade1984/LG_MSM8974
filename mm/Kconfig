@@ -401,3 +401,51 @@ config USE_USER_ACCESSIBLE_TIMERS
 	  architecture-specific code that will need to be enabled
 	  separately.
 
+config PROCESS_RECLAIM
+	bool "Enable process reclaim"
+	depends on PROC_FS
+	default n
+	help
+	  It allows to reclaim pages of the process by /proc/pid/reclaim.
+
+	  (echo file > /proc/PID/reclaim) reclaims file-backed pages only.
+	  (echo anon > /proc/PID/reclaim) reclaims anonymous pages only.
+	  (echo all > /proc/PID/reclaim) reclaims all pages.
+
+	  (echo addr size-byte > /proc/PID/reclaim) reclaims pages in
+	  (addr, addr + size-bytes) of the process.
+
+	  Any other vaule is ignored.
+
+config HSWAP
+	bool "Enable Hybrid SWAP"
+	depends on SWAP && ZRAM && PROCESS_RECLAIM
+	default n
+	help
+	  This config supports multiple swap files which are based on
+	  different block devices such as eMMC, UFS, or ZRAM.
+	  kswapd use high priority swap file, while lowmemorykiller and
+	  direct reclaim module use low priority swap file.
+	  lowmemorykiller reclaims pages of victim process instead
+	  kill the process.
+
+config READAHEAD_MMAP_SIZE_ENABLE
+	bool "readahead mmap size set enable"
+	default n
+	help
+		readahead mmap size set enable
+
+config READAHEAD_MMAP_PAGE_CNT
+	int "readahead mmap page count set"
+	depends on READAHEAD_MMAP_SIZE_ENABLE
+	help
+		Select readahead mmap page count
+		Example:
+			128 ==> 512KB
+			64 ==> 256KB
+			32 ==> 128KB
+			16 ==> 64KB
+			8 ==> 32KB
+			4 ==> 16KB
+			2 ==> 8KB
+			1 ==> 4KB

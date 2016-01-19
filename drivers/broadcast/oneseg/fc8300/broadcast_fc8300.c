@@ -276,7 +276,7 @@ static int broadcast_Isdb_i2c_probe(struct i2c_client *client, const struct i2c_
 	int rc = 0;
 	int addr = 0;
 
-#if defined (CONFIG_ARCH_MSM8994)
+#if defined (CONFIG_ARCH_MSM8992) || defined (CONFIG_ARCH_MSM8994)
     printk("[dtv]broadcast_Isdb_i2c_probe client:0x%lX\n", (UDynamic_32_64)client);
 #else
     printk("[dtv]broadcast_Isdb_i2c_probe client:0x%X\n", (UDynamic_32_64)client);
@@ -326,6 +326,12 @@ static int broadcast_Isdb_i2c_probe(struct i2c_client *client, const struct i2c_
 #ifndef _NOT_USE_WAKE_LOCK_
 	wake_lock_init(&IsdbCtrlInfo.wake_lock, WAKE_LOCK_SUSPEND,
 					dev_name(&client->dev));	
+#endif
+
+#if defined (CONFIG_ARCH_MSM8992) || defined (CONFIG_ARCH_MSM8994)
+    fc8300_power_on();
+    tunerbb_drv_fc8300_read_chip_id();
+    fc8300_power_off();
 #endif
 
 	return rc;

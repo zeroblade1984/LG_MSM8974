@@ -70,6 +70,9 @@ static int mmc_queue_thread(void *d)
 	do {
 		struct mmc_queue_req *tmp;
 		struct request *req = NULL;
+#ifdef CONFIG_MACH_LGE
+		unsigned int cmd_flags;
+#endif
 
 		spin_lock_irq(q->queue_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -79,12 +82,19 @@ static int mmc_queue_thread(void *d)
 
 		if (req || mq->mqrq_prev->req) {
 			set_current_state(TASK_RUNNING);
+#ifdef CONFIG_MACH_LGE
+			cmd_flags = mq->mqrq_cur->req ? mq->mqrq_cur->req->cmd_flags : 0;
+#endif
 			mq->issue_fn(mq, req);
 			if (test_bit(MMC_QUEUE_NEW_REQUEST, &mq->flags)) {
 				continue; /* fetch again */
 			} else if (test_bit(MMC_QUEUE_URGENT_REQUEST,
 					&mq->flags) && (mq->mqrq_cur->req &&
+#ifdef CONFIG_MACH_LGE
+					!(cmd_flags &
+#else
 					!(mq->mqrq_cur->req->cmd_flags &
+#endif
 						MMC_REQ_NOREINSERT_MASK))) {
 				/*
 				 * clean current request when urgent request

@@ -37,8 +37,10 @@ struct pm8xxx_cradle {
 	int pen;
 	struct delayed_work pen_work;
 #else
+	#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	int camera;
 	struct delayed_work camera_work;
+	#endif
 #endif
 };
 
@@ -86,6 +88,13 @@ static void boot_cradle_det_func(void)
 	else
 		state = SMARTCOVER_POUCH_OPENED;
 #else
+
+	#if defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_T1_ATT)
+	    if(cradle->pouch == 1)
+            state = SMARTCOVER_POUCH_CLOSED;
+            else
+            state = SMARTCOVER_POUCH_OPENED;
+	#else
 	if (cradle->pdata->hallic_camera_detect_pin)
 		cradle->camera = !gpio_get_value(cradle->pdata->hallic_camera_detect_pin);
 
@@ -99,6 +108,8 @@ static void boot_cradle_det_func(void)
 		state = SMARTCOVER_CAMERA_OPENED;
 	else
 		state = SMARTCOVER_POUCH_OPENED;
+	#endif
+
 #endif
 
 	printk("%s : [Cradle] boot cradle value is %d\n", __func__ , state);
@@ -148,6 +159,8 @@ static void pm8xxx_pen_work_func(struct work_struct *work)
 }
 
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 static void pm8xxx_camera_work_func(struct work_struct *work)
 {
 	int state = 0;
@@ -184,12 +197,18 @@ static void pm8xxx_camera_work_func(struct work_struct *work)
 }
 #endif
 
+#endif
+
 static void pm8xxx_pouch_work_func(struct work_struct *work)
 {
 	int state = 0;
 	unsigned long flags;
 #if !defined CONFIG_HALLIC_PEN
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	int tmp_camera = 0;
+#endif
+
 #endif
 	spin_lock_irqsave(&cradle->lock, flags);
 
@@ -201,9 +220,11 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 			cradle->pen = !gpio_get_value(cradle->pdata->hallic_pen_detect_pin);
 	printk("%s : pen === > %d \n", __func__ , cradle->pen);
 #else
+	#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	if (cradle->pdata->hallic_camera_detect_pin)
 		tmp_camera = !gpio_get_value(cradle->pdata->hallic_camera_detect_pin);
 	printk("%s : camera === > %d \n", __func__ , tmp_camera);
+	#endif
 #endif
 
 #if defined CONFIG_HALLIC_PEN
@@ -212,12 +233,21 @@ static void pm8xxx_pouch_work_func(struct work_struct *work)
 	else if (cradle->pouch == 0)
 		state = SMARTCOVER_POUCH_OPENED;
 #else
+
+	#if defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_T1_ATT)
+	    if (cradle->pouch == 1)
+        state = SMARTCOVER_POUCH_CLOSED;
+    else if (cradle->pouch == 0)
+        state = SMARTCOVER_POUCH_OPENED;
+	#else
 	if (tmp_camera == 1 && cradle->pouch == 1)
 		state = SMARTCOVER_CAMERA_VIEW;
 	else if (cradle->pouch == 1)
 		state = SMARTCOVER_POUCH_CLOSED;
 	else if (cradle->pouch == 0)
 		state = SMARTCOVER_POUCH_OPENED;
+	#endif
+
 #endif
 
 #if defined HALLIC_TOUCH_IF
@@ -294,6 +324,8 @@ static irqreturn_t pm8xxx_pen_irq_handler(int irq, void *handle)
 	return IRQ_HANDLED;
 }
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 static irqreturn_t pm8xxx_camera_irq_handler(int irq, void *handle)
 {
 	struct pm8xxx_cradle *cradle_handle = handle;
@@ -302,6 +334,8 @@ static irqreturn_t pm8xxx_camera_irq_handler(int irq, void *handle)
 	queue_delayed_work(cradle_wq, &cradle_handle->camera_work, msecs_to_jiffies(HALL_DETECT_DELAY));
 	return IRQ_HANDLED;
 }
+#endif
+
 #endif
 
 static ssize_t
@@ -335,6 +369,8 @@ cradle_pen_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return len;
 }
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM)  && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 static ssize_t
 cradle_camera_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -345,10 +381,16 @@ cradle_camera_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return len;
 }
 #endif
+
+#endif
 #if defined CONFIG_HALLIC_PEN
 static struct device_attribute cradle_pen_attr   = __ATTR(pen, S_IRUGO | S_IWUSR, cradle_pen_show, NULL);
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 static struct device_attribute cradle_camera_attr  = __ATTR(camera, S_IRUGO | S_IWUSR, cradle_camera_show, NULL);
+#endif
+
 #endif
 static struct device_attribute cradle_sensing_attr = __ATTR(sensing, S_IRUGO | S_IWUSR, cradle_sensing_show, NULL);
 static struct device_attribute cradle_pouch_attr   = __ATTR(pouch, S_IRUGO | S_IWUSR, cradle_pouch_show, NULL);
@@ -364,6 +406,20 @@ static ssize_t cradle_print_name(struct switch_dev *sdev, char *buf)
 	return -EINVAL;
 }
 
+#if defined(CONFIG_S5717)
+static void s5717_parse_dt(struct device *dev,
+		struct pm8xxx_cradle_platform_data *pdata)
+{
+	struct device_node *np = dev->of_node;
+
+	if ((pdata->hallic_pouch_detect_pin = of_get_named_gpio_flags(np, "hallic-pouch-irq-gpio", 0, NULL)) > 0)
+		pdata->hallic_pouch_irq = gpio_to_irq(pdata->hallic_pouch_detect_pin);
+
+	printk("[Hall IC] hallic_pouch_gpio: %d\n", pdata->hallic_pouch_detect_pin);
+
+	pdata->irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+}
+#else
 static void bu52014hfv_parse_dt(struct device *dev,
 		struct pm8xxx_cradle_platform_data *pdata)
 {
@@ -381,14 +437,19 @@ static void bu52014hfv_parse_dt(struct device *dev,
 	printk("[Hall IC] hallic_pouch_gpio: %d, hallic_pen_gpio: %d\n",
 		pdata->hallic_pouch_detect_pin, pdata->hallic_pen_detect_pin);
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	if ((pdata->hallic_camera_detect_pin = of_get_named_gpio_flags(np, "hallic-camera-irq-gpio", 0, NULL)) > 0)
 		pdata->hallic_camera_irq = gpio_to_irq(pdata->hallic_camera_detect_pin);
 	printk("[Hall IC] hallic_pouch_gpio: %d, hallic_camera_gpio: %d\n",
 		pdata->hallic_pouch_detect_pin, pdata->hallic_camera_detect_pin);
 #endif
 
+#endif
+
 	pdata->irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
 }
+#endif
 
 static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 {
@@ -396,7 +457,13 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 #if defined CONFIG_HALLIC_PEN
 	unsigned int hall_pen_gpio_irq = 0, hall_pouch_gpio_irq = 0;
 #else
+
+#if defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_T1_ATT)
+	unsigned int hall_pouch_gpio_irq = 0;
+#else
 	unsigned int hall_camera_gpio_irq = 0, hall_pouch_gpio_irq = 0;
+#endif
+
 #endif
 
 	struct pm8xxx_cradle_platform_data *pdata;
@@ -410,7 +477,11 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			return -ENOMEM;
 		}
 		pdev->dev.platform_data = pdata;
+#if defined(CONFIG_S5717)
+		s5717_parse_dt(&pdev->dev, pdata);
+#else
 		bu52014hfv_parse_dt(&pdev->dev, pdata);
+#endif
 	} else {
 		pdata = pdev->dev.platform_data;
 	}
@@ -431,7 +502,11 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 #if defined CONFIG_HALLIC_PEN
 	cradle->pen = 0;
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	cradle->camera = 0;
+#endif
+
 #endif
 
 	spin_lock_init(&cradle->lock);
@@ -450,7 +525,11 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 #if defined CONFIG_HALLIC_PEN
 	INIT_DELAYED_WORK(&cradle->pen_work, pm8xxx_pen_work_func);
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	INIT_DELAYED_WORK(&cradle->camera_work, pm8xxx_camera_work_func);
+#endif
+
 #endif
 
 	printk("%s : init cradle\n", __func__);
@@ -498,6 +577,8 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			printk("%s :enable_irq_wake failed(2)\n",__func__);
 	}
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	if (cradle->pdata->hallic_camera_detect_pin > 0) {
 		hall_camera_gpio_irq = gpio_to_irq(cradle->pdata->hallic_camera_detect_pin);
 		printk("%s : hall_camera_gpio_irq = [%d]\n", __func__, hall_camera_gpio_irq);
@@ -517,6 +598,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 		else
 			printk("%s :enable_irq_wake failed(2)\n",__func__);
 	}
+#endif
 
 #endif
 	printk("%s : pdata->irq_flags = [%d]\n", __func__,(int)pdata->irq_flags);
@@ -541,11 +623,15 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			goto err_request_irq;
 	}
 #else
+
+#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	if (cradle->pdata->hallic_camera_detect_pin > 0) {
 		ret = device_create_file(&pdev->dev, &cradle_camera_attr);
 		if (ret)
 			goto err_request_irq;
 	}
+#endif
+
 #endif
 	platform_set_drvdata(pdev, cradle);
 	return 0;
@@ -557,8 +643,10 @@ err_request_irq:
 	if (hall_pen_gpio_irq)
 		free_irq(hall_pen_gpio_irq, 0);
 #else
+	#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	if (hall_camera_gpio_irq)
 		free_irq(hall_camera_gpio_irq, 0);
+	#endif
 #endif
 
 err_switch_dev_register:
@@ -574,7 +662,9 @@ static int __devexit pm8xxx_cradle_remove(struct platform_device *pdev)
 #if defined CONFIG_HALLIC_PEN
 	cancel_delayed_work_sync(&cradle->pen_work);
 #else
+	#if !defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) && !defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) && !defined(CONFIG_MACH_MSM8974_T1_ATT)
 	cancel_delayed_work_sync(&cradle->camera_work);
+	#endif
 #endif
 	switch_dev_unregister(&cradle->sdev);
 	platform_set_drvdata(pdev, NULL);
@@ -599,20 +689,35 @@ static const struct dev_pm_ops pm8xxx_cradle_pm_ops = {
 };
 
 #ifdef CONFIG_OF
+#if defined(CONFIG_S5717)
+static struct of_device_id s5717_match_table[] = {
+	{ .compatible = "seiko,hall-s5717", },
+	{ },
+};
+#else
 static struct of_device_id bu52031nvx_match_table[] = {
 	{ .compatible = "rohm,hall-bu52031nvx", },
 	{ },
 };
+#endif
 #endif
 
 static struct platform_driver pm8xxx_cradle_driver = {
 	.probe		= pm8xxx_cradle_probe,
 	.remove		= __devexit_p(pm8xxx_cradle_remove),
 	.driver		= {
+#if defined (CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFI_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_T1WIFIN_GLOBAL_COM) || defined(CONFIG_MACH_MSM8974_T1_ATT)
+        .name    = "s5717",
+#else
         .name    = HALL_IC_DEV_NAME,
+#endif
 		.owner	= THIS_MODULE,
 #ifdef CONFIG_OF
+#if defined(CONFIG_S5717)
+		.of_match_table = s5717_match_table,
+#else
 		.of_match_table = bu52031nvx_match_table,
+#endif
 #endif
 #ifdef CONFIG_PM
 		.pm	= &pm8xxx_cradle_pm_ops,

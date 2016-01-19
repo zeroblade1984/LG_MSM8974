@@ -163,6 +163,10 @@ struct sdhci_host {
  * 1-bit mode of SDIO.
  */
 #define SDHCI_QUIRK2_IGN_DATA_END_BIT_ERROR             (1<<9)
+
+/* Use reset workaround in case sdhci reset timeouts */
+#define SDHCI_QUIRK2_USE_RESET_WORKAROUND (1 << 15)
+
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 

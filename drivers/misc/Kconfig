@@ -710,9 +710,22 @@ config BU52031NVX_CARKIT
          This option enable device driver support for the carkit 
          on the PM8XXX chips. The cradle is controlled using the PM8XXX gpio
 
+config S5717
+       tristate "Cradle S5717 support"
+       default n
+       help
+         This option enable device driver support for the cradle
+         on the PM8XXX chips. The cradle is controlled using the PM8XXX gpio
+
 config LGE_IRDA_KDDI
 		bool "LGE IrDA driver for KDDI"
 		default n
+
+config UID_CPUTIME
+	tristate "Per-UID cpu time statistics"
+	depends on PROFILING
+	help
+	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

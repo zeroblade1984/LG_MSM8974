@@ -138,6 +138,8 @@ typedef struct
     int per_fullseg;
     int total_tsp_fullseg;
     int err_tsp_fullseg;
+    int oneseg_to_fullseg_value;
+    int fullseg_to_oneseg_value;
 }mmb_sig_info;
 
 struct broadcast_dmb_sig_info
@@ -193,6 +195,7 @@ enum
     DMB_CMD_GET_SCAN_STATUS,
     DMB_CMD_GET_SYSINFO,
     DMB_CMD_GET_TMCCINFO,
+    DMB_GET_ONESEG_SIG_INFO
 };
 
 enum

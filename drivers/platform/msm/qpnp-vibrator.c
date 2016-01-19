@@ -181,6 +181,7 @@ static int qpnp_vib_get_level(struct timed_output_dev *dev)
 }
 #endif
 
+#ifdef CONFIG_TSPDRV_PMIC_VIBRATOR
 /* Begin Immersion changes */
 int qpnp_vib_set_with_vtglevel(struct qpnp_vib *vib, int vtglevel, int on)
 {
@@ -217,6 +218,7 @@ int qpnp_vib_set_with_vtglevel(struct qpnp_vib *vib, int vtglevel, int on)
 }
 EXPORT_SYMBOL(qpnp_vib_set_with_vtglevel);
 /* End Immersion changes */
+#endif
 
 static void qpnp_vib_enable(struct timed_output_dev *dev, int value)
 {
@@ -327,7 +329,7 @@ static int __devinit qpnp_vibrator_probe(struct spmi_device *spmi)
 	vib->vtg_level /= 100;
 
 #ifdef CONFIG_VIBRATOR_PM8941_HAPTIC
-	vib->vtg_haptic_level = QPNP_VIB_MAX_LEVEL;
+	vib->vtg_haptic_level = vib->vtg_level;
 #endif
 
 	vib_resource = spmi_get_resource(spmi, 0, IORESOURCE_MEM, 0);

@@ -75,6 +75,7 @@ obj-$(CONFIG_FTT_CHARGER_V3)	+= ftt_wireless.o
 ftt_wireless-y	+= ftt_charger_v3.o ftt_device.o ftt_sysfs.o ftt_uevent.o ftt_protocol.o
 obj-$(CONFIG_MAX17048_FUELGAUGE)+= max17048_battery.o
 obj-$(CONFIG_MAX17050_FUELGAUGE)+= max17050_battery.o
+obj-$(CONFIG_LGE_PM_BATTERY_RT9428_FUELGAUGE)+= rt9428_battery.o
 obj-$(CONFIG_LGE_PM_BATTERY_ID_CHECKER) += lge_battery_id.o
 obj-$(CONFIG_LGE_PM) += lge_smpl_count.o
 obj-$(CONFIG_BQ24296_CHARGER)   += bq24296_charger.o

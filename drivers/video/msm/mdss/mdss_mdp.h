@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -164,9 +164,9 @@ enum mdss_mdp_wb_ctl_type {
 
 #ifdef VIDEO_PLAYBACK_AB_1_1_G3
 enum mdss_mdp_bw_vote_mode {
-    MDSS_MDP_BW_MODE_NONE = 0,
-    MDSS_MDP_BW_MODE_VIDEO = BIT(0),
-    MDSS_MDP_BW_MODE_MAX
+	MDSS_MDP_BW_MODE_NONE = 0,
+	MDSS_MDP_BW_MODE_VIDEO = BIT(0),
+	MDSS_MDP_BW_MODE_MAX
 };
 #endif
 
@@ -216,6 +216,7 @@ struct mdss_mdp_ctl {
 	struct mdss_mdp_mixer *mixer_right;
 	struct mutex lock;
 	struct mutex *shared_lock;
+	struct mutex *wb_lock;
 	spinlock_t spin_lock;
 
 	struct mdss_panel_data *panel_data;
@@ -246,6 +247,7 @@ struct mdss_mdp_ctl {
 
 	void *priv_data;
 	u32 wb_type;
+	u64 bw_pending;
 };
 
 struct mdss_mdp_mixer {
@@ -298,6 +300,7 @@ struct mdss_mdp_img_data {
 	u32 len;
 	u32 flags;
 	int p_need;
+	bool mapped;
 	struct file *srcp_file;
 	struct ion_handle *srcp_ihdl;
 };
@@ -349,7 +352,6 @@ struct mdss_ad_info {
 	u32 last_bl;
 	u32 bl_data;
 	u32 calc_itr;
-	uint32_t bl_bright_shift;
 	uint32_t bl_lin[AD_BL_LIN_LEN];
 	uint32_t bl_lin_inv[AD_BL_LIN_LEN];
 	uint32_t bl_att_lut[AD_BL_ATT_LUT_LEN];
@@ -484,6 +486,7 @@ struct mdss_overlay_private {
 	int retire_cnt;
 #ifdef MDP_BW_LIMIT_AB
 	bool bw_limit;
+	bool bw_limit_vt;
 #endif
 };
 
@@ -542,6 +545,15 @@ static inline int mdss_mdp_line_buffer_width(void)
 	return MAX_LINE_BUFFER_WIDTH;
 }
 
+static inline void mdss_update_sd_client(struct mdss_data_type *mdata,
+							bool status)
+{
+	if (status)
+		atomic_inc(&mdata->sd_client_count);
+	else
+		atomic_add_unless(&mdss_res->sd_client_count, -1, 0);
+}
+
 irqreturn_t mdss_mdp_isr(int irq, void *ptr);
 int mdss_iommu_attach(struct mdss_data_type *mdata);
 int mdss_iommu_dettach(struct mdss_data_type *mdata);
@@ -564,6 +576,7 @@ unsigned long mdss_mdp_get_clk_rate(u32 clk_idx);
 int mdss_mdp_vsync_clk_enable(int enable);
 void mdss_mdp_clk_ctrl(int enable, int isr);
 struct mdss_data_type *mdss_mdp_get_mdata(void);
+int mdss_mdp_secure_display_ctrl(unsigned int enable);
 
 int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd);
 int mdss_mdp_overlay_req_check(struct msm_fb_data_type *mfd,
@@ -644,6 +657,7 @@ int mdss_mdp_csc_setup_data(u32 block, u32 blk_idx, u32 tbl_idx,
 
 int mdss_mdp_pp_init(struct device *dev);
 void mdss_mdp_pp_term(struct device *dev);
+int mdss_mdp_pp_overlay_init(struct msm_fb_data_type *mfd);
 
 int mdss_mdp_pp_resume(struct mdss_mdp_ctl *ctl, u32 mixer_num);
 

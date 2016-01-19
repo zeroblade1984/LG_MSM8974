@@ -16,6 +16,7 @@
 /include/ "msm8974pro-g3-kddi-usb.dtsi"
 /include/ "msm8974pro-g3-kddi-misc.dtsi"
 /include/ "msm8974pro-g3-kddi-pm.dtsi"
+/include/ "msm8974pro-g3-kddi-fullseg-i2c.dtsi"
 /include/ "msm8974pro-g3-kddi-camera.dtsi"
 /include/ "msm8974pro-g3-kddi-nfc.dtsi"
 /include/ "msm8974pro-g3-kddi-sound.dtsi"
@@ -46,6 +47,10 @@
 		reg = <0xf9962000 0x1000>;
 		interrupts = <0 118 0>;
 		status = "ok";
+
+		qcom,config-gpio = <1>;
+		qcom,tx-gpio = <&msmgpio 85 0x00>;
+		qcom,rx-gpio = <&msmgpio 86 0x00>;
 	};
 
 	sdhc_2: sdhci@f98a4900 {
@@ -110,52 +115,6 @@
 		status = "disable";
 	};
 
-	sdcc3_rev_evb: qcom,sdcc_rev_evb@f9864000 {
-		cell-index = <3>; /* SDC3 WLAN slot */
-		compatible = "qcom,msm-sdcc";
-		reg = <0xf9864000 0x800>,
-			<0xf9864800 0x100>,
-			<0xf9844000 0x7000>;
-		reg-names = "core_mem", "dml_mem", "bam_mem";
-		#address-cells = <0>;
-		interrupt-parent = <&sdcc3_rev_evb>;
-		interrupts = <0 1 2>;
-		#interrupt-cells = <1>;
-		interrupt-map-mask = <0xffffffff>;
-		interrupt-map = <0 &intc 0 127 0
-				1 &intc 0 223 0
-				2 &msmgpio 44 0x3>;
-		interrupt-names = "core_irq", "bam_irq", "wlan_oob_irq";
-
-		gpios = <&msmgpio 40 0>, /* CLK */
-			<&msmgpio 39 0>, /* CMD */
-			<&msmgpio 38 0>, /* DATA0 */
-			<&msmgpio 37 0>, /* DATA1 */
-			<&msmgpio 36 0>, /* DATA2 */
-			<&msmgpio 35 0>; /* DATA3 */
-		qcom,gpio-names = "CLK", "CMD", "DAT0", "DAT1", "DAT2", "DAT3";
-
-		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000>;
-		qcom,sup-voltages = <1800 2950>;
-		qcom,bus-width = <4>;
-		qcom,nonremovable;
-		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50";
-
-		qcom,msm-bus,name = "sdcc3";
-		qcom,msm-bus,num-cases = <8>;
-		qcom,msm-bus,active-only = <0>;
-		qcom,msm-bus,num-paths = <1>;
-		qcom,msm-bus,vectors-KBps = <79 512 0 0>, /* No vote */
-				<79 512 1600 3200>,    /* 400 KB/s*/
-				<79 512 80000 160000>, /* 20 MB/s */
-				<79 512 100000 200000>, /* 25 MB/s */
-				<79 512 200000 400000>, /* 50 MB/s */
-				<79 512 400000 800000>, /* 100 MB/s */
-				<79 512 800000 1600000>, /* 200 MB/s */
-				<79 512 2048000 4096000>; /* Max. bandwidth */
-		qcom,bus-bw-vectors-bps = <0 400000 20000000 25000000 50000000 100000000 200000000 4294967295>;
-		status = "ok";
-	};
 	/* LGE_CHANGE, for camera gpio pin, 2014-03-04, yt.kim@lge.com */
 	i2c@f9928000 {
 	status = "disable";

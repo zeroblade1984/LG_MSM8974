@@ -1,0 +1,42 @@
+config MACH_MSM8974_T1
+	bool
+
+config MACH_MSM8974_T1_ATT
+	depends on ARCH_MSM8974
+	select MACH_LGE
+	select MACH_MSM8974_T1
+	bool "MSM8974 T1 ATT"
+	help
+	  Support for the Qualcomm MSM8974 T1 AT&T device.
+
+config MACH_MSM8974_T1_USC
+	depends on ARCH_MSM8974
+	select MACH_LGE
+	select MACH_MSM8974_T1
+	bool "MSM8974 T1 USC"
+	help
+	  Support for the Qualcomm MSM8974 T1 USC device.
+
+config MACH_MSM8974_T1LTE_GLOBAL_COM
+    depends on ARCH_MSM8974
+    select MACH_LGE
+    select MACH_MSM8974_T1
+    bool "MSM8974 T1 GLOBAL COM"
+    help
+        Support for the Qualcomm MSM8974 T1LTE Global Com device.
+
+config MACH_MSM8974_T1WIFI_GLOBAL_COM
+    depends on ARCH_MSM8974
+    select MACH_LGE
+    select MACH_MSM8974_T1
+    bool "MSM8974 T1WIFI GLOBAL COM"
+    help
+        Support for the Qualcomm MSM8974 T1WIFI Global Com device.
+
+config MACH_MSM8974_T1WIFIN_GLOBAL_COM
+    depends on ARCH_MSM8974
+    select MACH_LGE
+    select MACH_MSM8974_T1
+    bool "MSM8974 T1WIFIN GLOBAL COM"
+    help
+        Support for the Qualcomm MSM8974 T1WIFIN Global Com device.

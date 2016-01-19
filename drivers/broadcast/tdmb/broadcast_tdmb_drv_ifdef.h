@@ -66,6 +66,10 @@
 #define LGE_BROADCAST_TDMB_IOCTL_SELECT_ANTENNA \
 	_IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 13, int)
 
+// national identification
+#define LGE_BROADCAST_TDMB_IOCTL_SET_NATION \
+    _IOW(LGE_BROADCAST_TDMB_IOCTL_MAGIC, 14, int)
+
 struct broadcast_tdmb_set_ch_info
 {
 	unsigned int	mode;
@@ -87,6 +91,7 @@ struct broadcast_tdmb_sig_info
 	unsigned int	va_ber;
 	unsigned char	srv_state_flag;
 	unsigned int	antenna_level;
+	char			rssi;
 };
 
 struct broadcast_tdmb_ch_info
@@ -127,6 +132,7 @@ extern int broadcast_drv_if_get_dmb_data(char** buffer_ptr, unsigned int* buffer
 extern int broadcast_drv_if_reset_ch(void);
 extern int broadcast_drv_if_user_stop(int mode);
 extern int broadcast_drv_if_select_antenna(unsigned int sel);
+extern int broadcast_drv_if_set_nation(unsigned int nation);
 extern int broadcast_drv_if_isr(void);
 
 //20130516_wonhee.jeong Code for revision separation [START]

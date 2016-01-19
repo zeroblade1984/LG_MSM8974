@@ -1,7 +1,7 @@
 #ifndef __ASM_ARCH_MSM_BOARD_LGE_H
 #define __ASM_ARCH_MSM_BOARD_LGE_H
 
-#if defined (CONFIG_MACH_MSM8974_G3_GLOBAL_COM)
+#if defined (CONFIG_MACH_MSM8974_G3_GLOBAL_COM) || defined (CONFIG_MACH_MSM8974_G3_KDDI)
 typedef enum {
 	HW_REV_EVB1 = 0,
 	HW_REV_EVB2,
@@ -11,24 +11,6 @@ typedef enum {
 	HW_REV_C,
 	HW_REV_D,
 	HW_REV_E,
-	HW_REV_G,
-	HW_REV_H,
-	HW_REV_1_0,
-	HW_REV_1_1,
-	HW_REV_1_2,
-	HW_REV_MAX
-} hw_rev_type;
-#elif defined (CONFIG_MACH_MSM8974_G3_KDDI)
-typedef enum {
-	HW_REV_EVB1 = 0,
-	HW_REV_EVB2,
-	HW_REV_A,
-	HW_REV_A1,
-	HW_REV_B,
-	HW_REV_C,
-	HW_REV_D,
-	HW_REV_E,
-	HW_REV_F,
 	HW_REV_G,
 	HW_REV_H,
 	HW_REV_1_0,
@@ -75,6 +57,12 @@ typedef enum {
 extern char *rev_str[];
 
 hw_rev_type lge_get_board_revno(void);
+
+#ifdef CONFIG_LGE_GPIO_SIM_DETECT
+#if defined(CONFIG_MACH_MSM8974_T1_ATT) || defined(CONFIG_MACH_MSM8974_T1LTE_GLOBAL_COM)
+#define SIM_DETECT_N 100
+#endif
+#endif
 
 #ifdef CONFIG_LGE_PM
 typedef enum {
@@ -151,6 +139,7 @@ enum lge_boot_mode_type {
 	LGE_BOOT_MODE_PIFBOOT2,
 	LGE_BOOT_MODE_PIFBOOT3,
 };
+
 enum lge_boot_mode_type lge_get_boot_mode(void);
 int lge_get_factory_boot(void);
 int lge_get_factory_cable(void);
@@ -179,7 +168,16 @@ struct kcal_platform_data {
 	int (*get_values) (int *r, int *g, int *b);
 	int (*refresh_display) (void);
 };
-#endif /* CONFIG_LCD_KCAL */
+#endif
+#if defined(CONFIG_PRE_SELF_DIAGNOSIS)
+int lge_pre_self_diagnosis(char *drv_bus_code, int func_code, char *dev_code, char *drv_code, int errno);
+int lge_pre_self_diagnosis_pass(char *dev_code);
+#endif
+
+struct pre_selfd_platform_data {
+	int (*set_values) (int r, int g, int b);
+	int (*get_values) (int *r, int *g, int *b);
+};
 
 enum lge_laf_mode_type {
 	LGE_LAF_MODE_NORMAL = 0,
@@ -233,6 +231,11 @@ void __init lge_add_persist_ram_devices(void);
 #endif
 
 #ifdef CONFIG_LGE_LCD_TUNING
+struct lcd_platform_data {
+	int (*set_values) (int *tun_lcd_t);
+	int (*get_values) (int *tun_lcd_t);
+};
+
 void __init lge_add_lcd_misc_devices(void);
 #endif
 

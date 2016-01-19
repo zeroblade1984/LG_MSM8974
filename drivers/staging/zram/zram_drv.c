@@ -55,7 +55,35 @@ static struct zram *zram_devices;
 #define ALLOC_ERROR_LOG_RATE_MS 1000
 
 /* Module params (documentation at end) */
-static unsigned int num_devices = 1;
+static unsigned int num_devices = 2;
+
+#ifdef CONFIG_HSWAP
+int zram_free_size(void)
+{
+	int i;
+	u64 val = 0;
+
+	if (!zram_devices)
+		return 0;
+
+	for (i = 0; i < num_devices; i++) {
+		struct zram *zram = &zram_devices[i];
+
+		down_read(&zram->init_lock);
+		if (zram->init_done) {
+			val = (zram->disksize >> PAGE_SHIFT) -
+				zram->stats.pages_stored -
+				zram->stats.pages_zero;
+
+			up_read(&zram->init_lock);
+			return val;
+		}
+		up_read(&zram->init_lock);
+	}
+
+	return val;
+}
+#endif
 
 static inline struct zram *dev_to_zram(struct device *dev)
 {
@@ -951,6 +979,7 @@ static int create_device(struct zram *zram, int device_id)
 	zram->disk->private_data = zram;
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
+	__set_bit(QUEUE_FLAG_FAST, &zram->queue->queue_flags);
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
 

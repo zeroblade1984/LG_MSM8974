@@ -1269,7 +1269,7 @@ irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 	vfe_dev->hw_info->vfe_ops.irq_ops.
 		read_irq_status(vfe_dev, &irq_status0, &irq_status1);
 	if ((irq_status0 == 0) && (irq_status1 == 0)) {
-		pr_err_ratelimited("%s: irq_status0 & 1 are both 0\n",
+		pr_debug("%s: irq_status0 & 1 are both 0\n",
 			__func__);
 		return IRQ_HANDLED;
 	}
@@ -1447,11 +1447,10 @@ void msm_isp_end_avtimer(void)
 
 int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
-	long rc;
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
-	ISP_DBG("%s\n", __func__);
 	mutex_lock(&vfe_dev->realtime_mutex);
 	mutex_lock(&vfe_dev->core_mutex);
+
 	if (vfe_dev->vfe_open_cnt == 0) {
 		pr_err("%s: Invalid close\n", __func__);
 		mutex_unlock(&vfe_dev->core_mutex);
@@ -1459,10 +1458,7 @@ int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		return -ENODEV;
 	}
 
-	rc = vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);
-	if (rc <= 0)
-		pr_err("%s: halt timeout rc=%ld\n", __func__, rc);
-
+	vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);
 	vfe_dev->buf_mgr->ops->buf_mgr_deinit(vfe_dev->buf_mgr);
 	vfe_dev->hw_info->vfe_ops.core_ops.release_hw(vfe_dev);
 	vfe_dev->vfe_open_cnt--;

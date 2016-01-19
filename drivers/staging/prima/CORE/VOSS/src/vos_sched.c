@@ -29,9 +29,6 @@
   @file vos_sched.c
   @brief VOS Scheduler Implementation
 
-  Copyright (c) 2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 /*===========================================================================
                        EDIT HISTORY FOR FILE
@@ -423,9 +420,6 @@ VosMCThread
         /*
         ** Service the WDI message queue
         */
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  ("Servicing the VOS MC WDI Message queue"));
-
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiMcMq);
 
         if (pMsgWrapper == NULL)
@@ -623,20 +617,6 @@ VosMCThread
       "%s: MC Thread exiting!!!!", __func__);
   complete_and_exit(&pSchedContext->McShutdown, 0);
 } /* VosMCThread() */
-
-v_BOOL_t isWDresetInProgress(void)
-{
-   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                "%s: Reset is in Progress...",__func__);
-   if(gpVosWatchdogContext!=NULL)
-   {
-      return gpVosWatchdogContext->resetInProgress;
-   }
-   else
-   {
-      return FALSE;
-   }
-}
 
 v_BOOL_t isSsrPanicOnFailure(void)
 {
@@ -1907,6 +1887,7 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
         /* wcnss has crashed, and SSR has alredy been started by Kernel driver.
          * So disable SSR from WLAN driver */
         hdd_set_ssr_required( HDD_SSR_DISABLED );
+
         /* Release the lock here before returning */
         spin_unlock(&gpVosWatchdogContext->wdLock);
         return VOS_STATUS_E_FAILURE;
@@ -1972,8 +1953,6 @@ void vos_ssr_protect(const char *caller_func)
 {
      int count;
      count = atomic_inc_return(&ssr_protect_entry_count);
-     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: ENTRY ACTIVE %d", caller_func, count);
 }
 
 /**
@@ -1988,6 +1967,4 @@ void vos_ssr_unprotect(const char *caller_func)
 {
    int count;
    count = atomic_dec_return(&ssr_protect_entry_count);
-   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: ENTRY INACTIVE %d", caller_func, count);
 }

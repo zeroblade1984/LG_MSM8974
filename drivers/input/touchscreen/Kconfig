@@ -128,6 +128,53 @@ config TOUCHSCREEN_ATMEL_S540
 	  To compile this driver as a module, choose M here: the
 	  module will be called atmel_s540.
 
+config TOUCHSCREEN_ATMEL_2954
+	tristate "Atmel mXT 2954 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT series I2C touchscreen,
+	  such as AT42QT602240/ATMXT224, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called atmel_2954.
+
+config TOUCHSCREEN_UNIFIED_DRIVER
+	bool "LGE Unified driver"
+	depends on I2C
+	default n
+	help
+	 Say Y here if you use lge unified driver
+	 if unsure, say N
+
+config TOUCHSCREEN_ATMEL_mxT2954
+	tristate "Atmel mXT 2954 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT series I2C touchscreen,
+	  such as AT42QT602240/ATMXT224, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called atmel_2954.
+config TOUCHSCREEN_LGE_TS_MISC
+	bool "LGE Touch Misc driver"
+	depends on I2C
+	default n
+	help
+	 Say Y here if you use lge touch misc
+	 if unsure, say N
+
+config TOUCHSCREEN_LGE_LPWG
+	bool "LGE Touch LPWG feature"
+	depends on I2C
+	default n
+	help
+	 Say Y here if you use lge LPWG feature
+	 if unsure, say N
+
 config TOUCHSCREEN_ATMEL_MAXTOUCH_TS
 	tristate "Atmel Maxtouch Touchscreen Family"
 	depends on I2C

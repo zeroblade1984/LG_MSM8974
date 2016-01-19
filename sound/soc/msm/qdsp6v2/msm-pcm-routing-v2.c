@@ -1457,6 +1457,10 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 		msm_route_ec_ref_rx = 6;
 		ec_ref_port_id = AFE_PORT_ID_QUATERNARY_MI2S_TX;
 		break;
+	case 8:
+		msm_route_ec_ref_rx = 8;
+		ec_ref_port_id = AFE_PORT_ID_INTERNAL_BT_SCO_RX;
+		break;
 	default:
 		msm_route_ec_ref_rx = 0; /* NONE */
 		pr_err("%s EC ref rx %ld not valid\n",
@@ -1474,9 +1478,9 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 
 static const char *const ec_ref_rx[] = { "None", "SLIM_RX", "I2S_RX",
 	"PRI_MI2S_TX",
-	"SEC_MI2S_TX", "TERT_MI2S_TX", "QUAT_MI2S_TX", "PROXY_RX"};
+	"SEC_MI2S_TX", "TERT_MI2S_TX", "QUAT_MI2S_TX", "PROXY_RX", "INTERNAL_BT_SCO_RX"};
 static const struct soc_enum msm_route_ec_ref_rx_enum[] = {
-	SOC_ENUM_SINGLE_EXT(8, ec_ref_rx),
+	SOC_ENUM_SINGLE_EXT(9, ec_ref_rx),
 };
 
 static const struct snd_kcontrol_new ext_ec_ref_mux_ul1 =

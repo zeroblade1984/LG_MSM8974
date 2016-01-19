@@ -1150,4 +1150,11 @@ config RTC_DRV_QPNP
 	  To compile this driver as a module, choose M here: the
 	  module will be called qpnp-rtc.
 
+config LGE_RTC_FAKE_SECS
+	bool "LGE RTC FAKE Feature."
+	depends on RTC_DRV_QPNP
+	default n
+	help
+	  If you say yes here, kernel will show fake rtc epoch time.
+
 endif # RTC_CLASS

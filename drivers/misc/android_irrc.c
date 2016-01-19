@@ -161,7 +161,8 @@ static int android_irrc_set_pwm(int enable,int PWM_CLK, int duty)
 static void android_irrc_enable_pwm(struct timed_irrc_data *irrc, int PWM_CLK, int duty)
 {
     int rc;
-
+	INFO_MSG("start \n");
+#ifndef CONFIG_SND_SOC_TPA2028D_STEREO
     if(lge_get_board_revno() >= HW_REV_B) {
         if( gpio_cansleep(GPIO_IRRC_PWEN) )
             gpio_set_value_cansleep(GPIO_IRRC_PWEN, GPIO_IRRC_PWEN_ENABLE);
@@ -169,7 +170,11 @@ static void android_irrc_enable_pwm(struct timed_irrc_data *irrc, int PWM_CLK, i
             gpio_set_value(GPIO_IRRC_PWEN, GPIO_IRRC_PWEN_ENABLE);
         udelay(30);
     } else if (!(regulator_is_enabled(irrc->vreg) > 0)) {
+#else
+	 if (!(regulator_is_enabled(irrc->vreg) > 0)) {
+#endif
         rc = regulator_enable(irrc->vreg);
+		INFO_MSG("regulator_enable \n");
         if (rc < 0)
             ERR_MSG("regulator_enable failed\n");
     }
@@ -204,8 +209,10 @@ static void android_irrc_disable_pwm(struct work_struct *work)
     int rc;
     struct timed_irrc_data *irrc = container_of(work, struct timed_irrc_data, gpio_off_work.work);
 
+	INFO_MSG("start \n");
     INFO_MSG("bk gpio_high_flag = %d\n", gpio_high_flag);
 
+#ifndef CONFIG_SND_SOC_TPA2028D_STEREO
     if(lge_get_board_revno() >= HW_REV_B) {
         if( gpio_cansleep(GPIO_IRRC_PWEN) )
             gpio_set_value_cansleep(GPIO_IRRC_PWEN, GPIO_IRRC_PWEN_DISABLE);
@@ -213,7 +220,11 @@ static void android_irrc_disable_pwm(struct work_struct *work)
             gpio_set_value(GPIO_IRRC_PWEN, GPIO_IRRC_PWEN_DISABLE);
         udelay(150);
     } else if (regulator_is_enabled(irrc->vreg) > 0) {
+#else
+	if (regulator_is_enabled(irrc->vreg) > 0) {
+#endif
         rc = regulator_disable(irrc->vreg);
+		INFO_MSG("regulator_disable \n");
         if (rc < 0)
             ERR_MSG("regulator_disable failed\n");
     }
@@ -248,6 +259,10 @@ static ssize_t android_irrc_write(struct file *file, const char __user *buf, siz
     return 0;
 }
 
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+extern void mute_spk_for_swirrc (int enable);
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+
 static long android_irrc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     struct timed_irrc_data *irrc = file->private_data;
@@ -260,12 +275,20 @@ static long android_irrc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 
             INFO_MSG("IRRC_START: freq:%d, duty:%d\n", test.frequency/1000, test.duty);
             android_irrc_enable_pwm(irrc, test.frequency/1000, test.duty);
+
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+		mute_spk_for_swirrc (1);
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+
             break;
 
         case IRRC_STOP:
             INFO_MSG("IRRC_STOP\n");
             cancel_delayed_work_sync(&irrc->gpio_off_work); //android_irrc_disable_pwm
             queue_delayed_work(irrc->workqueue, &irrc->gpio_off_work, msecs_to_jiffies(1500));
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+		mute_spk_for_swirrc (0);
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
             break;
         default:
         INFO_MSG("CMD ERROR: cmd:%d\n", cmd);
@@ -479,15 +502,19 @@ static int android_irrc_probe(struct platform_device *pdev)
     irrc->gp_clk = clk_get(&pdev->dev, irrc->clk_name);
     clk_set_rate(irrc->gp_clk, (unsigned long)irrc->clk_rate);
 
+#ifndef CONFIG_SND_SOC_TPA2028D_STEREO
     if(lge_get_board_revno() >= HW_REV_B) {
-#if 0   /* GPIO_IRRC_PWEN(GPIO 69) is shared with IrDA and IrRC in B2 KDDI targets. */
+	   /* GPIO_IRRC_PWEN(GPIO 69) is shared with IrDA and IrRC in B2 KDDI targets. */
         /* Proving of IrDA driver is invoked earlier than IrRC driver's one, so IrRC doesn't need to init. */
-        if((rc = gpio_request_one(GPIO_IRRC_PWEN, GPIOF_OUT_INIT_LOW, "IrRC_PWEN")) != 0) {
-            ERR_MSG("failed to gpio_request_one an external LDO(GPIO:%d) for SW IrRC \n", GPIO_IRRC_PWEN);
-            goto err_4;
-        }
-#endif
+        //if((rc = gpio_request_one(GPIO_IRRC_PWEN, GPIOF_OUT_INIT_LOW, "IrRC_PWEN")) != 0) {
+        //    ERR_MSG("failed to gpio_request_one an external LDO(GPIO:%d) for SW IrRC \n", GPIO_IRRC_PWEN);
+        //    goto err_4;
+        //}
     } else {
+#else
+	if(1){
+#endif
+
         // for VREG_L19_2V85 on irrc sensor.
         irrc->vreg = regulator_get(&pdev->dev, "vreg_irrc");
         if (IS_ERR(irrc->vreg)) {
@@ -495,8 +522,16 @@ static int android_irrc_probe(struct platform_device *pdev)
             irrc->vreg = NULL;
             goto err_4;
         }
-    }
 
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+		if (regulator_is_enabled(irrc->vreg) > 0) {
+		    rc = regulator_disable(irrc->vreg);
+		    INFO_MSG("After irrc probing, disable l17 \n");
+		    if (rc < 0)
+				ERR_MSG("regulator_disable failed\n");
+		}
+#endif
+    }
     irrc_data_ptr = irrc;
     irrc_dev_ptr = pdev;
 

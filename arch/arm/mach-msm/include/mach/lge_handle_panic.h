@@ -47,5 +47,11 @@ void lge_set_ram_console_addr(unsigned int addr, unsigned int size);
 void lge_set_panic_reason(void);
 void lge_set_fb1_addr(unsigned int addr);
 void lge_set_restart_reason(unsigned int);
+void lge_panic_handler_fb_cleanup(void);
+
+struct panic_handler_data {
+    unsigned long   fb_addr;
+    unsigned long   fb_size;
+};
 
 #endif

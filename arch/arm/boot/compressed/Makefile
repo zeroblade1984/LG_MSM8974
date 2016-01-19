@@ -22,6 +22,13 @@ OBJS		+= sdhi-sh7372.o
 endif
 
 AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+
+# in a FIPS build, FIPS_KERNEL_RAM_BASE is the start of kernel text in RAM
+# this _must_ match the "kerneladdr" parameter used when creating the boot image
+ifeq ($(CONFIG_CRYPTO_FIPS),y)
+AFLAGS_head.o += -DFIPS_KERNEL_RAM_BASE=0x00008000
+endif
+
 HEAD	= head.o
 OBJS	+= misc.o decompress.o
 ifeq ($(CONFIG_KERNEL_LZ4),y)

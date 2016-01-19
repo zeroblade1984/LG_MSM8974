@@ -1289,6 +1289,10 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 			map.type = MT_DEVICE_USER_ACCESSIBLE;
 			create_mapping(&map);
 		}
+		if (end_fixup) {
+			pmd = pmd_off_k(end);
+			pmd[1] = pmd[0] & ~1;
+		}
 	}
 
 	/*

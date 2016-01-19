@@ -443,8 +443,14 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 				ps[i].seq_val = SENSOR_GPIO_STANDBY;
 			else if (!strcmp(seq_name, "sensor_gpio_vdig"))
 				ps[i].seq_val = SENSOR_GPIO_VDIG;
+#if defined(CONFIG_MACH_LGE)
 			else if (!strcmp(seq_name, "sensor_gpio_vio"))
 				ps[i].seq_val = SENSOR_GPIO_VIO;
+			else if (!strcmp(seq_name, "sensor_gpio_vana"))
+				ps[i].seq_val = SENSOR_GPIO_VANA;
+			else if (!strcmp(seq_name, "sensor_gpio_vaf"))
+				ps[i].seq_val = SENSOR_GPIO_VAF;
+#endif
 			else
 				rc = -EILSEQ;
 			break;
@@ -825,6 +831,7 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_FL_NOW]);
 	}
 
+#if defined(CONFIG_MACH_LGE)
 	if (of_property_read_bool(of_node, "qcom,gpio-vana") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-vana", &val);
 		if (rc < 0) {
@@ -932,7 +939,7 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		CDBG("%s qcom,gpio-ldaf-en %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_LDAF_EN]);
 	}
-
+#endif
 
 	return rc;
 

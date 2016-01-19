@@ -260,6 +260,7 @@ typedef struct clock_data{
    unsigned int xtal_clk_m10;
 } clock_Data;
 
+extern bool hdcp_support_check;
 
 #define SP_POWER_ON 1
 #define SP_POWER_DOWN 0
@@ -287,6 +288,7 @@ bool sp_tx_edid_read(unchar *pBuf);
 
 bool slimport_chip_detect(void);
 void slimport_chip_initial(void);
+void sp_tx_variable_init(void);
 void slimport_main_process(void);
 unchar is_cable_detected(void);
 unchar sp_tx_aux_dpcdread_bytes(unchar addrh, unchar addrm,

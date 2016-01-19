@@ -377,6 +377,21 @@ static int gpio_all_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef CONFIG_LGE_GPIO_SIM_DETECT
+extern int gpio_num_sim_detect(void);
+static int gpio_sim_detect_get(void *data, u64 *val)
+{
+    u64 sim_detected = 0;
+    gpio_direction_input(SIM_DETECT_N);
+    sim_detected = (u64)gpio_get_value(SIM_DETECT_N);
+    printk(KERN_ERR "get_sim_inserted : %llu\n",sim_detected);
+    *val = sim_detected;
+    return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(gpio_sim_detect_fops, gpio_sim_detect_get, NULL, "%llu");
+#endif
+
 DEFINE_SIMPLE_ATTRIBUTE(gpio_address_fops, gpio_address_get, gpio_address_set, "0x%llx\n");
 DEFINE_SIMPLE_ATTRIBUTE(gpio_data_fops, gpio_data_get, gpio_data_set, "0x%llx\n");
 DEFINE_SIMPLE_ATTRIBUTE(gpio_all_fops, gpio_all_get, NULL, "0x%llx\n");
@@ -397,6 +412,9 @@ int __init gpio_debug_init(void)
 	debugfs_create_file("address", 0644, debugfs_base, NULL, &gpio_address_fops);
 	debugfs_create_file("data", 0644, debugfs_base, NULL, &gpio_data_fops);
 	debugfs_create_file("data_all", 0644, debugfs_base, NULL, &gpio_all_fops);
+#ifdef CONFIG_LGE_GPIO_SIM_DETECT
+	debugfs_create_file("sim_detect", 0644, debugfs_base, NULL, &gpio_sim_detect_fops);
+#endif
 
 	return 0;
 }

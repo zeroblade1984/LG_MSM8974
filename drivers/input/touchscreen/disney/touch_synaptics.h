@@ -246,6 +246,7 @@ struct synaptics_ts_f51_reg {
 	u8 lpwg_touch_slop_reg2;
 	u8 lpwg_tap_distance_reg2;
 	u8 lpwg_interrupt_delay_reg2;
+	u8 lpwg_partial_reg;
 };
 
 struct synaptics_ts_f54_reg {

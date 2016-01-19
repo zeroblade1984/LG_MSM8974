@@ -309,8 +309,13 @@ I32S Tcc353xInit(I32S _moduleIndex, I08U * _coldbootData, I32S _codeSize)
 					 MISC_SDRAM_REG_CTRL, 0x04, 0x1FFFF);
 			Tcc353xMiscWrite(_moduleIndex, i, 
 					 MISC_SDRAM_REG_CTRL, 0x04, 0x20);
+#if defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN_TCC3535_SDRAM)
+			Tcc353xMiscWrite(_moduleIndex, i,
+					 MISC_SDRAM_REG_CTRL, 0x04, 0x402);
+#else
 			Tcc353xMiscWrite(_moduleIndex, i, 
 					 MISC_SDRAM_REG_CTRL, 0x04, 0x460);
+#endif
 			Tcc353xMiscWrite(_moduleIndex, i, 
 					 MISC_SDRAM_REG_CTRL, 0x04, 0x1FFFF);
 			Tcc353xMiscWrite(_moduleIndex, i, 

@@ -542,8 +542,10 @@ static ssize_t make_onoff_pattern(struct device *dev, struct device_attribute *a
 
 	ret = size;
 
-	/* printk("[RGB LED] make_onoff_rgb is %06x\n",rgb); */
-	make_onoff_led_pattern(onoff_rgb);
+	if (lge_get_boot_mode() <= LGE_BOOT_MODE_CHARGERLOGO) {
+		/* printk("[RGB LED] make_onoff_rgb is %06x\n",rgb); */
+		make_onoff_led_pattern(onoff_rgb);
+	}
 
 	return ret;
 }

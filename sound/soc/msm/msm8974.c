@@ -36,6 +36,10 @@
 #include "../codecs/tpa2015d1.h"
 #include <mach/board_lge.h>
 
+#if defined (CONFIG_SND_SOC_TPA2028D) || defined (CONFIG_SND_SOC_TPA2028D_STEREO)
+#include <sound/tpa2028d.h>
+#endif
+
 #define DRV_NAME "msm8974-asoc-taiko"
 
 #define MSM8974_SPK_ON 1
@@ -65,10 +69,17 @@ static int hdmi_rx_bit_format = SNDRV_PCM_FORMAT_S16_LE;
 #endif
 #endif
 static int msm8974_auxpcm_rate = 8000;
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+#define LO_1_SPK_AMP	0x1
+#define LO_2_SPK_AMP	0x2
+#define LO_3_SPK_AMP	0x4
+#define LO_4_SPK_AMP	0x8
+#else
 #define LO_1_SPK_AMP	0x1
 #define LO_3_SPK_AMP	0x2
 #define LO_2_SPK_AMP	0x4
 #define LO_4_SPK_AMP	0x8
+#endif
 
 #define I2S_PCM_SEL 1
 #define I2S_PCM_SEL_OFFSET 1
@@ -335,6 +346,17 @@ enum {
 
 static struct platform_device *spdev;
 static struct regulator *ext_spk_amp_regulator;
+
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+static int ext_boost_gpio = -1;
+static int boost_on = 0;
+#endif
+
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+static int flag_mute_spk_for_swirrc = 0;
+void mute_spk_for_swirrc (int enable);
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+
 static int ext_spk_amp_gpio = -1;
 static int ext_ult_spk_amp_gpio = -1;
 static int ext_ult_lo_amp_gpio = -1;
@@ -818,6 +840,117 @@ static int msm_ext_spkramp_event(struct snd_soc_dapm_widget *w,
 
 }
 
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+static void tpa2028d_ext_spk_power_amp_on(u32 spk)
+{
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+	if (flag_mute_spk_for_swirrc) {
+        printk("%s: irrc is working, speakers will not be enabled\n", __func__);
+        return;
+    }
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+
+	if (spk & (LO_1_SPK_AMP | LO_2_SPK_AMP)) {
+		printk("%s Enable stereo speakers case spk = 0x%08x\n",__func__, spk);
+		msm8974_ext_spk_pamp |= spk;
+		if(!boost_on){
+			if (ext_boost_gpio >= 0) {
+				gpio_direction_output(ext_boost_gpio, 1);
+				printk("%s: Enabled 5V external supply for external amp. spk = %d\n",__func__,spk);
+				boost_on = 1;
+			}else {
+				printk("%s: Booster GPIO is not valid.\n", __func__);
+			}
+		}
+		set_amp_gain(spk-1, MSM8974_SPK_ON);
+		printk("%s: CONFIG_SND_SOC_TPA2028D_STEREO.  spk = %d\n",__func__,spk);
+
+	} else  {
+		pr_err("%s: Invalid external speaker ampl. spk = 0x%x\n",
+		       __func__, spk);
+	}
+
+	return ;
+}
+
+
+static void tpa2028d_ext_spk_power_amp_off(u32 spk)
+{
+	if (spk & (LO_1_SPK_AMP | LO_2_SPK_AMP)) {
+
+		printk("%s Disable left and right speakers case spk = 0x%08x", __func__, spk);
+		msm8974_ext_spk_pamp &= ~spk;
+
+		set_amp_gain(spk-1, MSM8974_SPK_OFF);
+		if(boost_on && (!msm8974_ext_spk_pamp)){
+			if (ext_boost_gpio >= 0) {
+				gpio_direction_output(ext_boost_gpio, 0);
+				printk("%s: Disabled 5V external supply for external amp. spk = %d\n",
+						__func__,spk);
+				boost_on = 0;
+			}else{
+				printk("%s: Booster GPIO is not valid.\n", __func__);
+			}
+		}
+
+	} else  {
+
+		pr_err("%s: ERROR : Invalid Ext Spk Ampl. spk = 0x%08x\n",
+			__func__, spk);
+		return;
+	}
+}
+
+#ifdef CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+void mute_spk_for_swirrc (int enable)
+{
+	printk("%s: set mute %s\n", __func__, enable?"Enable":"Disable");
+	flag_mute_spk_for_swirrc = enable;
+	if (flag_mute_spk_for_swirrc) {
+		tpa2028d_ext_spk_power_amp_off(LO_1_SPK_AMP);
+		tpa2028d_ext_spk_power_amp_off(LO_2_SPK_AMP);
+	}
+}
+EXPORT_SYMBOL_GPL(mute_spk_for_swirrc);
+#endif //CONFIG_LGE_SW_IRRC_MUTE_SPEAKER
+
+static int tpa2028d_ext_spkramp_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *k, int event)
+{
+	printk("%s()\n", __func__);
+
+	if (SND_SOC_DAPM_EVENT_ON(event)) {
+		if (!strncmp(w->name, "Lineout_5 amp", 14))
+			tpa2028d_ext_spk_power_amp_on(LO_1_SPK_AMP);
+		else if (!strncmp(w->name, "Lineout_6 amp", 14))
+			tpa2028d_ext_spk_power_amp_on(LO_2_SPK_AMP);
+		else if (!strncmp(w->name, "Lineout_8 amp", 14))
+			tpa2028d_ext_spk_power_amp_on(LO_4_SPK_AMP);
+
+		else {
+			pr_err("%s() Invalid Speaker Widget = %s\n",
+			__func__, w->name);
+			return -EINVAL;
+		}
+	} else {
+		if (!strncmp(w->name, "Lineout_5 amp", 14))
+			tpa2028d_ext_spk_power_amp_off(LO_1_SPK_AMP);
+		else if (!strncmp(w->name, "Lineout_6 amp", 14))
+			tpa2028d_ext_spk_power_amp_off(LO_2_SPK_AMP);
+		else if (!strncmp(w->name, "Lineout_8 amp", 14))
+			tpa2028d_ext_spk_power_amp_off(LO_4_SPK_AMP);
+
+		else {
+			pr_err("%s() Invalid Speaker Widget = %s\n",
+				__func__, w->name);
+			return -EINVAL;
+		}
+	}
+	return 0;
+
+}
+
+#endif
 static int msm_ext_spkramp_ultrasound_event(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *k, int event)
 {
@@ -1103,6 +1236,12 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 #ifdef CONFIG_SND_SOC_CS35L32
 	SND_SOC_DAPM_SPK("Main Speaker", NULL),
 #endif /*CONFIG_SND_SOC_CS35L32*/
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+	SND_SOC_DAPM_SPK("Lineout_5 amp", tpa2028d_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Lineout_6 amp", tpa2028d_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Lineout_7 amp", tpa2028d_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Lineout_8 amp", tpa2028d_ext_spkramp_event),
+#endif
 	SND_SOC_DAPM_SPK("Lineout_1 amp", msm_ext_spkramp_event),
 	SND_SOC_DAPM_SPK("Lineout_3 amp", msm_ext_spkramp_event),
 
@@ -1151,7 +1290,7 @@ static const char *const proxy_rx_ch_text[] = {"One", "Two", "Three", "Four",
 
 static char const *hdmi_rx_sample_rate_text[] = {"KHZ_48", "KHZ_96",
 					"KHZ_192"};
-static const char *const btsco_rate_text[] = {"8000", "16000"};
+static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ", "BTSCO_RATE_16KHZ"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
@@ -1301,7 +1440,20 @@ static int msm_btsco_rate_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	pr_debug("%s: msm_btsco_rate  = %d", __func__, msm_btsco_rate);
+#ifdef CONFIG_MACH_LGE
+    switch (msm_btsco_rate) {
+    case BTSCO_RATE_16KHZ:
+        ucontrol->value.integer.value[0] = 1;
+        break;
+
+    case BTSCO_RATE_8KHZ:
+    default:
+        ucontrol->value.integer.value[0] = 0;
+        break;
+    }
+#else
 	ucontrol->value.integer.value[0] = msm_btsco_rate;
+#endif
 	return 0;
 }
 
@@ -1309,10 +1461,10 @@ static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	switch (ucontrol->value.integer.value[0]) {
-	case 8000:
+	case 0:
 		msm_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 16000:
+	case 1:
 		msm_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -3864,7 +4016,25 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
-
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+	ext_boost_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,cdc-ext-boost-gpios", 0);
+	if (ext_boost_gpio < 0) {
+		dev_err(card->dev, "Looking up %s property in node %s failed %d\n",
+			"qcom,cdc-ext-boost-gpios\n",
+			pdev->dev.of_node->full_name, ext_boost_gpio);
+	} else {
+		ret = gpio_request(ext_boost_gpio, "TAPAN_CODEC_EXT_BOOSTER");
+		gpio_direction_output(ext_boost_gpio, 0);
+		if (ret) {
+			/* GPIO to enable EXT VDD exists, but failed request */
+			dev_err(card->dev,
+					"%s: Failed to request tapan external booster gpio %d\n",
+					__func__, ext_boost_gpio);
+			goto err;
+		}
+	}
+#endif
 	/* Parse Primary AUXPCM info from DT */
 	ret = msm8974_dtparse_auxpcm(pdev, &pdata->pri_auxpcm_ctrl,
 					msm_prim_auxpcm_gpio_name);
@@ -4033,6 +4203,10 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 		gpio_free(ext_ult_lo_amp_gpio);
 
 	gpio_free(pdata->mclk_gpio);
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+	if (ext_boost_gpio >= 0)
+		gpio_free(ext_boost_gpio);
+#endif
 	gpio_free(pdata->us_euro_gpio);
 	if (gpio_is_valid(ext_spk_amp_gpio))
 		gpio_free(ext_spk_amp_gpio);
@@ -4050,7 +4224,9 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 		kfree(msm8974_liquid_dock_dev);
 		msm8974_liquid_dock_dev = NULL;
 	}
-
+#ifdef CONFIG_SND_SOC_TPA2028D_STEREO
+	ext_boost_gpio = -1;
+#endif
 	iounmap(pdata->pri_auxpcm_ctrl->mux);
 	iounmap(pdata->sec_auxpcm_ctrl->mux);
 	snd_soc_unregister_card(card);

@@ -1,0 +1,26 @@
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+
+	i2c@f9924000 {
+		atmel_2954@4a {									/*touch ic I2C bus adddress*/
+			status = "ok";
+			atmel,fw_name = "atmel/t1lte_att_us/t1_1006v26.fw";
+			};
+		atmel_2954_rev_a@4a {
+			status = "ok";
+			atmel,fw_name = "atmel/t1lte_att_us/t1_1006v26.fw";
+			};
+	};
+
+};

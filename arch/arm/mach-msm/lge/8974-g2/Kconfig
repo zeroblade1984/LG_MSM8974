@@ -380,7 +380,7 @@ config MACH_MSM8974_B1W_OPEN_HK
 config MACH_MSM8974_TIGERS_KR
         depends on ARCH_MSM8974
         select MACH_LGE
-	select MACH_MSM8974_G2
+#	select MACH_MSM8974_G2
         bool "MSM8974 TIGERS KR"
         help
           Support for the Qualcomm MSM8974 TIGERS Korea device.
@@ -388,7 +388,7 @@ config MACH_MSM8974_TIGERS_KR
 config MACH_MSM8974_TIGERS_SKT
         depends on ARCH_MSM8974
         select MACH_LGE
-	select MACH_MSM8974_G2
+#	select MACH_MSM8974_G2
         bool "MSM8974 TIGERS SKT"
         help
           Support for the Qualcomm MSM8974 TIGERS SKT device.

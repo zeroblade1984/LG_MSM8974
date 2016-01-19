@@ -105,6 +105,10 @@
 #define VERSION		"1.1"
 #define PROC_DIR	"bluetooth/sleep"
 
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#define APPLY_TX_TIMER_FOR_BT_SLEEP
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+
 struct bluesleep_info {
 	unsigned host_wake;
 	unsigned ext_wake;
@@ -139,7 +143,19 @@ DECLARE_DELAYED_WORK(sleep_workqueue, bluesleep_sleep_work);
 #ifdef CONFIG_LGE_BLUESLEEP
 /* Fixed power consumtion problem when connected with Samsung stereo headset. */
 /* 5 second timeout */
-#define TX_TIMER_INTERVAL	5
+//#define TX_TIMER_INTERVAL	5
+//BT_S : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+#define TX_TIMER_INTERVAL   5           /* unit : sec */
+#define BTWAKE_TIMER_INTERVAL   300     /* unit : msec */
+#else
+#define TX_TIMER_INTERVAL   300//(Uint : ms)
+#endif
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#define RX_TIMER_INTERVAL   5//(Uint : sec)
+//BT_E : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
+
 #else /* CONFIG_LGE_BLUESLEEP */
 /* 1 second timeout */
 #define TX_TIMER_INTERVAL	1
@@ -199,7 +215,11 @@ static struct tasklet_struct hostwake_task;
 
 /** Transmission timer */
 static struct timer_list tx_timer;
-
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+static struct timer_list btwake_timer;
+#endif
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
 /** Lock for state transitions */
 static spinlock_t rw_lock;
 
@@ -474,6 +494,43 @@ static int bluesleep_hci_event(struct notifier_block *this,
 
 	return NOTIFY_DONE;
 }
+#else
+
+void bluesleep_outgoing_data(void)
+{
+	unsigned long irq_flags;
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+	mod_timer(&btwake_timer, jiffies + msecs_to_jiffies(BTWAKE_TIMER_INTERVAL));
+
+	if(!test_bit(BT_TXDATA,&flags))
+	{
+		spin_lock_irqsave(&rw_lock, irq_flags);
+		set_bit(BT_TXDATA, &flags);
+		gpio_set_value(bsi->ext_wake, 0);
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+
+		bluesleep_sleep_wakeup();
+	}
+#else
+	spin_lock_irqsave(&rw_lock, irq_flags);
+
+	/* log data passing by */
+	set_bit(BT_TXDATA, &flags);
+
+	/* if the tx side is sleeping... */
+	if (gpio_get_value(bsi->ext_wake)) {
+
+		BT_DBG("tx was sleeping");
+		bluesleep_sleep_wakeup();
+	}
+
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
+#endif
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+}
+
+EXPORT_SYMBOL(bluesleep_outgoing_data);
 #endif /* CONFIG_LGE_BLUESLEEP */
 /* LG_BTUI : chanha.park@lge.com : Enable Bluesleep-[E] */
 
@@ -518,6 +575,25 @@ static void bluesleep_tx_timer_expire(unsigned long data)
 	spin_unlock_irqrestore(&rw_lock, irq_flags);
 }
 
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+static void bluesleep_btwake_timer_expire(unsigned long data)
+{
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&rw_lock, irq_flags);
+
+	BT_DBG("btwake timer expired");
+
+	clear_bit(BT_TXDATA,&flags);
+	gpio_set_value(bsi->ext_wake, 1);
+	bluesleep_tx_idle();
+
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
+}
+#endif
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+
 /**
  * Schedules a tasklet to run when receiving an interrupt on the
  * <code>HOST_WAKE</code> GPIO pin.
@@ -547,7 +623,7 @@ static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
 	if (host_wake == 0)	{
 //BT_S : [CONBT-952] Remove duplicate bluesleep log
 #ifndef REMOVE_DUPLICATE_BT_LOG
-		BT_DBG("Registration Tasklet");
+		BT_DBG("bluesleep_hostwake_isr : Registration Tasklet");
 #endif
 //BT_E : [CONBT-952] Remove duplicate bluesleep log
 		tasklet_schedule(&hostwake_task);
@@ -565,7 +641,7 @@ static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
  * @return On success, 0. On error, -1, and <code>errno</code> is set
  * appropriately.
  */
-static int bluesleep_start(void)
+/*static*/ int bluesleep_start(void)
 {
 	int retval;
 	unsigned long irq_flags;
@@ -661,12 +737,15 @@ fail:
 
 	return retval;
 }
+//BT_S : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
+EXPORT_SYMBOL(bluesleep_start);
+//BT_E : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
 
 /**
  * Stops the Sleep-Mode Protocol on the Host.
  */
 //BT_S : [PSIX-6850] LPM_SLEEP_MODE_DO_NOT_UART_CLOSE
-static void bluesleep_stop(int uart_off)
+/*static*/ void bluesleep_stop(int uart_off)
 //static void bluesleep_stop(void)
 //BT_E : [PSIX-6850] LPM_SLEEP_MODE_DO_NOT_UART_CLOSE
 {
@@ -684,6 +763,11 @@ static void bluesleep_stop(int uart_off)
 /* LG_BTUI : chanha.park@lge.com : Enable Bluesleep-[S] */
 #ifdef CONFIG_LGE_BLUESLEEP
 	del_timer(&tx_timer);
+//BT_S : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+	del_timer(&btwake_timer);
+#endif
+//BT_E : [CONBT-2386][CSP#974250] Set TX timer for BT Sleep Mode
 #else /* CONFIG_LGE_BLUESLEEP */
 	/* assert BT_WAKE */
 	gpio_set_value(bsi->ext_wake, 0);
@@ -751,6 +835,12 @@ static void bluesleep_stop(int uart_off)
 #endif /* CONFIG_LGE_BLUESLEEP */
 /* END: 0019639 chanha.park@lge.com 2012-06-16 */
 }
+
+//BT_S : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
+EXPORT_SYMBOL(bluesleep_stop);
+//BT_E : [CONBT-2112] LGC_BT_COMMON_IMP_KERNEL_V4L2_SLEEP_DRIVER
+
+
 /**
  * Read the <code>BT_WAKE</code> GPIO pin value via the proc interface.
  * When this function returns, <code>page</code> will contain a 1 if the
@@ -1334,6 +1424,12 @@ static int __init bluesleep_init(void)
 	init_timer(&tx_timer);
 	tx_timer.function = bluesleep_tx_timer_expire;
 	tx_timer.data = 0;
+
+#ifdef APPLY_TX_TIMER_FOR_BT_SLEEP
+	init_timer(&btwake_timer);
+	btwake_timer.function = bluesleep_btwake_timer_expire;
+	btwake_timer.data = 0;
+#endif
 
 	/* initialize host wake tasklet */
 	tasklet_init(&hostwake_task, bluesleep_hostwake_task, 0);

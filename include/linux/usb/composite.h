@@ -150,6 +150,7 @@ struct usb_function {
 	int			(*func_suspend)(struct usb_function *,
 						u8 suspend_opt);
 #ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+	int			(*set_config)(struct usb_function *);
 	int			(*desc_change)(struct usb_function *, bool is_mac);
 #endif
 	/* private: */

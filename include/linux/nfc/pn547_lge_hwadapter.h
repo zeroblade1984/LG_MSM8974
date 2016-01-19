@@ -7,7 +7,7 @@
 
 #ifdef CONFIG_LGE_NFC_USE_PMIC
 #include <linux/clk.h>
-#include "../../arch/arm/mach-msm/clock-rpm.h"
+#include "../../../arch/arm/mach-msm/clock-rpm.h"
 
 #define D1_ID		 2
 DEFINE_CLK_RPM_SMD_XO_BUFFER(cxo_d1, cxo_d1_a, D1_ID);

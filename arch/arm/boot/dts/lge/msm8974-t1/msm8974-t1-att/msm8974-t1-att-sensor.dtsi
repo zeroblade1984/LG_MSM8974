@@ -1,0 +1,90 @@
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+
+    /* i2c bus */
+	/* Capsensor 0 */
+	i2c@f9927000 {
+		//revision="rev_EVB2...";
+		cell-index = <5>;
+		compatible = "qcom,i2c-qup";
+		reg = <0xf9927000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		interrupts = <0 99 0>;
+		interrupt-names = "qup_err_intr";
+		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-src-freq = <19200000>;
+		qcom,master-id = <86>;
+		qcom,scl-gpio = <&msmgpio 26 0>;
+		qcom,sda-gpio = <&msmgpio 25 0>;
+	};
+	/* Capsensor 1 */
+	i2c@f9964000 {
+		//revision="rev_EVB2...";
+		cell-index = <8>;
+		compatible = "qcom,i2c-qup";
+		reg = <0xf9964000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		interrupts = <0 102 0>;
+		interrupt-names = "qup_err_intr";
+		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-src-freq = <19200000>;
+		qcom,master-id = <84>;
+		qcom,scl-gpio = <&msmgpio 48 0>;
+		qcom,sda-gpio = <&msmgpio 47 0>;
+	};
+    /* i2c Driver */
+	/* Capsensor 0 */
+	i2c@f9927000 {
+		//revision="rev_EVB2...";
+		qcom,clk-freq-out = <100000>;
+		adsemicon_atmf04@5a {
+			compatible = "adsemicon,atmf04";
+			status = "ok";
+			reg = <0x5a>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <50 0x2>;
+			Adsemicon,vdd_ana-supply = <&pm8941_l10>;
+			Adsemicon,irq-gpio = <&msmgpio 50 0x00>;	/* Interrupt Pin */
+			Adsemicon,vdd_ana_supply_min = <1800000>;
+			Adsemicon,vdd_ana_supply_max = <1800000>;
+			Adsemicon,vdd_ana_load_ua = <15000>;
+			Adsemicon,chip_enable = <&msmgpio 121 0x00>;  /* enable pin */
+			Adsemicon,InputPinsNum = <1>;
+			Adsemicon,fw_name = "atmf04/atmf04_t1_V0.59.fw";
+		};
+	};
+	i2c@f9964000 {
+		//revision="rev_EVB2...";
+		qcom,clk-freq-out = <100000>;
+		adsemicon_atmf04@5a {
+			compatible = "adsemicon,atmf04";
+			status = "ok";
+			reg = <0x5a>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <80 0x2>;
+			Adsemicon,vdd_ana-supply = <&pm8941_l10>;
+			Adsemicon,irq-gpio = <&msmgpio 80 0x00>;	/* Interrupt Pin */
+			Adsemicon,vdd_ana_supply_min = <1800000>;
+			Adsemicon,vdd_ana_supply_max = <1800000>;
+			Adsemicon,vdd_ana_load_ua = <15000>;
+			Adsemicon,chip_enable = <&msmgpio 125 0x00>;  /* enable pin */
+			Adsemicon,InputPinsNum = <1>;
+			Adsemicon,fw_name = "atmf04/atmf04_t1_V0.59.fw";
+		};
+	};
+};

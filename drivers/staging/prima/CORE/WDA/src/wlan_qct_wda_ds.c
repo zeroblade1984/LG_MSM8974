@@ -43,9 +43,6 @@
   Are listed for each API below.
 
 
-  Copyright (c) 2010-2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -141,6 +138,12 @@ void WDA_TLI_FastHwFwdDataFrame
    */
 }
 #endif /*WLAN_PERF*/
+
+void WDA_DS_RxLogCallback(void)
+{
+  WDA_FWLoggingDXEdoneInd();
+  return;
+}
 
 /*==========================================================================
   FUNCTION    WDA_DS_Register
@@ -238,6 +241,7 @@ VOS_STATUS WDA_DS_Register
                                (WDI_DS_TxCompleteCallback)WDA_DS_TxCompleteCB,
                                (WDI_DS_RxPacketCallback)pfnRxPacketCallback,
                                WDA_DS_TxFlowControlCallback,
+                               WDA_DS_RxLogCallback,
                                pvosGCtx );
 
   if ( WDI_STATUS_SUCCESS != wdiStatus )
@@ -424,7 +428,8 @@ WDA_DS_BuildTxPacketInfo
   v_U32_t          txFlag,
   v_U32_t         timeStamp,
   v_U8_t          ucIsEapol,
-  v_U8_t          ucUP
+  v_U8_t          ucUP,
+  v_U32_t         ucTxBdToken
 )
 {
   VOS_STATUS             vosStatus;
@@ -469,7 +474,7 @@ WDA_DS_BuildTxPacketInfo
   pTxMetaInfo->fdisableFrmXlt = ucDisableFrmXtl;
   pTxMetaInfo->frmType     = ( ( typeSubtype & 0x30 ) >> 4 );
   pTxMetaInfo->typeSubtype = typeSubtype;
-
+  pTxMetaInfo->txBdToken = ucTxBdToken;
   /* Length = MAC header + payload */
   vos_pkt_get_packet_length( vosDataBuff, pusPktLen);
   pTxMetaInfo->fPktlen = *pusPktLen;

@@ -368,6 +368,7 @@ static const char fsg_string_interface[] = "Mass Storage";
  */
 #define SUB_ACK_STATUS_MUL      0x07
 #endif
+#define SUB_ACK_STATUS_MIDI     0x08
 
 #endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
 
@@ -443,6 +444,7 @@ enum check_mode_state {
 #ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
 	ACK_STATUS_MUL = SUB_ACK_STATUS_MUL,
 #endif
+	ACK_STATUS_MIDI = SUB_ACK_STATUS_MIDI,
 	ACK_STATUS_ERR,
 };
 

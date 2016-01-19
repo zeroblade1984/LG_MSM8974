@@ -44,6 +44,7 @@ static unsigned char g_need_clean_status;
 /* external_block_en = 1: enable, 0: disable*/
 extern int external_block_en;
 extern int hdcp_disable;
+bool hdcp_support_check = false;
 
 #ifdef ENABLE_READ_EDID
 unsigned char g_edid_break;
@@ -248,7 +249,7 @@ static void hardware_power_ctl(unchar enable);
 #define system_state_change_with_case(status) \
 	do { \
 		if (sp_tx_system_state >= status) { \
-			pr_info("change_case: clean_status: %xm, ", (uint)g_need_clean_status); \
+			pr_info("change_case: clean_status: %x, ", (uint)g_need_clean_status); \
 			g_need_clean_status = 1; \
 			sp_tx_system_state_bak = sp_tx_system_state; \
 			sp_tx_system_state = (unchar)status; \
@@ -416,7 +417,6 @@ unchar sp_tx_aux_dpcdwrite_byte(unchar addrh, unchar addrm, unchar addrl, unchar
 	return sp_tx_wait_aux_finished();
 }
 
-
 /* ========initialized system */
 void slimport_block_power_ctrl(enum SP_TX_POWER_BLOCK sp_tx_pd_block, unchar power)
 {
@@ -478,6 +478,15 @@ enum CHARGING_STATUS downstream_charging_status_get(void)  /* xjh add for chargi
 {
 	return downstream_charging_status;
 }
+
+bool is_fastcharging(void)
+{
+	if (downstream_charging_status == FAST_CHARGING)
+		return 1;
+	return 0;
+}
+EXPORT_SYMBOL(is_fastcharging);
+
 void downstream_charging_status_set(void)
 {
 	unchar c1;
@@ -821,6 +830,7 @@ static unchar sp_tx_get_cable_type(CABLE_TYPE_STATUS det_cable_type_state)
 		} else {
 			mdelay(50);
 			pr_err("%s %s :  AUX access error\n", LOG_TAG, __func__);
+			break;
 		}
 	case GETTED_CABLE_TYPE:
 		switch ((ds_port_preset  & (_BIT1 | _BIT2)) >> 1) {
@@ -959,7 +969,7 @@ unchar sp_tx_get_downstream_connection(void)
 }
 void slimport_sink_connection(void)
 {
-	if (check_cable_det_pin() == 0) {
+	if (is_cable_detected() == 0) {
 		system_state_change(STATE_WAITTING_CABLE_PLUG);
 		return;
 	}
@@ -1398,8 +1408,8 @@ void slimport_edid_process(void)
 
 	pr_info("%s %s : edid_process\n", LOG_TAG, __func__);
 
-        if ( sp_tx_rx_type != DWN_STRM_IS_HDMI_7730 )
-                sp_tx_rx_type = sp_tx_get_cable_type(CHECK_AUXCH);
+	if (sp_tx_rx_type != DWN_STRM_IS_HDMI_7730)
+		sp_tx_rx_type = sp_tx_get_cable_type(CHECK_AUXCH);
 
 	if (g_read_edid_flag == 1) {
 		if (check_with_pre_edid(edid_blocks))
@@ -2053,9 +2063,10 @@ void slimport_config_video_output(void)
 			sp_tx_config_packets(AVI_PACKETS);
 			sp_tx_enable_video_input(1);
 			sp_tx_vo_state = VO_WAIT_TX_VIDEO_STABLE;
+			rx_count = 0;
 		}
 		else {
-			pr_info("%s %s :HDMI input video not stable!\n", LOG_TAG, __func__);
+			pr_info("%s %s :HDMI input video not stable! conunt=%d\n", LOG_TAG, __func__, rx_count);
 			if (rx_count++ > 30) {
 				rx_count = 0;
 				#ifdef CONFIG_SLIMPORT_DYNAMIC_HPD
@@ -2078,7 +2089,7 @@ void slimport_config_video_output(void)
 			sp_write_reg(TX_P0, SP_TX_SYS_CTRL3_REG, temp_value);
 			sp_read_reg(TX_P0, SP_TX_SYS_CTRL3_REG, &temp_value);
 			if (!(temp_value & STRM_VALID)) {
-				pr_err("%s %s : video stream not valid!\n", LOG_TAG, __func__);
+				pr_err("%s %s : video stream not valid! count=%d\n", LOG_TAG, __func__, tx_count);
 
 				if (tx_count++ > 30) {
 					tx_count = 0;
@@ -2088,7 +2099,8 @@ void slimport_config_video_output(void)
 					system_power_ctrl(0);
 					break;
 				}
-			} else{
+			} else {
+				tx_count = 0;
 			#ifdef DEMO_4K_2K
 			if (demo_4k_en)
 				sp_tx_vo_state = VO_FINISH;
@@ -2212,6 +2224,7 @@ void slimport_hdcp_process(void)
 
 	switch (HDCP_state) {
 	case HDCP_CAPABLE_CHECK:
+		hdcp_support_check = false;
 		ds_vid_stb_cntr = 0;
 		HDCP_fail_count = 0;
 		HDCP_state = HDCP_WAITTING_VID_STB;
@@ -2221,6 +2234,9 @@ void slimport_hdcp_process(void)
 				|| (sp_tx_rx_type == DWN_STRM_IS_VGA_9832)
 				||(slimport_hdcp_cap_check() == 0))
 				HDCP_state = HDCP_NOT_SUPPORT;
+		}
+		if(HDCP_state != HDCP_NOT_SUPPORT){
+			hdcp_support_check = true;
 		}
 
 		SP_BREAK(HDCP_CAPABLE_CHECK, HDCP_state);
@@ -3079,7 +3095,7 @@ static void sp_tx_sink_irq_int_handler(void)
 
 			//pr_info("%s %s : Set TEST_ACK!\n", LOG_TAG, __func__);
 			sp_tx_aux_dpcdread_bytes(0x00, 0x02, 0x60, 1, &c);
-			pr_info("%s %s : set TEST_ACK = %.2x!\n", LOG_TAG, __func__, (uint)c);
+			pr_info("%s %s : Set TEST_ACK = %.2x!\n", LOG_TAG, __func__, (uint)c);
 			if (sp_tx_system_state >= STATE_LINK_TRAINING)
 				sp_tx_set_sys_state(STATE_LINK_TRAINING);
 			pr_info("%s %s : IRQ:test-LT request!\n", LOG_TAG, __func__);
@@ -3724,8 +3740,7 @@ void clean_system_status(void)
 			sp_tx_enable_audio_output(0);
 			slimport_block_power_ctrl(SP_TX_PWR_VIDEO, SP_POWER_DOWN);
 			slimport_block_power_ctrl(SP_TX_PWR_AUDIO, SP_POWER_DOWN);
-		}
-		*/
+		}*/
 		if (sp_tx_system_state_bak >= STATE_HDCP_AUTH
 			&& sp_tx_system_state <= STATE_HDCP_AUTH) {
 			if (__i2c_read_byte(TX_P0, TX_HDCP_CTRL0) & 0xFC)

@@ -58,6 +58,7 @@ void slimport_set_hdmi_hpd(int on);
 
 #if defined (CONFIG_SLIMPORT_ANX7816) || defined(CONFIG_SLIMPORT_ANX7808)
 bool slimport_is_connected(void);
+bool slimport_is_check(void);
 #else
 static inline bool slimport_is_connected(void)
 {

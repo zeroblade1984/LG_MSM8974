@@ -482,7 +482,7 @@ static int msm_phonememo_voice_mute_put(struct snd_kcontrol *kcontrol,
 
     pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
         mute, session_id, ramp_duration);
-    voc_set_phonememo_tx_mute(voc_get_session_id(VOICE_SESSION_NAME), TX_PATH, mute);
+    voc_set_phonememo_tx_mute(session_id, TX_PATH, mute);
 
     done:
     return 0;

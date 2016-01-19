@@ -76,8 +76,9 @@ struct fc8300Status_t{
 void tunerbb_drv_hw_setting(void);
 void tunerbb_drv_hw_init(void);
 void tunerbb_drv_hw_deinit(void);
-
+int tunerbb_drv_fc8300_reset_ch(void);
 int tunerbb_drv_fc8300_init(int mode);
+int tunerbb_drv_fc8300_read_chip_id(void);
 int tunerbb_drv_fc8300_stop(void);
 int tunerbb_drv_fc8300_set_channel(s32 f_rf, u16 mode, u8 subch);
 int tunerbb_drv_fc8300_Get_SyncStatus(void);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,10 +26,6 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #else
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
-
-/* LGE_CHANGE_S Lens Pos Default Infinity, sungmin.woo@lge.com, 2013-06-20 */
-//#define PLACE_LENS_INF_POS_WHEN_ENTER_CAMERA      // LGE_CHANGE, Actuator bug fix for first movement, 2014-05-02, jeeho.hyun@lge.com
-/* LGE_CHANGE_E Lens Pos Default Infinity, sungmin.woo@lge.com, 2013-06-20 */
 
 
 static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
@@ -102,7 +98,7 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
 
-#if !defined(CONFIG_S5K3L2)
+#if !defined(CONFIG_S5K3L2) && !defined(CONFIG_IMX219) && !defined(CONFIG_HI544)
 /* Original */
 				if (size != (i+1)) {
 					i2c_byte2 = value & 0xFF;
@@ -292,8 +288,11 @@ static int32_t msm_actuator_piezo_move_focus(
 		return -EFAULT;
 	}
 
-	if (num_steps == 0)
-		return rc;
+	if (num_steps <= 0 || num_steps > MAX_NUMBER_OF_STEPS) {
+		pr_err("num_steps out of range = %d\n",
+			num_steps);
+		return -EFAULT;
+	}
 
 	a_ctrl->i2c_tbl_index = 0;
 	a_ctrl->func_tbl->actuator_parse_i2c_params(a_ctrl,
@@ -424,7 +423,7 @@ static int32_t msm_actuator_move_focus(
 	return rc;
 }
 
-#ifdef CONFIG_S5K3L2
+#if defined(CONFIG_S5K3L2) || defined(CONFIG_IMX219) || defined(CONFIG_HI544)
 /* LGE_CHANGE_S, add actuator parking routines, 2014-12-06, donghyun.kwon@lge.com */
 static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 {
@@ -440,7 +439,7 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 		(!a_ctrl->step_position_table) ||
 		(!a_ctrl->i2c_reg_tbl) ||
 		(!a_ctrl->func_tbl) ||
-		(!a_ctrl->func_tbl->actuator_parse_i2c_params)) 
+		(!a_ctrl->func_tbl->actuator_parse_i2c_params))
 	{
 			pr_err("%s:%d Failed to park lens.\n", __func__, __LINE__);
 			return 0;
@@ -455,7 +454,7 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 		if ((next_lens_pos > (a_ctrl->step_position_table[a_ctrl->total_steps-1] / 2)) && (a_ctrl->total_steps >= 1))
 		{
 			next_lens_pos = (uint16_t)(a_ctrl->step_position_table[a_ctrl->total_steps-1] * 1 / 2);
-		}		
+		}
 		else
 		{
 			next_lens_pos = (next_lens_pos > min_code_per_step) ?
@@ -463,7 +462,7 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 		}
 
 		//pr_err("%s:%d next_lens_pos = %d\n", __func__, __LINE__, next_lens_pos);
-		
+
 		a_ctrl->func_tbl->actuator_parse_i2c_params(a_ctrl,
 			next_lens_pos, 0xF,
 			100);
@@ -672,8 +671,12 @@ static int32_t msm_actuator_set_position(
 	uint32_t hw_params = 0;
 	struct msm_camera_i2c_reg_setting reg_setting;
 	CDBG("%s Enter %d\n", __func__, __LINE__);
-	if (set_pos->number_of_steps  == 0)
-		return rc;
+	if (set_pos->number_of_steps <= 0 ||
+		set_pos->number_of_steps > MAX_NUMBER_OF_STEPS) {
+		pr_err("num_steps out of range = %d\n",
+			set_pos->number_of_steps);
+		return -EFAULT;
+	}
 
 	a_ctrl->i2c_tbl_index = 0;
 	for (index = 0; index < set_pos->number_of_steps; index++) {
@@ -936,7 +939,7 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 #define IMX135_ACT_HW_DAMPING_LAST 0x7
 #define IMX135_ACT_HW_DAMPING_FASTEST 0xC
 
-#ifndef CONFIG_S5K3L2
+#if !defined(CONFIG_S5K3L2) && !defined(CONFIG_IMX219) && !defined(CONFIG_HI544)
 /* LGE_CHAGNE_S, check VCM movement done, 2013-06-28, hyungmoo.huh@lge.com */
 static int32_t msm_actuator_check_move_done(struct msm_actuator_ctrl_t * a_ctrl)
 {
@@ -1108,7 +1111,7 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 		pr_err("failed\n");
 		return -EINVAL;
 	}
-#ifndef CONFIG_S5K3L2
+#if !defined(CONFIG_S5K3L2) && !defined(CONFIG_IMX219) && !defined(CONFIG_HI544)
 /*LGE_CHANGE_S, Fix the Actuator Noise, 2013-06-16, kyungjin.min@lge.com */
 	msm_actuator_StablePosition(a_ctrl);
 /*LGE_CHANGE_E, Fix the Actuator Noise, 2013-06-16, kyungjin.min@lge.com */

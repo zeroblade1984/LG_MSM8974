@@ -54,6 +54,46 @@
 #include <linux/slimbus/slimbus.h>
 #endif
 
+
+#ifdef CONFIG_LGE_LCD_TUNING
+
+#include "../../../../drivers/video/msm/mdss/mdss_dsi.h"
+int tun_lcd[128];
+
+int lcd_set_values(int *tun_lcd_t)
+{
+	memset(tun_lcd,0,128*sizeof(int));
+	memcpy(tun_lcd,tun_lcd_t,128*sizeof(int));
+	printk("lcd_set_values ::: tun_lcd[0]=[%x], tun_lcd[1]=[%x], tun_lcd[2]=[%x] ......\n"
+			,tun_lcd[0],tun_lcd[1],tun_lcd[2]);
+	return 0;
+}
+static int lcd_get_values(int *tun_lcd_t)
+{
+	memset(tun_lcd_t,0,128*sizeof(int));
+	memcpy(tun_lcd_t,tun_lcd,128*sizeof(int));
+	printk("lcd_get_values\n");
+	return 0;
+}
+
+static struct lcd_platform_data lcd_pdata ={
+	.set_values = lcd_set_values,
+	.get_values = lcd_get_values,
+};
+static struct platform_device lcd_ctrl_device = {
+	.name = "lcd_ctrl",
+	.dev = {
+		.platform_data = &lcd_pdata,
+	}
+};
+
+void __init lge_add_lcd_ctrl_devices(void)
+{
+	platform_device_register(&lcd_ctrl_device);
+}
+#endif
+
+
 static struct memtype_reserve msm8974_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
 	},
@@ -111,6 +151,9 @@ void __init msm8974_add_drivers(void)
 	msm_smd_init();
 	msm_rpm_driver_init();
 	msm_pm_sleep_status_init();
+#ifdef CONFIG_LGE_LCD_TUNING
+	lge_add_lcd_ctrl_devices();
+#endif
 	rpm_regulator_smd_driver_init();
 	msm_spm_device_init();
 	krait_power_init();

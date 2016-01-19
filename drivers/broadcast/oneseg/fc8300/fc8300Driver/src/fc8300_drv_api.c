@@ -133,6 +133,16 @@ int tunerbb_drv_fc8300_init(int mode)
 	return res;
 }
 
+int tunerbb_drv_fc8300_read_chip_id(void)
+{
+    int res;
+    res = bbm_com_hostif_select(NULL, BBM_I2C);
+    res |= bbm_com_i2c_init(NULL, FCI_HPI_TYPE);
+    res |= bbm_com_probe(NULL, DIV_BROADCAST);
+    print_log(NULL, "[FC8300] read chp id : %d \n", res);
+    return res;
+}
+
 int tunerbb_drv_fc8300_stop(void)
 {
     s32 res = BBM_OK;
@@ -142,12 +152,23 @@ int tunerbb_drv_fc8300_stop(void)
     return res;
 }
 
+int tunerbb_drv_fc8300_reset_ch(void)
+{
+	s32 res = BBM_OK;
+
+	res = bbm_com_write(NULL, DIV_BROADCAST, BBM_BUF_ENABLE, 0x00);
+	print_log(NULL, "FC8300 tunerbb_drv_fc8300_reset_ch\n");
+
+	return res;
+}
+
 int tunerbb_drv_fc8300_set_channel(s32 f_rf, u16 mode, u8 subch)
 {
 	s32 res = BBM_OK;
 	subch = 0x16;
 
 	bbm_com_tuner_set_freq(NULL, DIV_BROADCAST, f_rf, subch);
+	bbm_com_write(NULL, DIV_BROADCAST, BBM_BUF_ENABLE, 0x01);
 	print_log(NULL, "FC8300 tunerbb_drv_fc8300_set_channel %d, %d, %d\n"
 		, f_rf, mode, subch);
 	if (mode)
@@ -342,7 +363,7 @@ int tunerbb_drv_fc8300_get_oneseg_antenna(int ant, int ber, int cn, s32 brd_type
                     antlvl = ant;
             break;
             case 1:
-                if((ber > 700) && (cn < 500))
+                if((ber > 750) || (cn < 500))
                     antlvl = ant = 0;
                 if((ber < 300) || (cn > 700))
                     antlvl = ant = 2;
@@ -350,7 +371,7 @@ int tunerbb_drv_fc8300_get_oneseg_antenna(int ant, int ber, int cn, s32 brd_type
                     antlvl = ant;
             break;
             case 2:
-                if((ber > 400) && (600 > cn))
+                if((ber > 400) || (600 > cn))
                     antlvl = ant = 1;
                 if((ber < 50) || (900 < cn))
                     antlvl = ant = 3;
@@ -358,7 +379,7 @@ int tunerbb_drv_fc8300_get_oneseg_antenna(int ant, int ber, int cn, s32 brd_type
                     antlvl = ant;
             break;
             case 3:
-                if((ber > 100) && (700 > cn))
+                if((ber > 100) || (700 > cn))
                     antlvl = ant = 2;
                 else
                     antlvl = ant;
@@ -414,29 +435,29 @@ int tunerbb_drv_fc8300_get_fullseg_antenna(int ant, int ber, int cn)
     switch(ant)
     {
         case 0:
-            if((ber < 510) && (cn >= 1600))
+            if((ber < 600) && (cn >= 1500))
                 antlvl = ant = 1;
             else
                 antlvl = ant;
         break;
         case 1:
-            if((ber > 530) && (cn <= 1650))
+            if( ber > 620 )
                 antlvl = ant = 0;
-            if((ber < 450) || (cn > 1720))
+            if( ber < 380 )
                 antlvl = ant = 2;
             else
                 antlvl = ant;
         break;
         case 2:
-            if((ber > 480) && (cn < 1680))
+            if( ber > 450 )
                 antlvl = ant = 1;
-            if((ber < 250) || (cn > 2300))
+            if( ber < 300 || (cn > 2700))
                 antlvl = ant = 3;
             else
                 antlvl = ant;
         break;
         case 3:
-            if((ber > 300) && (cn < 1820))
+            if( ber > 350 )
                 antlvl = ant = 2;
             else
                 antlvl = ant;
@@ -798,26 +819,43 @@ int tunerbb_drv_fc8300_Get_SignalInfo(struct fc8300Status_t *st, s32 brd_type)
         st->total_tsp_1seg = st->TotalTSP = dm.vit_c_ber_rxd_rsps;
     }
 
-    if((st->layerinfo_a & 0x0f) >= 12) {
+{
+    u8 num_of_seg_layer_a=0, num_of_seg_layer_b=0, num_of_seg_layer_c=0;
+    num_of_seg_layer_a = st->layerinfo_a & 0x0f;
+    num_of_seg_layer_b = st->layerinfo_b & 0x0f;
+    num_of_seg_layer_c = st->layerinfo_c & 0x0f;
+
+    //print_log(NULL, "[BHJ] numOfSegA(%d), numOfSegB(%d), numOfSegC(%d)\n", num_of_seg_layer_a, num_of_seg_layer_b, num_of_seg_layer_c);
+
+    if((num_of_seg_layer_a >= 12) && (num_of_seg_layer_a != 0x0f) ) {
+        //print_log(NULL, "[BHJ] Layer A is selected as FULLSEG Layer\n");
         st->ber_fullseg = st->ber_a;
         st->per_fullseg = st->per_a;
         st->err_tsp_fullseg = dm.vit_a_ber_err_rsps;
         st->total_tsp_fullseg = dm.vit_a_ber_rxd_rsps;
-
     }
-    else if((st->layerinfo_b & 0x0f) >= 12) {
-        st->ber_fullseg =  st->ber_b;
-        st->per_fullseg =  st->per_b;
-        st->err_tsp_fullseg = dm.vit_b_ber_err_rsps;
-        st->total_tsp_fullseg = dm.vit_b_ber_rxd_rsps;
-    }
-    else if((st->layerinfo_c & 0x0f) >= 12) {
-        st->ber_fullseg = st->ber_c;
-        st->per_fullseg = st->per_c;
+    else if((num_of_seg_layer_c >= 5) && (num_of_seg_layer_c != 0x0f)) {
+        //print_log(NULL, "[BHJ] Layer C is selected as FULLSEG Layer\n");
+        st->ber_fullseg =  st->ber_c;
+        st->per_fullseg =  st->per_c;
         st->err_tsp_fullseg = dm.vit_c_ber_err_rsps;
         st->total_tsp_fullseg = dm.vit_c_ber_rxd_rsps;
     }
-
+    else if((num_of_seg_layer_b > 1) && (num_of_seg_layer_b != 0x0f)) {
+        //print_log(NULL, "[BHJ] Layer B is selected as FULLSEG Layer\n");
+        st->ber_fullseg = st->ber_b;
+        st->per_fullseg = st->per_b;
+        st->err_tsp_fullseg = dm.vit_b_ber_err_rsps;
+        st->total_tsp_fullseg = dm.vit_b_ber_rxd_rsps;
+    }
+    else{
+        //print_log(NULL, "[BHJ] any layer isn't selected as FULLSEG Layer\n");
+        st->ber_fullseg = st->ber_b;
+        st->per_fullseg = st->per_b;
+        st->err_tsp_fullseg = dm.vit_b_ber_err_rsps;
+        st->total_tsp_fullseg = dm.vit_b_ber_rxd_rsps;
+    }
+}
     transmission_parameter_switching = ((tmcc_data[2] & 0x80) >> 5)
                                         + ((tmcc_data[2] & 0x40) >> 3)
                                         + ((tmcc_data[3] & 0x02) >> 1)

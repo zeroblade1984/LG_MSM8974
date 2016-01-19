@@ -172,6 +172,13 @@ config BATTERY_DA9052
 	  Say Y here to enable support for batteries charger integrated into
 	  DA9052 PMIC.
 
+config LGE_PM_BATTERY_EXTERNAL_FUELGAUGE
+	tristate "External Fuel Gauge"
+	depends on I2C && LGE_PM
+	default n
+	help
+	  Say Y here to enable support for External Fuel Gauge.
+
 config BATTERY_MAX17040
 	tristate "Maxim MAX17040 Fuel Gauge"
 	depends on I2C
@@ -225,6 +232,20 @@ config BATTERY_INTEL_MID
 	help
 	  Say Y here to enable the battery driver on Intel MID
 	  platforms.
+
+config LGE_PM_BATTERY_RT9428_FUELGAUGE
+	bool "Richtek RT9428 Fuelgauge support"
+	depends on LGE_PM_BATTERY_EXTERNAL_FUELGAUGE
+	default n
+	help
+	  Say Y to enable support for the Richtek RT9428 fuelgauge ic.
+
+config LGE_PM_BATTERY_RT9428_FGDBG
+	bool "Richtek fuelgauge detailed debug log support"
+	depends on LGE_PM_BATTERY_RT9428_FUELGAUGE
+	default n
+	help
+	  Say Y to enable the Richtek RT9428 fuelgauge debug log.
 
 config CHARGER_ISP1704
 	tristate "ISP1704 USB Charger Detection"
@@ -727,12 +748,14 @@ choice
 config CHARGER_UNIFIED_WLC_ALIGNMENT_IDT9025A
 	tristate "wireless charger alignment"
 	select CHARGER_UNIFIED_WLC_ALIGNMENT
+	default n
 	help
 	  wireless charger alignment
 
 config CHARGER_UNIFIED_WLC_ALIGNMENT_BQ5102X
 	tristate "wireless charger alignment"
 	select CHARGER_UNIFIED_WLC_ALIGNMENT
+	default n
 	help
 	  wireless charger alignment
 endchoice
@@ -743,6 +766,12 @@ config CHARGER_FACTORY_MODE
 	depends on CHARGER_MAX77819
 	help
 	  charger factory mode
+
+config LGE_PM_FACTORY_TESTMODE
+    bool "testmode node setting for battery testmode"
+    depends on LGE_PM
+    help
+      Say Y here to enable testmode setting
 
 config VZW_POWER_REQ
     	tristate "implementation power requirements of Verizon"
@@ -757,6 +786,19 @@ config LGE_PM_CHARGING_SUPPORT_PHIHONG
    	default n
     	help
 	  Chargers which is not support AICL need this feature.
+
+config LGE_PM_CHARGING_TABLET
+    tristate "Support TABLET Model's charging schem"
+    depends on LGE_PM
+    default n
+    help
+	  Support TABLET Model's charging schem.
+config LGE_PM_CHARGING_US_COMMON
+    tristate "Support US Model's charging schem"
+    depends on LGE_PM
+    default n
+    help
+	Support US Model's charging schem.
 
 config LGE_PM_LLK_MODE
     	tristate "implementation power requirements of retail mode"
@@ -801,4 +843,12 @@ config LGE_PM_CHARGING_TEMP_SCENARIO_V1_7
 	default n
 	help
 	  LGE CHARGING TEMP SCENARIO V1.7 Configuration
+
+config LGE_PM_USB_CURRENT_MAX_MODE
+	tristate "LGE_PM Support USB current max mode"
+	default n
+	depends on MACH_LGE
+	help
+	  Say Y to enable LGE PM USB current max mode
+	  for MST, Auto Testing with USB
 endif # POWER_SUPPLY

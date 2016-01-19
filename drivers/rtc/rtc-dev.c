@@ -26,6 +26,62 @@ static dev_t rtc_devt;
 #ifdef CONFIG_LGE_PM_RTC_PWROFF_ALARM
 bool poweron_alarm;
 struct rtc_wkalrm g_poalarm;
+
+#define LGFTM_RTC_STATE		1
+#define FTM_BLOCK_SIZE		2048
+#define FTM_RTC_OFFSET		200
+#define FTM_RTC_WRITE_SIZE	64
+
+static const char *ftmdev = "/dev/block/platform/msm_sdcc.1/by-name/misc";
+
+void write_rtc_pwron_in_misc(struct rtc_wkalrm *alarm)
+{
+	int fd;
+	mm_segment_t old_fs;
+	int offset = 0;
+	char buf[FTM_RTC_WRITE_SIZE];
+	unsigned long rtc_time;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+
+	fd = sys_open(ftmdev, O_WRONLY, 0);
+	if (fd < 0) {
+		pr_err("[%s %d] sys_open error(%d)\n", __func__, __LINE__, fd);
+	}
+	else {
+		typedef struct {
+		uint32_t time;
+		uint8_t enabled;
+		uint8_t padding[3];
+		} alarm_info_type;
+
+		alarm_info_type alarm_info;
+
+		memset(&alarm_info, 0, sizeof(alarm_info_type));
+		rtc_tm_to_time(&alarm->time, &rtc_time);
+		alarm_info.time = rtc_time;
+		alarm_info.enabled = alarm->enabled;
+
+
+		memset(buf, 0, FTM_RTC_WRITE_SIZE);
+		offset = (LGFTM_RTC_STATE) * FTM_BLOCK_SIZE * FTM_RTC_OFFSET;
+		memcpy(buf, &alarm_info, sizeof(alarm_info_type));
+
+		sys_lseek(fd, offset, 0);
+
+		if (sys_write(fd, buf, sizeof(alarm_info_type)) != FTM_RTC_WRITE_SIZE)
+			pr_err("[%s %d] sys_write error\n", __func__, __LINE__);
+		else
+			pr_info("[%s %d] write rtc pwnon %s\n", __func__, __LINE__, buf);
+
+		sys_close(fd);
+	}
+
+	set_fs(old_fs);
+
+}
+EXPORT_SYMBOL_GPL(write_rtc_pwron_in_misc);
 #endif
 
 static int rtc_dev_open(struct inode *inode, struct file *file)
@@ -382,12 +438,14 @@ static long rtc_dev_ioctl(struct file *file,
 			poweron_alarm = 0;
 		}
 
-		pr_info("[%s %d] RTC_AIE_OFF (%d),poweron_alarm (%d)\n", __func__, __LINE__,
-					g_poalarm.enabled, poweron_alarm);
 		if (g_poalarm.enabled) {
 			g_poalarm.enabled = 0;
+			write_rtc_pwron_in_misc(&g_poalarm);
 			rtc_set_po_alarm(rtc, &g_poalarm);
 		}
+
+		pr_info("[%s %d] RTC_AIE_OFF (%d),poweron_alarm (%d)\n", __func__, __LINE__,
+					g_poalarm.enabled, poweron_alarm);
 #endif
 		return rtc_alarm_irq_enable(rtc, 0);
 
@@ -446,6 +504,7 @@ static long rtc_dev_ioctl(struct file *file,
 			alarm.time.tm_hour, alarm.time.tm_min,
 			alarm.time.tm_sec, alarm.time.tm_mday,
 			alarm.time.tm_mon, alarm.time.tm_year);
+		write_rtc_pwron_in_misc(&g_poalarm);
 
 		return rtc_set_po_alarm(rtc, &g_poalarm);
 #endif

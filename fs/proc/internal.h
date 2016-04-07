@@ -121,10 +121,6 @@ static inline struct proc_dir_entry *pde_get(struct proc_dir_entry *pde)
 }
 void pde_put(struct proc_dir_entry *pde);
 
-#ifdef CONFIG_PROCESS_RECLAIM
-extern const struct file_operations proc_reclaim_operations;
-#endif
-
 int proc_fill_super(struct super_block *);
 struct inode *proc_get_inode(struct super_block *, struct proc_dir_entry *);
 int proc_remount(struct super_block *sb, int *flags, char *data);

@@ -2701,21 +2701,9 @@ static int taiko_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		taiko->spkr_pa_widget_on = true;
-#ifdef CONFIG_WCD9320_CODEC_CONTROL
-		spkr_toggle = true;
-
 		snd_soc_update_bits(codec, TAIKO_A_SPKR_DRV_EN, 0x80, 0x80);
-
-		if (spkr_digigain_con)
-			taiko_write(codec, TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL, spkr_digigain);
-#else
-		snd_soc_update_bits(codec, TAIKO_A_SPKR_DRV_EN, 0x80, 0x80);
-#endif
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-#ifdef CONFIG_WCD9320_CODEC_CONTROL
-		spkr_toggle = false;
-#endif
 		taiko->spkr_pa_widget_on = false;
 		snd_soc_update_bits(codec, TAIKO_A_SPKR_DRV_EN, 0x80, 0x00);
 		break;
@@ -3638,12 +3626,6 @@ static int taiko_hph_pa_event(struct snd_soc_dapm_widget *w,
 		if (hp_digigain_con) {
 			taiko_write(codec, TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL, hp_digigain);
 			taiko_write(codec, TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL, hp_digigain);
-		}
-		if (uhqa_mode) {
-			taiko_write(wcd9320_codec, TAIKO_A_RX_HPH_L_PA_CTL, 0x48);
-			taiko_write(wcd9320_codec, TAIKO_A_RX_HPH_R_PA_CTL, 0x48);
-			taiko_write(wcd9320_codec, TAIKO_A_RX_HPH_BIAS_PA,  0xAA);
-			snd_soc_update_bits(wcd9320_codec, TAIKO_A_RX_HPH_CHOP_CTL, 0x20, 0x00);
 		}
 #endif
 		break;

@@ -57,34 +57,6 @@ static struct zram *zram_devices;
 /* Module params (documentation at end) */
 static unsigned int num_devices = 2;
 
-#ifdef CONFIG_HSWAP
-int zram_free_size(void)
-{
-	int i;
-	u64 val = 0;
-
-	if (!zram_devices)
-		return 0;
-
-	for (i = 0; i < num_devices; i++) {
-		struct zram *zram = &zram_devices[i];
-
-		down_read(&zram->init_lock);
-		if (zram->init_done) {
-			val = (zram->disksize >> PAGE_SHIFT) -
-				zram->stats.pages_stored -
-				zram->stats.pages_zero;
-
-			up_read(&zram->init_lock);
-			return val;
-		}
-		up_read(&zram->init_lock);
-	}
-
-	return val;
-}
-#endif
-
 static inline struct zram *dev_to_zram(struct device *dev)
 {
 	return (struct zram *)dev_to_disk(dev)->private_data;

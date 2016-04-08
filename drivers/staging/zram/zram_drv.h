@@ -126,8 +126,4 @@ struct zram {
 	bool lz4;
 #endif
 };
-
-#ifdef CONFIG_HSWAP
-extern int zram_free_size(void);
-#endif
 #endif
